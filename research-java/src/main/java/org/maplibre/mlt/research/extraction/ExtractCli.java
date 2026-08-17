@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research;
+package org.maplibre.mlt.research.extraction;
 
 import java.io.File;
 import java.nio.file.Path;

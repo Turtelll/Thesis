@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research;
+package org.maplibre.mlt.research.extraction;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -11,7 +11,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.VertexBufferExtractor.ExtractedColumn;
+import org.maplibre.mlt.research.extraction.VertexBufferExtractor.ExtractedColumn;
 
 /**
  * Persists one {@link ExtractedColumn} per (tile, layer) as a raw int32 binary vertex buffer plus

@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research;
+package org.maplibre.mlt.research.extraction;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -16,7 +16,7 @@ import org.locationtech.jts.geom.LinearRing;
 import org.locationtech.jts.geom.Polygon;
 import org.maplibre.mlt.converter.encodings.GeometryEncoder;
 import org.maplibre.mlt.decoder.DecodingUtils;
-import org.maplibre.mlt.research.VertexBufferExtractor.ExtractedColumn;
+import org.maplibre.mlt.research.extraction.VertexBufferExtractor.ExtractedColumn;
 
 /**
  * Proves {@link VertexBufferExtractor} matches the real, private {@code

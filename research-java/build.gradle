@@ -31,7 +31,7 @@ java {
 }
 
 application {
-    mainClass = 'org.maplibre.mlt.research.ExtractCli'
+    mainClass = findProperty('mainClass') ?: 'org.maplibre.mlt.research.extraction.ExtractCli'
 }
 
 tasks.withType(Test).configureEach {
