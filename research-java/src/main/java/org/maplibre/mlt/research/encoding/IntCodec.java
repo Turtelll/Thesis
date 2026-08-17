@@ -1,0 +1,49 @@
+package org.maplibre.mlt.research.encoding;
+
+import me.lemire.integercompression.IntWrapper;
+import org.maplibre.mlt.converter.encodings.EncodingUtils;
+import org.maplibre.mlt.decoder.DecodingUtils;
+
+/** Physical-layer codec: packs an already-transformed {@code int[]} into bytes and back. */
+public interface IntCodec {
+
+  byte[] encode(int[] values);
+
+  int[] decode(byte[] data, int numValues);
+
+  /** Byte-aligned physical codec (protobuf-style varint), delegating to mlt-core. */
+  final class Varint implements IntCodec {
+
+    @Override
+    public byte[] encode(int[] values) {
+      try {
+        return EncodingUtils.encodeVarints(values, false, false);
+      } catch (java.io.IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    @Override
+    public int[] decode(byte[] data, int numValues) {
+      try {
+        return DecodingUtils.decodeVarints(data, new IntWrapper(0), numValues);
+      } catch (java.io.IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  /** Bit-aligned physical codec (FastPFOR + VariableByte fallback), delegating to mlt-core. */
+  final class FastPfor implements IntCodec {
+
+    @Override
+    public byte[] encode(int[] values) {
+      return EncodingUtils.encodeFastPfor128(values, false, false);
+    }
+
+    @Override
+    public int[] decode(byte[] data, int numValues) {
+      return DecodingUtils.decodeFastPfor(data, numValues, data.length, new IntWrapper(0));
+    }
+  }
+}
