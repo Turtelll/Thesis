@@ -1,0 +1,16 @@
+# Generated pipeline artifacts (baseline extractions, encodings, reports)
+data/
+
+# Gradle build output
+research-java/build/
+research-java/.gradle/
+
+# tools
+tools/map-viewer/node_modules
+
+# IDE
+.idea/
+*.iml
+
+# OS
+Thumbs.db
