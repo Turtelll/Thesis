@@ -7,6 +7,10 @@ research-java/.gradle/
 
 # tools
 tools/map-viewer/node_modules
+tools/map-viewer/public/main.js
+tools/map-viewer/public/main.js.map
+tools/map-viewer/public/main.css
+tools/map-viewer/public/main.css.map
 
 # IDE
 .idea/
