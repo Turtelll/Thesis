@@ -1,0 +1,26 @@
+{
+  "name": "mvt-map-viewer",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Interactive MapLibre GL viewer for the thesis mbtiles source data, with per-layer toggles.",
+  "type": "commonjs",
+  "scripts": {
+    "build:client": "esbuild src/main.ts --bundle --outfile=public/main.js --format=iife --sourcemap",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build": "npm run build:client && npm run build:server",
+    "start": "npm run build && node dist/server.js",
+    "dev": "npm run build && node dist/server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.9.1",
+    "express": "^4.21.2",
+    "maplibre-gl": "^4.7.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.10",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.6.3"
+  }
+}

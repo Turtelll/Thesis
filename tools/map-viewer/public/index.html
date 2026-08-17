@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>MVT Layer Viewer — Thesis</title>
+    <link rel="stylesheet" href="main.css" />
+    <style>
+      html, body, #map {
+        height: 100%;
+        margin: 0;
+      }
+
+      #layer-panel {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        z-index: 1;
+        background: rgba(255, 255, 255, 0.92);
+        border-radius: 6px;
+        padding: 10px 14px;
+        font-family: system-ui, sans-serif;
+        font-size: 13px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      #layer-panel h1 {
+        font-size: 13px;
+        margin: 0 0 8px;
+        font-weight: 600;
+      }
+
+      .layer-toggle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 0;
+        cursor: pointer;
+      }
+
+      .swatch {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        display: inline-block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="layer-panel">
+      <h1>Layers</h1>
+    </div>
+    <script src="main.js"></script>
+  </body>
+</html>
