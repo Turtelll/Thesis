@@ -45,13 +45,16 @@ public final class BenchmarkCli {
 
   private static final Gson GSON = new Gson();
 
+  /** Layers shown individually in the breakdown; the rest are folded into one {@code (other)} row. */
+  private static final int TOP_LAYERS = 6;
+
   /** Running byte totals for one encoding within one group (the whole corpus, or one layer). */
   private static final class Totals {
     private final Map<String, Long> bytes = new LinkedHashMap<>();
     private int buffers;
 
-    void add(String encoding, int encodedBytes) {
-      bytes.merge(encoding, (long) encodedBytes, Long::sum);
+    void add(String encoding, long encodedBytes) {
+      bytes.merge(encoding, encodedBytes, Long::sum);
     }
 
     long get(String encoding) {
@@ -155,9 +158,14 @@ public final class BenchmarkCli {
   // --- reporting ----------------------------------------------------------
 
   /**
-   * Prints the corpus totals, then the same numbers per layer and per dominant geometry type. Each
-   * encoding is shown as a percentage against the best baseline for that group, so a new encoding's
-   * effect can be read per segment rather than only as a corpus average.
+   * Prints the corpus totals, then the same numbers per layer and per dominant geometry type.
+   *
+   * <p>Two different questions are answered per row, and they are deliberately separate columns.
+   * The percentages are measured against {@code ref}, the best <em>baseline</em> for that group —
+   * that is the honest yardstick, since crediting an encoding for beating a baseline that was not
+   * the one to beat would overstate it. The starred cell and the {@code best} column name the
+   * smallest encoding overall, which is what you would actually ship for that group and may well be
+   * a research encoding rather than a baseline.
    */
   private static void report(
       List<String> names,
@@ -170,46 +178,110 @@ public final class BenchmarkCli {
         "%d buffers, %s raw bytes%n%n", overall.buffers, String.format("%,d", rawTotal));
 
     var width = names.stream().mapToInt(String::length).max().orElse(20);
-    System.out.printf("%-" + width + "s %14s %12s %12s%n", "encoding", "bytes", "vs raw", "vs base");
-    var overallBest = bestBaseline(overall);
+    System.out.printf(
+        "%-" + width + "s %14s %12s %12s%n", "encoding", "bytes", "vs raw", "vs ref");
+    var reference = bestBaseline(overall);
+    var winner = winner(names, overall);
     for (var name : names) {
       var bytes = overall.get(name);
       System.out.printf(
-          "%-" + width + "s %14s %11.1f%% %12s%n",
+          "%-" + width + "s %14s %11.1f%% %12s%s%n",
           name,
           String.format("%,d", bytes),
           100.0 * bytes / rawTotal,
-          delta(bytes, overallBest));
+          delta(bytes, reference),
+          name.equals(winner) ? "  *" : "");
     }
+    System.out.printf(
+        "%n* smallest overall. \"ref\" is the best baseline (%s), what percentages compare to.%n",
+        referenceName(overall));
 
-    segment("layer", names, byLayer);
-    segment("geometry", names, byGeometry);
+    segment("layer", names, byLayer, TOP_LAYERS);
+    segment("geometry", names, byGeometry, Integer.MAX_VALUE);
   }
 
-  /** One breakdown table: a row per group, a column per encoding, sorted by group size. */
-  private static void segment(String label, List<String> names, Map<String, Totals> groups) {
+  /**
+   * One breakdown table: a row per group, a column per encoding, sorted by group size and cut to
+   * {@code limit} rows. Everything past the cut is folded into a single {@code (other)} row rather
+   * than dropped, so the column totals still add up to the corpus figures above.
+   */
+  private static void segment(
+      String label, List<String> names, Map<String, Totals> groups, int limit) {
     System.out.printf("%n--- by %s ---%n", label);
 
-    var width = Math.max(label.length(), groups.keySet().stream().mapToInt(String::length).max().orElse(8));
-    var header = new StringBuilder(String.format("%-" + width + "s %8s", label, "buffers"));
+    /* Ranked by bytes, not by buffer count: a buffer is one (tile, layer) pair, so counting them
+     * measures how many tiles a layer appears in, not how much data it is. `building` is 311
+     * buffers and 3.2 MB; `place` is 1090 buffers and 0.24 MB. Since the question is where an
+     * encoding can save bytes, the big layers are the byte-heavy ones. */
+    var sorted = new ArrayList<>(groups.entrySet());
+    sorted.sort((a, b) -> Long.compare(bestBaseline(b.getValue()), bestBaseline(a.getValue())));
+
+    var shown = new ArrayList<Map.Entry<String, Totals>>(sorted.subList(0, Math.min(limit, sorted.size())));
+    if (sorted.size() > limit) {
+      var rest = new Totals();
+      for (var group : sorted.subList(limit, sorted.size())) {
+        rest.buffers += group.getValue().buffers;
+        for (var name : names) {
+          rest.add(name, group.getValue().get(name));
+        }
+      }
+      shown.add(Map.entry("(other, " + (sorted.size() - limit) + ")", rest));
+    }
+
+    var width =
+        Math.max(label.length(), shown.stream().mapToInt(g -> g.getKey().length()).max().orElse(8));
+    var nameWidth = names.stream().mapToInt(String::length).max().orElse(20);
+    var corpus = shown.stream().mapToLong(g -> bestBaseline(g.getValue())).sum();
+    var header =
+        new StringBuilder(String.format("%-" + width + "s %8s %7s", label, "buffers", "share"));
     for (var name : names) {
       header.append(String.format(" %22s", abbreviate(name)));
     }
+    header.append(String.format("   %-" + nameWidth + "s", "best"));
     System.out.println(header);
 
-    var sorted = new ArrayList<>(groups.entrySet());
-    sorted.sort((a, b) -> Integer.compare(b.getValue().buffers, a.getValue().buffers));
-
-    for (var group : sorted) {
+    for (var group : shown) {
       var totals = group.getValue();
-      var best = bestBaseline(totals);
-      var row = new StringBuilder(String.format("%-" + width + "s %8d", group.getKey(), totals.buffers));
+      var reference = bestBaseline(totals);
+      var winner = winner(names, totals);
+      var row =
+          new StringBuilder(
+              String.format(
+                  "%-" + width + "s %8d %6.1f%%",
+                  group.getKey(),
+                  totals.buffers,
+                  corpus == 0 ? 0.0 : 100.0 * reference / corpus));
       for (var name : names) {
         var bytes = totals.get(name);
-        row.append(String.format(" %13s %8s", String.format("%,d", bytes), delta(bytes, best)));
+        /* The winning cell is starred; the percentages are all against the baseline reference,
+         * which is a different question and can land on a different column. */
+        row.append(
+            String.format(
+                " %13s %7s%s",
+                String.format("%,d", bytes),
+                delta(bytes, reference),
+                name.equals(winner) ? "*" : " "));
       }
+      row.append(String.format("   %-" + nameWidth + "s", winner));
       System.out.println(row);
     }
+  }
+
+  /** The smallest encoding for this group — what you would actually ship for it. */
+  private static String winner(List<String> names, Totals totals) {
+    return names.stream()
+        .filter(name -> totals.get(name) > 0)
+        .min((a, b) -> Long.compare(totals.get(a), totals.get(b)))
+        .orElse("-");
+  }
+
+  /** Which baseline the percentages in this group are measured against. */
+  private static String referenceName(Totals totals) {
+    return Baselines.baseline().stream()
+        .map(Encoding::name)
+        .filter(name -> totals.get(name) > 0)
+        .min((a, b) -> Long.compare(totals.get(a), totals.get(b)))
+        .orElse("-");
   }
 
   /**
@@ -226,15 +298,19 @@ public final class BenchmarkCli {
         .orElse(0);
   }
 
-  /** A signed percentage against the best baseline; negative means smaller, which is the goal. */
-  private static String delta(long bytes, long baseline) {
-    if (baseline == 0) {
+  /**
+   * A signed percentage against the baseline reference; negative means smaller, which is the goal.
+   * {@code ref} marks the reference cell itself — the best <em>baseline</em>, which is not
+   * necessarily the smallest encoding in the row (that one is starred instead).
+   */
+  private static String delta(long bytes, long reference) {
+    if (reference == 0) {
       return "-";
     }
-    if (bytes == baseline) {
-      return "base";
+    if (bytes == reference) {
+      return "ref";
     }
-    return String.format("%+.1f%%", 100.0 * (bytes - baseline) / baseline);
+    return String.format("%+.1f%%", 100.0 * (bytes - reference) / reference);
   }
 
   private static String abbreviate(String name) {
