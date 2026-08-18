@@ -12,9 +12,9 @@ Data will be provided in MVT
         -> 2. Delta, zigZag, Varint -> Byte aligned pattern
         -> 3. General Purpose Compression Gzip, Zstd -> Huffman Encoding + LZ77 -> Byte basis
     These 3 data sets will be the baseline to compare against/benchamrk
-  - the baseline extraction + encoding pipeline (1 and 2 above; 3 is still pending) lives in
+  - the baseline extraction + encoding pipeline (1 and 2 above; 3 is not implemented) lives in
     [`research-java/`](research-java/README.md) - see its README for how to run extraction,
-    encoding, and the round-trip tests.
+    the benchmark, and the round-trip tests.
 #### new Encoding Results
 - Different Results of diffrent prediction experiments
 ### Testing

@@ -34,6 +34,15 @@ application {
     mainClass = findProperty('mainClass') ?: 'org.maplibre.mlt.research.extraction.ExtractCli'
 }
 
+/* The benchmark is the everyday command, so it gets its own task rather than a -PmainClass
+ * incantation: ./gradlew benchmark --args="../data/extracted" */
+tasks.register('benchmark', JavaExec) {
+    group = 'application'
+    description = 'Encodes every extracted VertexBuffer with every registered encoding.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.maplibre.mlt.research.BenchmarkCli'
+}
+
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
     testLogging {

@@ -3,40 +3,72 @@ package org.maplibre.mlt.research.encoding;
 import java.util.List;
 import org.maplibre.mlt.converter.geometry.Vertex;
 
-/** Pairs a {@link VertexTransform} (logical) with an {@link IntCodec} (physical). */
-public final class VertexBufferCodec {
+/**
+ * Pairs a {@link VertexTransform} (logical) with an {@link IntCodec} (physical), forming a complete
+ * {@link Encoding}: the transform and codec supply encode/decode, and this class adds the
+ * stream-metadata accounting the benchmark compares on.
+ */
+public final class VertexBufferCodec implements Encoding {
 
+  /**
+   * Everything a codec may condition on: the vertex buffer plus the topology streams that describe
+   * how it is partitioned into features, parts and rings.
+   *
+   * <p>Predictors with structural reset points (see {@code ideen.md}) need the part/ring boundaries,
+   * which are derivable from {@code numParts}/{@code numRings}. These are the same streams {@link
+   * org.maplibre.mlt.research.extraction.VertexBufferExtractor.ExtractedColumn} produces and the
+   * {@code .json} sidecar persists, so a context is reconstructable from an existing extraction
+   * without re-extracting.
+   */
+  public record BufferContext(
+      List<Vertex> vertices,
+      List<Integer> geometryTypes,
+      List<Integer> numGeometries,
+      List<Integer> numParts,
+      List<Integer> numRings) {
+
+    /** Context for a bare vertex buffer with no topology — for tests and point-only columns. */
+    public static BufferContext of(List<Vertex> vertices) {
+      return new BufferContext(vertices, List.of(), List.of(), List.of(), List.of());
+    }
+  }
+
+  /**
+   * One encoding's result: the payload plus the stream-metadata bytes MLT would write alongside it.
+   * The benchmark compares {@link #totalBytes()}, since that is what lands in the tile — an encoding
+   * that shrinks the payload but needs a longer header has not necessarily won.
+   */
+  public record EncodedBuffer(byte[] payload, int metadataBytes) {
+
+    public int totalBytes() {
+      return payload.length + metadataBytes;
+    }
+  }
+
+  private final String name;
   private final VertexTransform transform;
   private final IntCodec codec;
 
-  public VertexBufferCodec(VertexTransform transform, IntCodec codec) {
+  public VertexBufferCodec(String name, VertexTransform transform, IntCodec codec) {
+    this.name = name;
     this.transform = transform;
     this.codec = codec;
   }
 
-  public byte[] encode(List<Vertex> vertices) {
-    return codec.encode(transform.apply(vertices));
+  @Override
+  public String name() {
+    return name;
   }
 
-  public List<Vertex> decode(byte[] data, int numVertices) {
-    return transform.invert(codec.decode(data, numVertices * 2));
+  @Override
+  public EncodedBuffer encode(BufferContext ctx) {
+    final var payload = codec.encode(transform.apply(ctx.vertices()));
+    return new EncodedBuffer(
+        payload, StreamMetadata.bytes(ctx.vertices().size() * 2, payload.length));
   }
 
-  /** Registry of the baseline {@link VertexBufferCodec} variants to benchmark against. */
-  public enum Baseline {
-    DELTA_ZIGZAG_FASTPFOR(
-        new VertexBufferCodec(new VertexTransform.ZigZagDelta(), new IntCodec.FastPfor())),
-    DELTA_ZIGZAG_VARINT(
-        new VertexBufferCodec(new VertexTransform.ZigZagDelta(), new IntCodec.Varint()));
-
-    private final VertexBufferCodec codec;
-
-    Baseline(VertexBufferCodec codec) {
-      this.codec = codec;
-    }
-
-    public VertexBufferCodec codec() {
-      return codec;
-    }
+  @Override
+  public List<Vertex> decode(EncodedBuffer encoded, int vertexCount) {
+    return transform.invert(codec.decode(encoded.payload(), vertexCount * 2));
   }
 }

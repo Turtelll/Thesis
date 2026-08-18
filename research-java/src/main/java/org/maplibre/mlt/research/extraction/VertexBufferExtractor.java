@@ -27,7 +27,7 @@ import org.maplibre.mlt.converter.geometry.Vertex;
  * helpers ({@code flatPolygon}, {@code flatLineString}, {@code ringToLineString}, {@code
  * addLineString}, {@code containsPolygon}) from {@code maplibre-tile-spec/java/mlt-core}
  * (org.maplibre.mlt.converter.encodings.GeometryEncoder), copied rather than called because the
- * original method is private. {@link GeometryEncoderFidelityTest} pins this copy against the
+ * original method is private. {@code VertexBufferExtractorFidelityTest} pins this copy against the
  * original via reflection so submodule drift is caught, not hidden.
  *
  * <p>Rules preserved from the original (each a correctness trap if reimplemented from the spec
