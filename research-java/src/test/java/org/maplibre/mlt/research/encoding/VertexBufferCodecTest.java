@@ -30,20 +30,35 @@ class VertexBufferCodecTest {
     return Baselines.all();
   }
 
+  /** A context carrying the real topology streams, as {@code BenchmarkCli} builds from a sidecar. */
+  private static BufferContext contextOf(VertexBufferExtractor.ExtractedColumn column) {
+    return new BufferContext(
+        column.vertexBuffer(),
+        column.geometryTypes(),
+        column.numGeometries(),
+        column.numParts(),
+        column.numRings());
+  }
+
   @ParameterizedTest
   @MethodSource("everyEncoding")
   void roundTripsExtractedVertexBuffer(Encoding encoding) {
     var column = VertexBufferExtractor.extract(List.of(square(100, 200, 50)));
     var vertices = column.vertexBuffer();
 
-    var encoded = encoding.encode(BufferContext.of(vertices));
+    var ctx = BufferContext.of(vertices);
+    var encoded = encoding.encode(ctx);
 
-    assertEquals(vertices, encoding.decode(encoded, vertices.size()));
+    assertEquals(vertices, encoding.decode(encoded, ctx, vertices.size()));
   }
 
   /**
    * A multi-part column, so that any codec conditioning on part boundaries (the forced reset points
    * of the {@code ideen.md} predictor design) is exercised on more than one part.
+   *
+   * <p>Passes the real topology streams rather than {@link BufferContext#of}, so the reset path is
+   * actually taken — with an empty context a resetting codec silently degrades to one run and the
+   * boundary logic goes untested.
    */
   @ParameterizedTest
   @MethodSource("everyEncoding")
@@ -51,11 +66,32 @@ class VertexBufferCodecTest {
     var column =
         VertexBufferExtractor.extract(
             List.of(square(0, 0, 10), square(500, 500, 20), square(-300, 40, 5)));
-    var vertices = column.vertexBuffer();
+    var ctx = contextOf(column);
 
-    var encoded = encoding.encode(BufferContext.of(vertices));
+    var encoded = encoding.encode(ctx);
 
-    assertEquals(vertices, encoding.decode(encoded, vertices.size()));
+    assertEquals(column.vertexBuffer(), encoding.decode(encoded, ctx, column.vertexBuffer().size()));
+  }
+
+  /**
+   * Points contribute vertices but no run-length entry, so the run stream covers fewer vertices
+   * than the buffer holds and the remainder must still be reconstructed.
+   */
+  @ParameterizedTest
+  @MethodSource("everyEncoding")
+  void roundTripsMixedPointAndPolygonBuffer(Encoding encoding) {
+    var column =
+        VertexBufferExtractor.extract(
+            List.of(
+                square(0, 0, 10),
+                GF.createPoint(new Coordinate(700, 800)),
+                square(200, 200, 15),
+                GF.createPoint(new Coordinate(-40, -50))));
+    var ctx = contextOf(column);
+
+    var encoded = encoding.encode(ctx);
+
+    assertEquals(column.vertexBuffer(), encoding.decode(encoded, ctx, column.vertexBuffer().size()));
   }
 
   @ParameterizedTest
@@ -64,9 +100,10 @@ class VertexBufferCodecTest {
     var column = VertexBufferExtractor.extract(List.of(GF.createPoint(new Coordinate(7, 9))));
     var vertices = column.vertexBuffer();
 
-    var encoded = encoding.encode(BufferContext.of(vertices));
+    var ctx = BufferContext.of(vertices);
+    var encoded = encoding.encode(ctx);
 
-    assertEquals(vertices, encoding.decode(encoded, vertices.size()));
+    assertEquals(vertices, encoding.decode(encoded, ctx, vertices.size()));
   }
 
   /** A constant buffer — the degenerate case where every delta is zero. */
@@ -78,9 +115,10 @@ class VertexBufferCodecTest {
       vertices.add(new Vertex(12, 34));
     }
 
-    var encoded = encoding.encode(BufferContext.of(vertices));
+    var ctx = BufferContext.of(vertices);
+    var encoded = encoding.encode(ctx);
 
-    assertEquals(vertices, encoding.decode(encoded, vertices.size()));
+    assertEquals(vertices, encoding.decode(encoded, ctx, vertices.size()));
   }
 
   /** The two baselines the whole benchmark is measured against must stay stable and named. */

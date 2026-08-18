@@ -27,7 +27,14 @@ public interface Encoding {
    *
    * @param encoded the result of {@link #encode}. The whole {@link EncodedBuffer} is passed, not
    *     just its payload, because a real decoder reads the stream metadata first.
+   * @param ctx the topology streams ({@code numParts}, {@code numRings}, {@code geometryTypes}),
+   *     for encodings whose predictor resets at part/ring boundaries. MLT ships these streams in
+   *     the tile, so a real decoder has them available before it reads the vertex stream.
+   *     <p><strong>{@link BufferContext#vertices()} must not be read by an implementation.</strong>
+   *     Reading it would let a decoder return the input it is supposed to be reconstructing,
+   *     making any encoding round-trip trivially — including one that discards the buffer
+   *     entirely, which is exactly what the mandatory {@code decode} exists to catch.
    * @param vertexCount the number of vertices to reconstruct, likewise known from the metadata.
    */
-  List<Vertex> decode(EncodedBuffer encoded, int vertexCount);
+  List<Vertex> decode(EncodedBuffer encoded, BufferContext ctx, int vertexCount);
 }

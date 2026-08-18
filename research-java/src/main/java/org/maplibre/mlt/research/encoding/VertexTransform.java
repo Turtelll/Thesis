@@ -5,13 +5,24 @@ import java.util.List;
 import org.maplibre.mlt.converter.encodings.GeometryEncoder;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.decoder.DecodingUtils;
+import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 
 /** Logical-layer transform between a vertex buffer and the interleaved int stream a codec sees. */
 public interface VertexTransform {
 
-  int[] apply(List<Vertex> vertices);
+  /**
+   * Transforms a buffer into the interleaved int stream. {@code ctx} carries the topology streams
+   * for transforms that reset at part/ring boundaries; {@link #invert} is given the same streams,
+   * so the two derive identical run boundaries.
+   */
+  int[] apply(BufferContext ctx);
 
-  List<Vertex> invert(int[] values);
+  /**
+   * The inverse of {@link #apply}. {@code ctx} carries the topology streams for transforms that
+   * reset at part/ring boundaries; {@link BufferContext#vertices()} must not be read (see {@link
+   * Encoding#decode}).
+   */
+  List<Vertex> invert(int[] values, BufferContext ctx);
 
   /**
    * Componentwise delta + zigzag, continuous across the whole buffer (x and y tracked
@@ -20,12 +31,12 @@ public interface VertexTransform {
   final class ZigZagDelta implements VertexTransform {
 
     @Override
-    public int[] apply(List<Vertex> vertices) {
-      return GeometryEncoder.zigZagDeltaEncodeVertices(vertices);
+    public int[] apply(BufferContext ctx) {
+      return GeometryEncoder.zigZagDeltaEncodeVertices(ctx.vertices());
     }
 
     @Override
-    public List<Vertex> invert(int[] values) {
+    public List<Vertex> invert(int[] values, BufferContext ctx) {
       var vertices = new ArrayList<Vertex>(values.length / 2);
       int prevX = 0;
       int prevY = 0;

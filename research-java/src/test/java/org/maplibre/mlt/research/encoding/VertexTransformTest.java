@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
+import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 
 class VertexTransformTest {
 
@@ -19,8 +20,9 @@ class VertexTransformTest {
             new Vertex(0, 0));
 
     var transform = new VertexTransform.ZigZagDelta();
-    int[] applied = transform.apply(vertices);
-    List<Vertex> restored = transform.invert(applied);
+    var ctx = BufferContext.of(vertices);
+    int[] applied = transform.apply(ctx);
+    List<Vertex> restored = transform.invert(applied, ctx);
 
     assertEquals(vertices, restored);
   }
@@ -28,8 +30,9 @@ class VertexTransformTest {
   @Test
   void zigZagDelta_roundTripsEmpty() {
     var transform = new VertexTransform.ZigZagDelta();
-    int[] applied = transform.apply(List.of());
-    List<Vertex> restored = transform.invert(applied);
+    var ctx = BufferContext.of(List.of());
+    int[] applied = transform.apply(ctx);
+    List<Vertex> restored = transform.invert(applied, ctx);
     assertEquals(List.of(), restored);
   }
 }

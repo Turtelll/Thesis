@@ -62,6 +62,99 @@ public final class BenchmarkCli {
     }
   }
 
+  /**
+   * Answers the question the totals cannot: <em>would a tile ever choose one of these encodings?</em>
+   *
+   * <p>The tables above pick one encoding for a whole corpus or layer, but a real tile selects per
+   * stream, and {@code StreamMetadata} already carries the technique per stream — so an encoder may
+   * legitimately encode each buffer with whichever candidate is smallest. This accumulates the
+   * <em>oracle</em>: the sum of the per-buffer minimum, i.e. the best any such selector could do.
+   *
+   * <p>It is an upper bound and deliberately optimistic — it charges nothing for signalling the
+   * choice and assumes the encoder always guesses right. If the oracle barely beats simply always
+   * using the best single encoding, then per-buffer selection cannot pay for itself and the
+   * candidate encodings do not belong in a tile, however many individual buffers they win. Win
+   * counts alone are misleading: an encoding can win many buffers by a byte each.
+   */
+  private static final class Selection {
+
+    private long oracleBytes;
+    private long baselineOracleBytes;
+    private final Map<String, Integer> wins = new TreeMap<>();
+    private final Map<String, Long> savedVsBaselineOracle = new TreeMap<>();
+    private int buffersImproved;
+
+    void add(List<String> names, List<Integer> sizes) {
+      var best = 0;
+      var baselineBest = Long.MAX_VALUE;
+      for (var i = 0; i < names.size(); i++) {
+        if (sizes.get(i) < sizes.get(best)) {
+          best = i;
+        }
+        if (isBaseline(names.get(i))) {
+          baselineBest = Math.min(baselineBest, sizes.get(i));
+        }
+      }
+      oracleBytes += sizes.get(best);
+      baselineOracleBytes += baselineBest;
+      wins.merge(names.get(best), 1, Integer::sum);
+      if (sizes.get(best) < baselineBest) {
+        buffersImproved++;
+        savedVsBaselineOracle.merge(
+            names.get(best), baselineBest - sizes.get(best), Long::sum);
+      }
+    }
+
+    void report(List<String> names, Totals overall) {
+      var fixedBest = names.stream().mapToLong(overall::get).min().orElse(0);
+      var fixedName = winner(names, overall);
+
+      System.out.printf("%n--- per-buffer selection (oracle) ---%n");
+      System.out.printf(
+          "always %-24s %14s%n", fixedName, String.format("%,d", fixedBest));
+      System.out.printf(
+          "best baseline per buffer %14s   %s%n",
+          String.format("%,d", baselineOracleBytes), delta(baselineOracleBytes, fixedBest));
+      System.out.printf(
+          "best of all per buffer   %14s   %s%n",
+          String.format("%,d", oracleBytes), delta(oracleBytes, fixedBest));
+
+      var headroom = baselineOracleBytes - oracleBytes;
+      if (headroom == 0) {
+        System.out.printf(
+            "%nNo research encoding is smallest on any buffer, so a per-buffer selector gains%n"
+                + "nothing over the baselines.%n");
+      } else {
+        System.out.printf(
+            "%nAdding every research encoding to a per-buffer selector is worth %s (%.2f%%) over%n"
+                + "selecting among baselines alone, across %d of %d buffers.%n",
+            String.format("%,d", headroom),
+            100.0 * headroom / baselineOracleBytes,
+            buffersImproved,
+            overall.buffers);
+      }
+      if (!savedVsBaselineOracle.isEmpty()) {
+        System.out.printf("%-24s %12s %10s%n", "  encoding", "bytes saved", "buffers");
+        savedVsBaselineOracle.entrySet().stream()
+            .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+            .forEach(
+                e ->
+                    System.out.printf(
+                        "  %-22s %12s %10d%n",
+                        e.getKey(), String.format("%,d", e.getValue()), wins.getOrDefault(e.getKey(), 0)));
+      }
+      System.out.printf(
+          "%nThe oracle pays nothing to signal its choice and never guesses wrong, so this is the%n"
+              + "ceiling. A real selector costs signalling per stream plus decoder complexity; if the%n"
+              + "headroom above does not clearly exceed that, per-buffer selection cannot pay for%n"
+              + "itself.%n");
+    }
+
+    private static boolean isBaseline(String name) {
+      return Baselines.baseline().stream().map(Encoding::name).anyMatch(name::equals);
+    }
+  }
+
   public static void main(String[] args) throws IOException {
     var opts = Options.parse(args);
     var inDir = Path.of(opts.inDir);
@@ -76,6 +169,7 @@ public final class BenchmarkCli {
     var overall = new Totals();
     var byLayer = new TreeMap<String, Totals>();
     var byGeometry = new TreeMap<String, Totals>();
+    var selection = new Selection();
     long rawTotal = 0;
 
     Writer csv = null;
@@ -121,6 +215,8 @@ public final class BenchmarkCli {
           geometryTotals.add(encoding.name(), total);
         }
 
+        selection.add(names, sizes);
+
         if (csv != null) {
           csv.write(
               String.join(
@@ -149,7 +245,7 @@ public final class BenchmarkCli {
       return;
     }
 
-    report(names, overall, byLayer, byGeometry, rawTotal);
+    report(names, overall, byLayer, byGeometry, selection, rawTotal);
     if (opts.csvFile != null) {
       System.out.printf("%nWrote %s%n", opts.csvFile);
     }
@@ -172,6 +268,7 @@ public final class BenchmarkCli {
       Totals overall,
       Map<String, Totals> byLayer,
       Map<String, Totals> byGeometry,
+      Selection selection,
       long rawTotal) {
 
     System.out.printf(
@@ -198,6 +295,7 @@ public final class BenchmarkCli {
 
     segment("layer", names, byLayer, TOP_LAYERS);
     segment("geometry", names, byGeometry, Integer.MAX_VALUE);
+    selection.report(names, overall);
   }
 
   /**
@@ -328,7 +426,7 @@ public final class BenchmarkCli {
    */
   private static void verifyRoundTrip(
       ManifestEntry entry, BufferContext ctx, Encoding encoding, EncodedBuffer encoded) {
-    var decoded = encoding.decode(encoded, ctx.vertices().size());
+    var decoded = encoding.decode(encoded, ctx, ctx.vertices().size());
     if (!ctx.vertices().equals(decoded)) {
       throw new IllegalStateException(
           String.format(
