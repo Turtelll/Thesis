@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.maplibre.mlt.research.encoding.research.SegmentPair;
+import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
 
 /**
  * The encodings the harness runs: the fixed baselines, plus whatever is under test.
@@ -32,7 +33,9 @@ public final class Baselines {
      */
     public static List<Encoding> research() {
         return List.of(
-                new VertexBufferCodec("SEGMENT_PAIR_FASTPFOR", new SegmentPair(), new IntCodec.FastPfor()));
+                new VertexBufferCodec("SEGMENT_PAIR_FASTPFOR", new SegmentPair(), new IntCodec.FastPfor()),
+                new VertexBufferCodec(
+                        "SEGMENT_QUAD_CORNER_FASTPFOR", new SegmentQuadCorner(), new IntCodec.FastPfor()));
     }
 
     /**

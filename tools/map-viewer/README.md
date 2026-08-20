@@ -2,10 +2,11 @@
 
 A small TypeScript + [MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/)
 app for visually inspecting the thesis source data
-(`data/MVT/luxembourg.mbtiles`): a Node/Express server streams tiles straight
-out of the mbtiles file (converting MBTiles' TMS row order to XYZ on the fly),
-and the browser client renders `landcover`, `water`, `building` and
-`transportation` as an interactive map with one on/off checkbox per layer.
+(`data/MVT/munich.mbtiles`, `data/MVT/NY.mbtiles`): a Node/Express server
+streams tiles straight out of the selected mbtiles file (converting MBTiles'
+TMS row order to XYZ on the fly), and the browser client renders `landcover`,
+`water`, `building` and `transportation` as an interactive map with one on/off
+checkbox per layer, plus a dropdown to switch between datasets.
 
 No tile pre-processing or Java build is needed — this reads the same mbtiles
 file the `research-java` pipeline extracts from.
@@ -37,11 +38,14 @@ npm run build:client
 
 ## Layout
 
-- `server/server.ts` — Express server: `/tiles/:z/:x/:y.pbf` reads directly
-  from the mbtiles (SQLite) file and serves the raw tile bytes; `/metadata.json`
-  exposes the mbtiles' `center`/`bounds`/`minzoom`/`maxzoom` so the client can
-  set the initial view; static files are served from `public/`.
+- `server/server.ts` — Express server: `/tiles/:z/:x/:y.pbf?dataset=<id>` reads
+  directly from the selected mbtiles (SQLite) file and serves the raw tile
+  bytes; `/metadata.json?dataset=<id>` exposes the mbtiles'
+  `center`/`bounds`/`minzoom`/`maxzoom` so the client can set the initial view;
+  static files are served from `public/`. `dataset` is `munich` (default) or
+  `ny`.
 - `src/main.ts` — client: builds the MapLibre GL map, adds one styled layer per
   target layer (fill for landcover/water/building, line for transportation),
-  and renders a toggle panel that calls `map.setLayoutProperty(id, "visibility", ...)`.
+  and renders a toggle panel that calls `map.setLayoutProperty(id, "visibility", ...)`,
+  plus a dataset dropdown that reloads the page with `?dataset=`.
 - `public/index.html` — page shell + toggle panel container/styles.

@@ -118,10 +118,192 @@ would make even a codec that discards the buffer round-trip successfully.
    new test method.
 
 With `research()` empty the run reports the two baselines only — the null result that
-shows the harness works before any new encoding is judged by it. That is the current
-state; see **Results** for encodings that have been measured and rejected.
+shows the harness works before any new encoding is judged by it. `research()` currently
+holds `SEGMENT_PAIR_FASTPFOR` and `SEGMENT_QUAD_CORNER_FASTPFOR`; see **Results** for what
+they do and for the encodings that have been measured and rejected.
 
 ## Results
+
+### Composing both — `SEGMENT_QUAD_CORNER_FASTPFOR`, **-6,1% corpus / -12,2% building**
+
+Registered, and now the single best encoding on the whole corpus. It is the composition of
+the two transforms below — `SEGMENT_PAIR`'s part-start grouping and `QUAD_CORNER`'s
+parallelogram-corner predictor — which the per-geometry tables show win on *disjoint*
+populations (SEGMENT_PAIR on LINESTRING, QUAD_CORNER on POLYGON). Because they touch
+different residuals, they stack rather than compete.
+
+```
+DELTA_ZIGZAG_FASTPFOR            13.399.028   ref
+DELTA_ZIGZAG_VARINT              13.818.767  +3,1%
+QUAD_CORNER_FASTPFOR             13.181.440  -1,6%
+SEGMENT_PAIR_FASTPFOR            12.795.818  -4,5%
+SEGMENT_QUAD_CORNER_FASTPFOR     12.579.088  -6,1%  *
+```
+
+**What it does.** Three residual populations instead of two, each packed as its own
+contiguous FastPFOR region so it is sized to its own width: part starts (delta vs previous
+vertex — the wide boundary spikes), interior vertices (delta vs previous vertex — the narrow
+population), and fourth corners of four-vertex rings (predicted `p0+p2-p1`). The three classes
+are mutually exclusive and both derivable from the topology streams, so nothing is signalled;
+`prevX/prevY` stay continuous, so there are still no reset seeds.
+
+**How it stacks.**
+
+| segment | SEGMENT_PAIR | QUAD_CORNER | SEGMENT_QUAD_CORNER |
+|---|---|---|---|
+| **corpus** | -4,5% | -1,6% | **-6,1%** |
+| `building` | -5,2% | -7,1% | **-12,2%** |
+| POLYGON | -3,9% | -4,1% | **-8,0%** |
+| `transportation` | **-6,5%** | +0,3% | -6,2% |
+| LINESTRING | **-6,3%** | +0,3% | -6,1% |
+
+On `building` the two effects are nearly additive (-5,2% and -7,1% → -12,2%). On the line
+segments it keeps almost all of SEGMENT_PAIR's win; the small gap (-6,2% vs -6,5% on
+`transportation`) is the four-vertex *line* parts being pulled into their own region, a
+negligible reshuffle of block boundaries. The oracle confirms it dominates: it is the best
+single encoding, and a free per-buffer selector over it plus `SEGMENT_PAIR` and the two
+baselines improves on always-using-it by only ~0,4%.
+
+**Concepts and methods it exploits.** The encoding rests on four ideas, each measured:
+
+1. **The layer's geometric prior.** `building` is single-ring quadrilaterals, and the quads
+   are *rotated parallelograms*, not grid rectangles:
+
+   | property of the `building` corpus | measured |
+   |---|---|
+   | polygons with `numParts == 1` (no holes) | **99,5%** |
+   | rings storing exactly 4 vertices | **75,7%** |
+   | 4-vertex rings that are exact parallelograms (`p1-p0 == p2-p3`) | **40,7%** |
+   | 4-vertex rings axis-aligned to the tile grid | 4,2% |
+
+2. **Model-based prediction instead of delta coding.** The baseline predicts each vertex as
+   the *previous vertex* (a first-order delta). For the fourth corner of a quad this
+   throws away a known constraint: in a parallelogram `p3 = p0 + p2 - p1` exactly, so
+   predicting `p0+p2-p1` and storing the *residual* makes it zero for the 40,7% that are
+   parallelograms and small for the rest — where a previous-vertex delta would carry a full
+   edge length. This is the general **predict + store-residual** scheme (`ideen.md`): the
+   decoder recomputes the same prediction from already-decoded vertices and adds the residual
+   back, so the transform is symmetric and lossless.
+
+3. **Residual-population separation for a bit-packed codec.** FastPFOR packs each block to the
+   **bit width of its widest value**, so mixing a narrow population with a wide one taxes the
+   narrow one up to the wide width. Three populations here have distinct widths — part-start
+   deltas (wide boundary spikes), interior deltas (narrow), and corner residuals (near-zero) —
+   so the transform emits each as its own contiguous region, letting FastPFOR size each
+   independently. This is the same block-width lever `SEGMENT_PAIR` found; the corner
+   predictor's -9,6% per-value zigzag-bit saving only becomes a real byte win *because* the
+   corners are separated (interleaved, it measured -0,0%: one zero value in a block of wide
+   deltas changes nothing).
+
+4. **Derived, not signalled, structure — and no reset seeds.** Which vertex is a part start
+   or a fourth corner is derivable from the topology streams (`numParts`/`numRings`), so both
+   encoder and decoder compute the same partition and *nothing is written to the tile* to
+   describe it — no permutation, no flags. And prediction stays continuous across the buffer
+   (independent x/y cursors advancing through every vertex): the transform only changes *which*
+   predictor and *which* block a residual lands in, never restarting a run, so it pays none of
+   the ~10% seed cost the `DELTA_RESET_*` experiments incurred.
+
+**What was left on the table.** Exact-shape repetition (32,4% of building rings share a
+translation-invariant shape) was **not** exploited: 90% of repeated shapes span multiple
+tiles, which a single-tile codec cannot address — the "redundancy abundant, addressing
+expensive" wall the junction/reordering experiments hit. The 24,3% of quads that are *not*
+parallelograms are also untouched; a second-order corner predictor was judged unlikely to pay
+on `building` (better prospect on `landcover`).
+
+The two sections that follow record the component mechanisms — `SEGMENT_PAIR` (part-start
+grouping) is still registered as it remains the best on LINESTRING; the standalone
+`QUAD_CORNER` was measured (-7,1% building / -1,6% corpus) and **removed once the composition
+strictly dominated it**.
+
+### Grouping part starts — `SEGMENT_PAIR_FASTPFOR`, **-4,5% corpus / -6,5% transportation**
+
+Registered. The first encoding here to beat the baseline, and it does so on every layer
+except the point-only ones, where it degrades to the baseline exactly.
+
+```
+DELTA_ZIGZAG_FASTPFOR     13.399.028        ref
+DELTA_ZIGZAG_VARINT       13.818.767      +3,1%
+SEGMENT_PAIR_FASTPFOR     12.795.818      -4,5%  *
+```
+
+| segment | baseline | SEGMENT_PAIR | |
+|---|---|---|---|
+| `transportation` | 4.232.495 | 3.958.179 | **-6,5%** |
+| `boundary` | 1.159.184 | 1.088.496 | **-6,1%** |
+| `building` | 3.228.047 | 3.059.154 | -5,2% |
+| `landcover` | 1.194.048 | 1.162.968 | -2,6% |
+| `water` | 916.048 | 905.852 | -1,1% |
+| `housenumber` (point-only) | 735.180 | 735.180 | byte-identical |
+| LINESTRING | 5.992.732 | 5.614.175 | **-6,3%** |
+| POLYGON | 5.713.018 | 5.489.845 | -3,9% |
+| POINT | 1.512.324 | 1.512.324 | byte-identical |
+
+**What it does.** The same componentwise delta + zigzag residuals as the baseline, in a
+different order: every part-start residual first, then every within-part delta. No
+reordering of vertices, no reset seeds, nothing signalled — the split point is derived
+from the topology streams on both sides, so encoder and decoder agree without a flag.
+
+**Why it wins.** The starting observation was that `transportation` is not what the
+previous round assumed. It is not long polylines; it is a fragmented road graph:
+
+| property of the `transportation` corpus | measured |
+|---|---|
+| parts that are exactly 2 vertices | **70,4%** |
+| parts ≤ 5 vertices | 92,1% |
+| part-boundary deltas, share of all deltas | 30,2% |
+| …their share of total zigzag bits | **35,5%** |
+| mean zigzag width, interior delta | 10,30 bits |
+| mean zigzag width, boundary delta | 13,10 bits |
+
+Boundaries are not rare events between long runs — they are a third of the buffer, and
+they are 2,8 bits wider on average than the interior deltas they sit between. Interleaved,
+the wide population sets the block width for the narrow one, because **FastPFOR packs a
+block to the width of its widest value**. Grouping the two populations lets each be packed
+at its own width. Simulating just that block-width effect over 60 buffers predicts -20,2%
+on the packed bits, and the measured byte win follows from it.
+
+This is the same mechanism the delta-of-delta result identified as the reason *it* lost —
+"both physical codecs price the tail, not the median". Here the tail is separated from the
+median instead of being thickened.
+
+It follows that the win is specific to a bit-aligned codec. `SEGMENT_PAIR` over Varint was
+measured and is **byte-identical to `DELTA_ZIGZAG_VARINT`**: a byte-aligned codec prices
+each value independently, so reordering values cannot change the total. It is not
+registered, since a column that can never differ from a baseline is not a result worth a
+column in every table.
+
+### Junction back-references — regression, unregistered
+
+The other structural property of `transportation` is junction sharing: **45%** of parts
+share an endpoint with an adjacent part, **37,3%** of vertices exactly repeat another
+position in the same buffer, and **18,3%** of part-start residuals against the previous
+vertex are already exactly zero. Delta coding cannot capture this, because the repeats are
+not adjacent.
+
+The redundancy is real but **could not be addressed cheaply enough to pay for itself.**
+Measured as zigzag bit-width sums over samples of the extracted buffers:
+
+- Back-referencing each part start to the best of a window of K recent part endpoints
+  shrinks *boundary* bits by up to **-44,1%** (K=32, 28,1% exact hits) — but charging
+  ⌈log2(2K+1)⌉ bits per boundary for the reference index makes every K ≥ 2 a **net loss**
+  (+2,7% to +3,8%). Only K=1, which needs no index, wins: **-2,7%**.
+- A derivable candidate set with an entropy-coded rank (rank entropy 2,40 bits against
+  3,00 flat, 46% choose rank 0) nets **-1,4%**.
+- A `JUNCTION_REF` transform choosing between {previous vertex, previous part's start} by
+  a rule the decoder re-runs was implemented and measured **+1,6%** on `transportation`.
+
+The reason it cannot be rescued by a better rule: a **free, perfect oracle** choosing
+between those two references saves only **5,4%** of boundary bits (~1,9% of the buffer),
+and the alternative is the better reference at just 24,5% of boundaries. There is not
+enough headroom for any decoder-reproducible rule to pay off, so the failure is in the
+idea, not in the heuristic.
+
+**The governing constraint, and the reason reordering was not pursued further:** the
+redundancy in this layer is abundant but the *addressing* is expensive. Greedy chaining of
+parts by shared endpoints is worth **-16,8%** (top-25 buffers) / **-10,2%** (random 40),
+but an explicit permutation costs **+32,4%** of baseline — ⌈log2 P⌉ + 1 bits per part, with
+P often in the thousands — for a net **+22,2%**. Reordering can only pay if the permutation
+is *derived* rather than stored.
 
 ### Delta-of-delta and reset variants — regression, unregistered
 
@@ -175,7 +357,47 @@ most. Real map vertices are quantized to the tile grid, so successive deltas car
 rounding noise that a second difference amplifies rather than cancels. That the segments
 predicted to win lost hardest is the useful part of the result.
 
+### Midpoint reflection — regression, unregistered
+
+Targeted `landcover`, the layer the quad-corner predictor reaches worst
+(`SEGMENT_QUAD_CORNER` is only -2,8% there against -12,2% on `building`). The idea: its
+larger, blocky rings are often *centrally symmetric*, so instead of first-order delta
+across the whole ring, delta only through the first half and predict each second-half
+vertex as the point-reflection of a first-half partner through the midpoint of the ring's
+`start → apex` diagonal — `pred = start + apex - partner`, integer-exact, so lossless. A
+symmetric ring's residual is then zero; separated into its own FastPFOR region (starts |
+interior | reflect) it should pack narrow, the same block-width lever `SEGMENT_PAIR` uses.
+Two pairings were measured: `SYMMETRIC` (partner `L - r`, axis reflection) and `SPLIT`
+(partner `r - L/2`, central symmetry). Both are lossless over all 8.366 corpus buffers.
+
+Both are **larger than the baseline** on the target layer and everywhere else:
+
+```
+                                  corpus    landcover POLYGON   POLYGON
+DELTA_ZIGZAG_FASTPFOR               ref          ref             ref
+SEGMENT_QUAD_CORNER_FASTPFOR       -6,1%        -2,8%*          -8,0%*
+MIDPOINT_REFLECT_SPLIT_FASTPFOR    +0,9%        +7,0%          +1,8%
+MIDPOINT_REFLECT_SYM_FASTPFOR      +1,7%        +9,9%          +3,5%
+```
+
+The oracle picks a reflect variant on **0** landcover buffers (17+10 across the whole
+corpus, ~8 KB), so it is never the best on the layer it was built for.
+
+**Why it fails: the symmetry prior is wrong for this corpus.** Landcover rings are not
+symmetric enough for `start + apex - partner` to beat predicting the *immediately
+previous* vertex. A first-order delta spans one short edge; the reflection spans the
+deviation from a global symmetry the ring does not have, which is *wider*, not narrower.
+Pulling those wide residuals into their own block then makes it worse, not better — the
+`SEGMENT_PAIR` lever only pays when the separated population is genuinely narrow (near-zero
+quad corners), and here it is the widest of the three. Worst on `water` (+23,5%), whose
+rings are the least parallelogram-like of all. The transform and its
+`MidpointReflectMechanismTest` are kept so the negative result need not be re-derived; it
+is removed from `research()`.
+
 ### Would a tile ever pick one of these?
+
+*(This section is about the delta-of-delta family above. For `SEGMENT_PAIR` the answer is
+different — see below.)*
 
 No — which is why they were removed. The tables above choose one encoding per corpus or per layer, but a real tile selects
 per stream — `StreamMetadata` already carries the technique per stream, so an encoder may
@@ -207,6 +429,22 @@ are not free.** A predictor that restarts per part or ring has to beat the basel
 enough to pay for its own seeds first, which on this corpus is a ~10% handicap before
 the predictor does anything.
 
+`SEGMENT_PAIR` clears that bar without ever paying it: it has no reset seeds, because it
+never restarts a prediction — it only changes which residuals share a FastPFOR block. Its
+oracle line is also a different shape from the family above, since it does not need to be
+selected *against* the baseline to be worth having:
+
+```
+always SEGMENT_PAIR_FASTPFOR        12.795.818
+best baseline per buffer     13.325.818   +4,1%
+best of all per buffer       12.757.039   -0,3%
+```
+
+Always using it beats a perfect free selector over both baselines by 4,1%, and a perfect
+selector that also includes it improves on always-using-it by only 0,3%. That is the
+opposite of the delta-of-delta result: the win does not depend on per-stream signalling,
+so it needs no selector and no extra header — one technique, applied unconditionally.
+
 ## Baseline
 
 Baselines 1 and 2 from the root `README.md`: componentwise delta + zigzag over a
@@ -217,7 +455,9 @@ payload but needs a longer header has not necessarily won.
 
 Baseline 3 (general-purpose Gzip/Zstd) is not currently implemented.
 
-`research()` is currently empty — see **Results** for what has been measured and rejected.
+`research()` currently holds `SEGMENT_PAIR_FASTPFOR` and the composition
+`SEGMENT_QUAD_CORNER_FASTPFOR` — see **Results** for what they do, and for what has been
+measured and rejected.
 
 ## Notes on fidelity to MLT
 
@@ -254,15 +494,21 @@ research-java/
       ExtractCli.java              extract-step CLI (default mainClass)
     encoding/
       Encoding.java            name + encode + decode; the whole contract
+      PartBoundaries.java      vertex-run offsets derived from the topology streams
       VertexTransform.java     logical layer, List<Vertex> <-> int[] (+ ZigZagDelta)
       IntCodec.java            physical layer, int[] <-> byte[] (+ Varint, FastPfor)
       VertexBufferCodec.java   one transform + one codec = an Encoding; also holds
                                  BufferContext and EncodedBuffer
       StreamMetadata.java      size of the header MLT writes in front of a stream
       Baselines.java           the two baselines + the research registry
+      research/
+        SegmentPair.java       groups part-start residuals ahead of interior deltas
+        SegmentQuadCorner.java part starts + 4th-corner (p0+p2-p1) prediction, 3 grouped populations
   src/test/java/org/maplibre/mlt/research/
     extraction/VertexBufferExtractorFidelityTest.java   reflective pin against mlt-core
     encoding/IntCodecTest.java            physical-layer round trips
     encoding/VertexTransformTest.java     logical-layer round trips
     encoding/VertexBufferCodecTest.java   round trips every registered encoding
+    encoding/research/SegmentPairMechanismTest.java   pins SegmentPair's grouping and decode
+    encoding/research/SegmentQuadCornerMechanismTest.java   pins the composition reduces to each part
 ```

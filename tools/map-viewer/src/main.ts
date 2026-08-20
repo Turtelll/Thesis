@@ -18,6 +18,16 @@ interface LayerConfig {
 
 const SOURCE_ID = "mbtiles";
 
+const DATASETS = [
+  { id: "munich", label: "Munich" },
+  { id: "ny", label: "New York" },
+];
+
+function currentDataset(): string {
+  const id = new URLSearchParams(window.location.search).get("dataset");
+  return DATASETS.some((d) => d.id === id) ? id! : DATASETS[0].id;
+}
+
 // Suffix for the companion line layer that traces every polygon ring, so the
 // individual vertices/edges of a fill layer stay visible where fills overlap.
 const OUTLINE_SUFFIX = "-outline";
@@ -37,9 +47,9 @@ const LAYERS: LayerConfig[] = [
   },
 ];
 
-async function loadCenter(): Promise<{ center: [number, number]; zoom: number }> {
+async function loadCenter(dataset: string): Promise<{ center: [number, number]; zoom: number }> {
   try {
-    const response = await fetch("/metadata.json");
+    const response = await fetch(`/metadata.json?dataset=${dataset}`);
     const metadata: Record<string, string> = await response.json();
     const [lon, lat, zoom] = (metadata.center ?? "7.4246,43.7384,14").split(",").map(Number);
     return { center: [lon, lat], zoom };
@@ -100,6 +110,25 @@ function addOutlineLayer(map: MapLibreMap, layer: LayerConfig): void {
   });
 }
 
+function buildDatasetSelect(dataset: string): void {
+  const panel = document.getElementById("layer-panel")!;
+  const select = document.createElement("select");
+  select.className = "dataset-select";
+  for (const d of DATASETS) {
+    const option = document.createElement("option");
+    option.value = d.id;
+    option.textContent = d.label;
+    option.selected = d.id === dataset;
+    select.appendChild(option);
+  }
+  select.addEventListener("change", () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("dataset", select.value);
+    window.location.href = url.toString();
+  });
+  panel.appendChild(select);
+}
+
 function buildLayerToggles(map: MapLibreMap): void {
   const panel = document.getElementById("layer-panel")!;
   for (const layer of LAYERS) {
@@ -130,7 +159,8 @@ function buildLayerToggles(map: MapLibreMap): void {
 }
 
 async function main(): Promise<void> {
-  const { center, zoom } = await loadCenter();
+  const dataset = currentDataset();
+  const { center, zoom } = await loadCenter(dataset);
 
   const map = new maplibregl.Map({
     container: "map",
@@ -139,7 +169,7 @@ async function main(): Promise<void> {
       sources: {
         [SOURCE_ID]: {
           type: "vector",
-          tiles: [`${window.location.origin}/tiles/{z}/{x}/{y}.pbf`],
+          tiles: [`${window.location.origin}/tiles/{z}/{x}/{y}.pbf?dataset=${dataset}`],
           minzoom: 0,
           maxzoom: 14,
         },
@@ -161,6 +191,7 @@ async function main(): Promise<void> {
     for (const layer of LAYERS.filter((l) => l.type === "fill")) {
       addOutlineLayer(map, layer);
     }
+    buildDatasetSelect(dataset);
     buildLayerToggles(map);
   });
 }

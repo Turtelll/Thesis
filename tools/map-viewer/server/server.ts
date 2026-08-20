@@ -3,7 +3,7 @@ import Database from "better-sqlite3";
 import express from "express";
 
 /**
- * Serves the thesis mbtiles source data (data/MVT/luxembourg.mbtiles) as a plain
+ * Serves the thesis mbtiles source data (data/MVT/*.mbtiles) as a plain
  * XYZ vector tile endpoint for MapLibre GL, plus the static viewer page.
  *
  * MBTiles stores `tile_row` in TMS order (origin at the bottom); this flips it
@@ -12,14 +12,26 @@ import express from "express";
  */
 
 const PORT = Number(process.env.PORT) || 5173;
-const MBTILES_PATH = path.resolve(__dirname, "..", "..", "..", "data", "MVT", "munich.mbtiles");
+const MVT_DIR = path.resolve(__dirname, "..", "..", "..", "data", "MVT");
 const PUBLIC_DIR = path.resolve(__dirname, "..", "public");
 
-const db = new Database(MBTILES_PATH, { readonly: true, fileMustExist: true });
+const DATASETS: Record<string, string> = {
+  munich: path.join(MVT_DIR, "munich.mbtiles"),
+  ny: path.join(MVT_DIR, "NY.mbtiles"),
+};
+const DEFAULT_DATASET = "munich";
 
-const tileStatement = db.prepare(
-  "SELECT tile_data FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?",
+const dbs = Object.fromEntries(
+  Object.entries(DATASETS).map(([id, file]) => [
+    id,
+    new Database(file, { readonly: true, fileMustExist: true }),
+  ]),
 );
+
+function resolveDataset(req: express.Request): Database.Database | undefined {
+  const id = typeof req.query.dataset === "string" ? req.query.dataset : DEFAULT_DATASET;
+  return dbs[id];
+}
 
 function xyzRowToTms(z: number, xyzRow: number): number {
   return (1 << z) - 1 - xyzRow;
@@ -40,8 +52,16 @@ app.get("/tiles/:z/:x/:y.pbf", (req, res) => {
     return;
   }
 
+  const db = resolveDataset(req);
+  if (!db) {
+    res.status(400).send("Unknown dataset");
+    return;
+  }
+
   const tmsRow = xyzRowToTms(z, y);
-  const row = tileStatement.get(z, x, tmsRow) as { tile_data: Buffer } | undefined;
+  const row = db
+    .prepare("SELECT tile_data FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?")
+    .get(z, x, tmsRow) as { tile_data: Buffer } | undefined;
   if (!row) {
     res.status(204).end();
     return;
@@ -57,7 +77,12 @@ app.get("/tiles/:z/:x/:y.pbf", (req, res) => {
   res.send(data);
 });
 
-app.get("/metadata.json", (_req, res) => {
+app.get("/metadata.json", (req, res) => {
+  const db = resolveDataset(req);
+  if (!db) {
+    res.status(400).send("Unknown dataset");
+    return;
+  }
   const rows = db.prepare("SELECT name, value FROM metadata").all() as {
     name: string;
     value: string;
@@ -70,5 +95,5 @@ app.use(express.static(PUBLIC_DIR));
 
 app.listen(PORT, () => {
   console.log(`MVT map viewer running at http://localhost:${PORT}`);
-  console.log(`Serving tiles from ${MBTILES_PATH}`);
+  console.log(`Serving datasets from ${MVT_DIR}: ${Object.keys(DATASETS).join(", ")}`);
 });

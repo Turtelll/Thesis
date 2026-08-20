@@ -79,63 +79,71 @@ public final class BenchmarkCli {
   private static final class Selection {
 
     private long oracleBytes;
-    private long baselineOracleBytes;
     private final Map<String, Integer> wins = new TreeMap<>();
-    private final Map<String, Long> savedVsBaselineOracle = new TreeMap<>();
-    private int buffersImproved;
+    private final List<List<Integer>> perBufferSizes = new ArrayList<>();
 
     void add(List<String> names, List<Integer> sizes) {
       var best = 0;
-      var baselineBest = Long.MAX_VALUE;
       for (var i = 0; i < names.size(); i++) {
         if (sizes.get(i) < sizes.get(best)) {
           best = i;
         }
-        if (isBaseline(names.get(i))) {
-          baselineBest = Math.min(baselineBest, sizes.get(i));
-        }
       }
       oracleBytes += sizes.get(best);
-      baselineOracleBytes += baselineBest;
       wins.merge(names.get(best), 1, Integer::sum);
-      if (sizes.get(best) < baselineBest) {
-        buffersImproved++;
-        savedVsBaselineOracle.merge(
-            names.get(best), baselineBest - sizes.get(best), Long::sum);
-      }
+      perBufferSizes.add(sizes);
     }
 
     void report(List<String> names, Totals overall) {
       var fixedBest = names.stream().mapToLong(overall::get).min().orElse(0);
       var fixedName = winner(names, overall);
+      var fixedBaselineBest = bestBaseline(overall);
+      var fixedBaselineName = referenceName(overall);
+      var fixedBaselineIndex = names.indexOf(fixedBaselineName);
+
+      var savedVsBaseline = new TreeMap<String, Long>();
+      var buffersImproved = 0;
+      for (var sizes : perBufferSizes) {
+        var best = 0;
+        for (var i = 0; i < sizes.size(); i++) {
+          if (sizes.get(i) < sizes.get(best)) {
+            best = i;
+          }
+        }
+        var baselineSize = sizes.get(fixedBaselineIndex);
+        if (sizes.get(best) < baselineSize) {
+          buffersImproved++;
+          savedVsBaseline.merge(names.get(best), (long) (baselineSize - sizes.get(best)), Long::sum);
+        }
+      }
 
       System.out.printf("%n--- per-buffer selection (oracle) ---%n");
       System.out.printf(
           "always %-24s %14s%n", fixedName, String.format("%,d", fixedBest));
       System.out.printf(
-          "best baseline per buffer %14s   %s%n",
-          String.format("%,d", baselineOracleBytes), delta(baselineOracleBytes, fixedBest));
+          "baseline reference        %14s   %s%n",
+          String.format("%,d", fixedBaselineBest), delta(fixedBaselineBest, fixedBaselineBest));
       System.out.printf(
-          "best of all per buffer   %14s   %s%n",
-          String.format("%,d", oracleBytes), delta(oracleBytes, fixedBest));
+          "research oracle           %14s   %s%n",
+          String.format("%,d", oracleBytes), delta(oracleBytes, fixedBaselineBest));
 
-      var headroom = baselineOracleBytes - oracleBytes;
+      var headroom = fixedBaselineBest - oracleBytes;
       if (headroom == 0) {
         System.out.printf(
             "%nNo research encoding is smallest on any buffer, so a per-buffer selector gains%n"
-                + "nothing over the baselines.%n");
+                + "nothing over the baseline reference.%n");
       } else {
         System.out.printf(
             "%nAdding every research encoding to a per-buffer selector is worth %s (%.2f%%) over%n"
-                + "selecting among baselines alone, across %d of %d buffers.%n",
+                + "the baseline reference, across %d of %d buffers.%n",
             String.format("%,d", headroom),
-            100.0 * headroom / baselineOracleBytes,
+            100.0 * headroom / fixedBaselineBest,
             buffersImproved,
             overall.buffers);
       }
-      if (!savedVsBaselineOracle.isEmpty()) {
+      if (!savedVsBaseline.isEmpty()) {
         System.out.printf("%-24s %12s %10s%n", "  encoding", "bytes saved", "buffers");
-        savedVsBaselineOracle.entrySet().stream()
+        savedVsBaseline.entrySet().stream()
             .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
             .forEach(
                 e ->
@@ -148,10 +156,6 @@ public final class BenchmarkCli {
               + "ceiling. A real selector costs signalling per stream plus decoder complexity; if the%n"
               + "headroom above does not clearly exceed that, per-buffer selection cannot pay for%n"
               + "itself.%n");
-    }
-
-    private static boolean isBaseline(String name) {
-      return Baselines.baseline().stream().map(Encoding::name).anyMatch(name::equals);
     }
   }
 
@@ -254,7 +258,8 @@ public final class BenchmarkCli {
   // --- reporting ----------------------------------------------------------
 
   /**
-   * Prints the corpus totals, then the same numbers per layer and per dominant geometry type.
+   * Prints the breakdown per layer and per dominant geometry type, then the per-buffer selection
+   * oracle.
    *
    * <p>Two different questions are answered per row, and they are deliberately separate columns.
    * The percentages are measured against {@code ref}, the best <em>baseline</em> for that group —
@@ -273,25 +278,6 @@ public final class BenchmarkCli {
 
     System.out.printf(
         "%d buffers, %s raw bytes%n%n", overall.buffers, String.format("%,d", rawTotal));
-
-    var width = names.stream().mapToInt(String::length).max().orElse(20);
-    System.out.printf(
-        "%-" + width + "s %14s %12s %12s%n", "encoding", "bytes", "vs raw", "vs ref");
-    var reference = bestBaseline(overall);
-    var winner = winner(names, overall);
-    for (var name : names) {
-      var bytes = overall.get(name);
-      System.out.printf(
-          "%-" + width + "s %14s %11.1f%% %12s%s%n",
-          name,
-          String.format("%,d", bytes),
-          100.0 * bytes / rawTotal,
-          delta(bytes, reference),
-          name.equals(winner) ? "  *" : "");
-    }
-    System.out.printf(
-        "%n* smallest overall. \"ref\" is the best baseline (%s), what percentages compare to.%n",
-        referenceName(overall));
 
     segment("layer", names, byLayer, TOP_LAYERS);
     segment("geometry", names, byGeometry, Integer.MAX_VALUE);
