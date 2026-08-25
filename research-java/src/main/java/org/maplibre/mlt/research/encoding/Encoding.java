@@ -37,4 +37,40 @@ public interface Encoding {
    * @param vertexCount the number of vertices to reconstruct, likewise known from the metadata.
    */
   List<Vertex> decode(EncodedBuffer encoded, BufferContext ctx, int vertexCount);
+
+  /**
+   * Whether this encoding may emit geometries in an order other than the one it received.
+   *
+   * <p>Such an encoding cannot satisfy {@link #decode}'s usual contract — it does not reconstruct
+   * the original vertex sequence, it reconstructs an equivalent one — so the benchmark verifies it
+   * with {@link GeometryEquivalence} instead of exact equality. Defaulting to {@code false} is what
+   * keeps that relaxation <b>opt-in</b>: without it the check would have to be loosened for every
+   * encoding, and a genuinely lossy encoder would stop being caught.
+   *
+   * <p>The relaxation is exactly what the MLT spec allows and no more ({@code
+   * docs/specification.md}):
+   *
+   * <blockquote>
+   * Feature order is not necessarily a stable round-trip property. [...] MLT encoders may preserve
+   * order, but they may also sort features by id or spatial locality to improve compression when
+   * that optimization is enabled.
+   * </blockquote>
+   *
+   * <p>An encoding claiming this still has to preserve every geometry exactly; it is only released
+   * from preserving their <em>order</em>.
+   */
+  default boolean reordersGeometries() {
+    return false;
+  }
+
+  /**
+   * The buffer this encoding actually emits, which is what {@link #decode} must reconstruct.
+   *
+   * <p>Identical to {@code ctx} unless {@link #reordersGeometries()} — the benchmark compares the
+   * decode against this, and the geometry equivalence of this against the extraction, so a
+   * reordering encoding that silently dropped a feature is still caught.
+   */
+  default BufferContext emitted(BufferContext ctx) {
+    return ctx;
+  }
 }

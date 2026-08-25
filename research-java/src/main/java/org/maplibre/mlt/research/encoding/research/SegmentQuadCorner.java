@@ -43,6 +43,11 @@ public final class SegmentQuadCorner implements VertexTransform {
     private static final int CORNER = 2;
 
     @Override
+    public String name() {
+        return "SEGMENT_QUAD_CORNER";
+    }
+
+    @Override
     public int[] apply(BufferContext ctx) {
         final var vertices = ctx.vertices();
         final var classes = classify(PartBoundaries.of(ctx, vertices.size()), vertices.size());

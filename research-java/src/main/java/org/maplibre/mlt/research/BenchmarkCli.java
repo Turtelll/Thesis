@@ -17,6 +17,7 @@ import java.util.TreeMap;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.Baselines;
 import org.maplibre.mlt.research.encoding.Encoding;
+import org.maplibre.mlt.research.encoding.GeometryEquivalence;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
@@ -47,6 +48,12 @@ public final class BenchmarkCli {
 
   /** Layers shown individually in the breakdown; the rest are folded into one {@code (other)} row. */
   private static final int TOP_LAYERS = 6;
+
+  /** Encoding columns per table; the table repeats for the remaining encodings. */
+  private static final int COLUMNS_PER_TABLE = 4;
+
+  /** Widest cell content: "13.399.028" + " " + "+15,6%" + the winner star. */
+  private static final int CELL_WIDTH = 21;
 
   /** Running byte totals for one encoding within one group (the whole corpus, or one layer). */
   private static final class Totals {
@@ -120,9 +127,22 @@ public final class BenchmarkCli {
       System.out.printf("%n--- per-buffer selection (oracle) ---%n");
       System.out.printf(
           "always %-24s %14s%n", fixedName, String.format("%,d", fixedBest));
-      System.out.printf(
-          "baseline reference        %14s   %s%n",
-          String.format("%,d", fixedBaselineBest), delta(fixedBaselineBest, fixedBaselineBest));
+      /* Both baselines are printed, not just the smaller one: the encoder picks FastPFOR or
+       * Varint per stream, so a gain that only exists against the weaker baseline is not real.
+       * The starred row is the reference every percentage here is measured against. */
+      for (var baseline : Baselines.baseline()) {
+        var name = baseline.name();
+        var bytes = overall.get(name);
+        if (bytes == 0) {
+          continue;
+        }
+        System.out.printf(
+            "baseline %-15s%s %14s   %s%n",
+            name,
+            name.equals(fixedBaselineName) ? "*" : " ",
+            String.format("%,d", bytes),
+            delta(bytes, fixedBaselineBest));
+      }
       System.out.printf(
           "research oracle           %14s   %s%n",
           String.format("%,d", oracleBytes), delta(oracleBytes, fixedBaselineBest));
@@ -291,7 +311,6 @@ public final class BenchmarkCli {
    */
   private static void segment(
       String label, List<String> names, Map<String, Totals> groups, int limit) {
-    System.out.printf("%n--- by %s ---%n", label);
 
     /* Ranked by bytes, not by buffer count: a buffer is one (tile, layer) pair, so counting them
      * measures how many tiles a layer appears in, not how much data it is. `building` is 311
@@ -312,16 +331,48 @@ public final class BenchmarkCli {
       shown.add(Map.entry("(other, " + (sorted.size() - limit) + ")", rest));
     }
 
+    /* Encodings are printed in chunks so a row fits a terminal, the whole table repeating per
+     * chunk with the same rows. Nothing is dropped: the reference, the winner and the percentages
+     * are all computed over *every* encoding, so a chunk that happens to exclude the winner still
+     * names it in the `best` column and still measures against the same baseline. */
+    for (var from = 0; from < names.size(); from += COLUMNS_PER_TABLE) {
+      var chunk = names.subList(from, Math.min(from + COLUMNS_PER_TABLE, names.size()));
+      var part =
+          names.size() <= COLUMNS_PER_TABLE
+              ? ""
+              : String.format(
+                  " (%d/%d)",
+                  from / COLUMNS_PER_TABLE + 1,
+                  (names.size() + COLUMNS_PER_TABLE - 1) / COLUMNS_PER_TABLE);
+      System.out.printf("%n--- by %s%s ---%n", label, part);
+      table(label, names, chunk, shown, from + COLUMNS_PER_TABLE >= names.size());
+    }
+  }
+
+  /**
+   * One table: the given rows, but only {@code chunk}'s columns. {@code withBest} appends the
+   * winner column, which is printed once on the last chunk rather than repeated in every one.
+   */
+  private static void table(
+      String label,
+      List<String> names,
+      List<String> chunk,
+      List<Map.Entry<String, Totals>> shown,
+      boolean withBest) {
+
     var width =
         Math.max(label.length(), shown.stream().mapToInt(g -> g.getKey().length()).max().orElse(8));
     var nameWidth = names.stream().mapToInt(String::length).max().orElse(20);
     var corpus = shown.stream().mapToLong(g -> bestBaseline(g.getValue())).sum();
     var header =
         new StringBuilder(String.format("%-" + width + "s %8s %7s", label, "buffers", "share"));
-    for (var name : names) {
-      header.append(String.format(" %22s", abbreviate(name)));
+    var column = columnWidth(names);
+    for (var name : chunk) {
+      header.append(String.format(" %" + column + "s", name));
     }
-    header.append(String.format("   %-" + nameWidth + "s", "best"));
+    if (withBest) {
+      header.append(String.format("   %-" + nameWidth + "s", "best"));
+    }
     System.out.println(header);
 
     for (var group : shown) {
@@ -335,18 +386,22 @@ public final class BenchmarkCli {
                   group.getKey(),
                   totals.buffers,
                   corpus == 0 ? 0.0 : 100.0 * reference / corpus));
-      for (var name : names) {
+      for (var name : chunk) {
         var bytes = totals.get(name);
         /* The winning cell is starred; the percentages are all against the baseline reference,
          * which is a different question and can land on a different column. */
         row.append(
             String.format(
-                " %13s %7s%s",
-                String.format("%,d", bytes),
-                delta(bytes, reference),
-                name.equals(winner) ? "*" : " "));
+                " %" + column + "s",
+                String.format(
+                    "%s %s%s",
+                    String.format("%,d", bytes),
+                    delta(bytes, reference),
+                    name.equals(winner) ? "*" : "")));
       }
-      row.append(String.format("   %-" + nameWidth + "s", winner));
+      if (withBest) {
+        row.append(String.format("   %-" + nameWidth + "s", winner));
+      }
       System.out.println(row);
     }
   }
@@ -397,22 +452,57 @@ public final class BenchmarkCli {
     return String.format("%+.1f%%", 100.0 * (bytes - reference) / reference);
   }
 
-  private static String abbreviate(String name) {
-    return name.length() <= 22 ? name : name.substring(0, 21) + "…";
+  /**
+   * Width of one encoding column: wide enough for the widest cell ({@code bytes} + {@code delta} +
+   * the winner star) and for the longest encoding name, so nothing is truncated and no column is
+   * padded further than its content needs.
+   */
+  private static int columnWidth(List<String> names) {
+    var widestName = names.stream().mapToInt(String::length).max().orElse(0);
+    return Math.max(CELL_WIDTH, widestName);
   }
 
   // --- per-buffer work ----------------------------------------------------
 
   /**
-   * Decodes what was just encoded and fails the run if it does not reconstruct the buffer exactly.
+   * Decodes what was just encoded and fails the run if it does not reconstruct the buffer.
    *
    * <p>Runs unconditionally: a size from an encoding that loses data is not a result, and a lossy
    * encoder would otherwise report the smallest number in the table precisely <em>because</em> it
    * discards information.
+   *
+   * <p>An encoding declaring {@link Encoding#reordersGeometries()} is checked against the buffer
+   * it actually emits rather than the extraction, and by geometry equivalence rather than exact
+   * equality — it is allowed to change the order of geometries and nothing else. Every other
+   * encoding is still held to exact reconstruction, so that declaration is the only way to obtain
+   * the weaker check and a lossy encoder cannot slip through by claiming to reorder.
    */
   private static void verifyRoundTrip(
       ManifestEntry entry, BufferContext ctx, Encoding encoding, EncodedBuffer encoded) {
     var decoded = encoding.decode(encoded, ctx, ctx.vertices().size());
+
+    if (encoding.reordersGeometries()) {
+      var emitted = encoding.emitted(ctx);
+      // Two separate obligations: the decode must reproduce what was encoded, and the reordering
+      // must not have altered the geometry. Checking only the first would pass an encoding that
+      // silently dropped a feature before encoding it.
+      if (!emitted.vertices().equals(decoded)) {
+        throw new IllegalStateException(
+            String.format(
+                "%s does not decode to the buffer it emitted on %d/%d/%d %s (%d vertices)",
+                encoding.name(), entry.z(), entry.x(), entry.y(), entry.layerName(),
+                ctx.vertices().size()));
+      }
+      if (!GeometryEquivalence.holds(ctx, emitted)) {
+        throw new IllegalStateException(
+            String.format(
+                "%s did not preserve the geometry of %d/%d/%d %s (%d vertices): %s",
+                encoding.name(), entry.z(), entry.x(), entry.y(), entry.layerName(),
+                ctx.vertices().size(), GeometryEquivalence.describe(ctx, emitted)));
+      }
+      return;
+    }
+
     if (!ctx.vertices().equals(decoded)) {
       throw new IllegalStateException(
           String.format(

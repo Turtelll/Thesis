@@ -18,3 +18,9 @@ tools/map-viewer/public/main.css.map
 
 # OS
 Thumbs.db
+
+# Python analysis project
+analysis-python/.venv/
+analysis-python/out/
+__pycache__/
+*.pyc

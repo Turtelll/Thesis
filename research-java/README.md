@@ -63,6 +63,7 @@ the topology streams (`tileExtent`, `geometryTypes`, `numGeometries`, `numParts`
 | `<extractionDir>` | yes | Must contain `manifest.json` |
 | `--csv <file>` | no | Also dump per-buffer sizes (one column per encoding) |
 | `--layer <name>` | no | Restrict the run to one layer |
+| `--reorder <mode>` | no | Reorder geometries before encoding: `none` (default), `feature`, `feature-rev` |
 
 Prints corpus totals, then a breakdown by layer and by dominant geometry type. Each
 encoding is shown as a percentage against the **best baseline for that group**, so a
@@ -82,6 +83,10 @@ housenumber              244       735.180     base       849.969   +15,6%
 ```
 
 Negative means smaller, which is the goal.
+
+With `--reorder`, every buffer is additionally checked for geometry preservation before it is
+encoded: reordering may change the order and nothing else, so the multiset of parts must be
+unchanged (parts compared up to reversal). The run fails naming the tile and layer otherwise.
 
 Every run **round-trips every encoding on every buffer** — encode, decode, compare
 against the extraction — and fails naming the encoding, tile and layer if any does not
@@ -123,6 +128,130 @@ holds `SEGMENT_PAIR_FASTPFOR` and `SEGMENT_QUAD_CORNER_FASTPFOR`; see **Results*
 they do and for the encodings that have been measured and rejected.
 
 ## Results
+
+### Reordering geometries — `--reorder feature-rev`, **-11,2% NY / -11,8% Munich**
+
+Not an encoding but a **pre-pass on the buffer**, and currently the largest single effect
+measured here. It reorders whole features so each one starts near where the previous ended,
+shrinking the part-start residual that a continuous delta cursor pays at every boundary.
+
+```
+                                   plain baseline   reorder   reorder+rev
+DELTA_ZIGZAG_FASTPFOR                  13.399.028  12.036.928  11.821.207  -11,8%
+SEGMENT_PAIR_FASTPFOR                  12.795.818  11.807.430  11.497.757  -14,2%
+SEGMENT_QUAD_CORNER_FASTPFOR           12.579.088  11.595.318  11.285.948  -15,8%
+```
+
+| segment | baseline | reorder | +reversal |
+|---|---|---|---|
+| `transportation` | 4.232.495 | -15,9% | **-17,6%** |
+| `boundary` | 1.169.821 | -19,0% | **-22,3%** |
+| `building` | 3.228.047 | -11,1% | **-13,5%** |
+| `landuse` | 492.037 | -4,4% | -5,2% |
+| `landcover` | 1.194.048 | -3,1% | -3,9% |
+| `water` | 916.048 | -0,6% | -0,7% |
+| LINESTRING | 5.992.732 | -15,7% | **-17,7%** |
+| POLYGON | 5.713.018 | -7,4% | -9,0% |
+| POINT / `housenumber` / `poi` | — | byte-identical | byte-identical |
+
+**Confirmed on the NY corpus.** 35.641 buffers, identical row sets across all three modes:
+
+```
+                                       none      feature   feature-rev
+DELTA_ZIGZAG_FASTPFOR            58.403.996   52.910.127   51.845.247   -11,2%
+SEGMENT_PAIR_FASTPFOR            55.686.995   51.844.248   50.957.202   -12,8%
+SEGMENT_QUAD_CORNER_FASTPFOR     54.695.817   50.841.123   49.960.832   -14,5%
+```
+
+| NY segment | baseline | feature-rev |
+|---|---|---|
+| `boundary` | 1.471.037 | **-18,6%** |
+| `transportation` | 16.536.440 | **-15,9%** |
+| `building` | 23.160.287 | -13,5% |
+| `transportation_name` | 4.011.771 | -9,3% |
+| `landuse` | 1.603.241 | -3,7% |
+| `landcover` | 3.713.513 | -2,1% |
+| `water` | 2.062.937 | -0,8% |
+| `housenumber` (point-only) | 3.513.170 | byte-identical |
+| LINESTRING | 22.459.493 | **-14,6%** |
+| POLYGON | 30.368.015 | -10,8% |
+| POINT | 5.253.329 | byte-identical |
+| **z14 alone** (73,4% of mass) | 41.649.791 | **-10,4%** |
+
+**Why it is free.** The earlier junction work rejected reordering because an explicit
+permutation costs ceil(log2 P)+1 bits per part — "+32,4% of baseline ... for a net +22,2%"
+(see *Junction back-references* below). **That cost does not exist.** The order of geometries in
+the buffer carries no information that has to be reconstructed: no coordinate changes, only a
+geometry's position *within* the buffer, and the spec says so directly
+(`maplibre-tile-spec/docs/specification.md`):
+
+> **Feature order is not necessarily a stable round-trip property.** [...] MLT encoders may
+> preserve order, but they may also **sort features by id or spatial locality to improve
+> compression** when that optimization is enabled.
+
+So nothing is signalled and no decoder changes — a decoder emits the order it reads. This is the
+"reordering can only pay if the permutation is *derived* rather than stored" constraint being
+satisfied in the strongest way available: the permutation is not derived either, it is simply
+not needed.
+
+**What it does.** `GeometryReorder` greedily chains features: repeatedly take the unused feature
+whose entry endpoint is nearest the current cursor (Manhattan distance — that is what the two
+componentwise delta cursors actually pay), emit it, advance the cursor to its exit endpoint.
+`feature-rev` additionally emits a feature backwards when its far endpoint is nearer.
+
+Two constraints it respects: a multi-part feature's parts stay contiguous and in order (splitting
+them changes the feature), and a buffer whose runs are not derivable from the topology streams is
+returned untouched — which is why every point-only column above is byte-identical rather than
+merely unchanged in aggregate.
+
+**It is not additive with `SEGMENT_PAIR`, but still worth combining.** Both levers attack the same
+part-start population — one shrinks those residuals, the other moves them into their own FastPFOR
+region:
+
+| | corpus |
+|---|---|
+| `SEGMENT_PAIR` alone | -4,50% |
+| reorder alone | -11,78% |
+| both | -14,19% |
+| *(if they were additive)* | *(-16,28%)* |
+
+The overlap is 2,09pp. Combining still beats either alone, and the best measured configuration on
+this corpus is reorder + `SEGMENT_QUAD_CORNER_FASTPFOR` at **-15,8%**.
+
+**Reversal is the riskier half.** It is free for rendering — a LineString reversed is the same
+LineString — but it destroys direction semantics (one-way streets, direction-dependent labelling).
+It is a separate mode (`--reorder feature` vs `feature-rev`) so the two are always reported apart;
+it is worth roughly 2pp of the total.
+
+**Two caveats that bound this result.**
+
+1. **The property columns are not measured.** It is the *feature table* that is sorted, not the
+   vertex buffer alone — attributes must travel with their feature, which is what
+   `MltConverter.sortFeaturesAndEncodeGeometryColumn` already does for the existing sorts. A
+   spatial sort can make the attribute columns compress *worse* (weaker RLE runs), and the spec
+   notes sorting by `id` tested more efficient in their case. **-11,8% on the geometry is not a
+   net win on the tile** until that counter-cost is measured. This is the next measurement.
+2. **~~This corpus overstates boundary-dominated levers.~~ Measured on both corpora — it does
+   not.** The concern was that Munich carries 63% of its vertex mass on z4/z5 overview tiles, where
+   part boundaries are a large share of the bits, and that NY (43,7% on z14, with boundary deltas
+   only 25,7% of bits against Munich's 37,6%) would therefore be much weaker. It is not:
+
+   | | Munich (8.366 buffers) | NY (35.641 buffers) |
+   |---|---|---|
+   | corpus | -11,8% | **-11,2%** |
+   | z14 only | -10,8% | **-10,4%** (73,4% of NY's mass) |
+   | + `SEGMENT_QUAD_CORNER` | -15,8% | **-14,5%** |
+
+   The lever is not the one `SEGMENT_PAIR` depends on. `SEGMENT_PAIR` exploits the *width gap*
+   between boundary and interior deltas, which does shrink with zoom; reordering shrinks the
+   boundary residuals themselves, and a road network at z14 has just as many features needing to be
+   visited in a sensible order as one at z5.
+
+Verified on every buffer: reordering may change the order and nothing else, so
+`GeometryEquivalence` checks that the multiset of parts is unchanged — same coordinates, same part
+structure, parts compared up to reversal — and the run fails naming the tile and layer otherwise.
+Every encoding is still round-tripped exactly against the reordered buffer, so the strict contract
+that protects every other result is untouched.
 
 ### Composing both — `SEGMENT_QUAD_CORNER_FASTPFOR`, **-6,1% corpus / -12,2% building**
 
@@ -305,6 +434,12 @@ but an explicit permutation costs **+32,4%** of baseline — ⌈log2 P⌉ + 1 bi
 P often in the thousands — for a net **+22,2%**. Reordering can only pay if the permutation
 is *derived* rather than stored.
 
+> **Superseded on the permutation point.** The premise above — that the new order must be
+> transmitted — is wrong: feature order is not a round-trip property, so there is no
+> permutation to pay for. See *Reordering geometries* at the top of **Results**, where the
+> same greedy chaining measures **-11,8%** corpus-wide. The junction *back-reference* results
+> in this section stand; only the reordering verdict is overturned.
+
 ### Delta-of-delta and reset variants — regression, unregistered
 
 **These encodings are no longer in `research()`** — they were removed after measuring.
@@ -356,6 +491,185 @@ Worst on `transportation` and `MULTILINESTRING` — the long polylines expected 
 most. Real map vertices are quantized to the tile grid, so successive deltas carry
 rounding noise that a second difference amplifies rather than cancels. That the segments
 predicted to win lost hardest is the useful part of the result.
+
+### Predictors for >4-vertex rings — measured, no encoder written
+
+`SEGMENT_QUAD_CORNER`'s parallelogram predictor fires only on *exactly*-four-vertex rings.
+Rings with more vertices — **27% of all rings** (163k), predominant in `landcover` (68%),
+`water` (67%), `landuse` (57%) — get plain first-order delta. The question was whether any
+model-based predictor beats that delta on their *interior* vertices (those with two
+predecessors, so an edge is defined). `RingPriorCli` measures it directly — it encodes
+nothing, it just sums the zigzag bit width of each candidate residual over every >4-vertex
+ring in the pure-polygon columns (75% of these rings, zero linestring contamination):
+
+```
+./gradlew ringPrior --args="../data/extracted"
+```
+
+Three predictors, all integer-exact (lossless), against the baseline `B: pred = p[i-1]`:
+
+- **C — edge continuation** (constant velocity, for collinear runs): `pred = p[i-1] + (p[i-1]-p[i-2])`.
+- **R — right-angle turn** (rectilinear): `pred = p[i-1] + rot90(p[i-1]-p[i-2])`, both turn
+  directions and a per-vertex best-of.
+
+Mean residual bits per interior vertex (lower is better), corpus-wide over 1,35M vertices:
+
+| predictor | corpus | building | landcover | water |
+|---|---|---|---|---|
+| **B baseline** | **10,41** | 8,81 | 11,57 | 10,41 |
+| C continuation | 11,53 | 10,91 | 12,28 | 10,79 |
+| R rot-best (free turn choice) | 10,04 | 7,78 | 11,64 | 10,26 |
+| best{B,C,R} (free per-vertex oracle) | 8,69 | 6,92 | 9,93 | 8,80 |
+
+**No predictor beats B on any layer that matters.** C is *wider* than B almost everywhere —
+the same reason uniform delta-of-delta lost: on quantized map vertices the second difference
+amplifies rounding noise. R edges B only on `building`/`water` and loses on
+`landcover`/`landuse`. The separable near-zero population that made `QUAD_CORNER` win (40,7%
+exact parallelograms) **does not exist here**: across every layer the share of residuals that
+are zero or ≤1 bit is under 1,2% (building's best case, 3,2%). Larger rings are neither
+rectilinear nor collinear enough for a fixed model to zero out an edge.
+
+**The oracle settles it.** Even a *free, perfect* per-vertex choice among all four predictors
+drops the mean only ~1,7 bits/vertex (10,41 → 8,69). Signalling a 4-way per-vertex choice
+costs 2 bits/vertex, so the oracle is **net negative on every layer** (corpus −0,3, building
+−0,1, landcover −0,4 bits/vertex) before the block-width separation lever is even applied —
+and that lever cannot help a population with ~0% near-zero residuals. So there is no encoder
+to write: a first-order delta over a short ring edge is already near-optimal, and the two
+priors that could have beaten it (rectilinearity, collinearity) do not hold on this corpus.
+`RingPriorCli` is kept so the measurement need not be re-derived.
+
+**The rectilinear-staircase refinement, and why it also fails.** `building` is CCW-wound and
+mostly right-angled, so a natural idea is a *derived* turn direction instead of a signalled one:
+force each turn to be the 90° rotation *opposite* to the previous actual turn (an alternating
+`staircase`), reading the previous turn's sign from `p[i-3..i-1]` so nothing is signalled. It
+measures **9,39 bits on building — worse than the baseline (8,81) and worse than a fixed
+rot90-ccw (8,71).** Two direct measurements say why:
+
+| property of `building` >4-ring interior turns (446k) | measured |
+|---|---|
+| turn is ~90° (80°–100°) | **82,2%** |
+| turn *alternates* sign from the previous turn | **51,7%** |
+
+The rectilinearity is real, but the walk is **not a zigzag**: a concave outline turns in *runs*
+of same-direction corners with occasional reversals at notches, so the alternation is a coin
+flip and forcing it adds error rather than removing it. And even with the direction right, the
+rotation predicts an edge's *direction*, not its *length* — adjacent walls differ in length, so
+`p[i-1] + rot90(prevEdge)` still carries a full residual edge (fixed rot90-ccw reaches only
+1,9% ≤1bit). A rectilinear prior cannot be converted into a near-zero residual here, because
+neither the turn sign nor the edge length is derivable.
+
+### Context-adaptive delta for LineStrings — `CONTEXT_DELTA`, weak win, registered
+
+Answers the question `ideen.md` leaves open as *Idee 2*, and the answer is **no**.
+
+`ideen.md` measured that edge continuation (`pred = p[i-1] + (p[i-1]-p[i-2])`) beats the baseline
+by **-10,1% in mean zigzag bits** on NY z14 with nothing signalled, but is **+1,9% as bytes** under
+FastPFOR: it wins the median (5,91 -> 5,31 bits) and widens the tail (p99,9 rises 11 -> 12), and
+FastPFOR prices the block maximum. The open question was whether the positions where continuation
+loses are recognizable from a *derivable* feature — if so, a gate would suppress the tail and no
+rANS would be needed.
+
+**What it does.** A run-length state machine over already-reconstructed vertices, the `c = min(run,3)`
+shape `ideen.md` specifies. A step is *smooth* when the turn between the last two edges is shallow
+by an integer cross/dot test (`|cross| <= |dot| >> turnShift`, `dot > 0` — no floating point). The
+context picks the predictor (`c=0` plain delta, `c>=1` the mean of the last `c` edges) **and** the
+FastPFOR region the residual lands in, so a rough population never sets a smooth one's block width.
+A mispredicted vertex (residual wider than `missThreshold`) collapses the run — the "Streikzähler"
+of `ideen.md`'s decoder state. Nothing is signalled per vertex; only the four region *counts* are
+written, since the decoder cannot derive region offsets from topology alone (see below).
+
+**Measured on both corpora, LINESTRING:**
+
+```
+                            Munich LINESTRING        NY transportation
+DELTA_ZIGZAG_FASTPFOR            5.992.732  ref         16.536.440  ref
+CONTEXT_DELTA_T2_M8              5.968.948  -0,4%       16.410.704  -0,8%
+CONTEXT_DELTA_T2_M32             5.925.249  -1,1%       16.242.958  -1,8%
+SEGMENT_PAIR_FASTPFOR            5.614.175  -6,3%       15.386.675  -7,0%
+REORDER_REV_SEGMENT_PAIR         4.668.030 -22,1%       13.625.028 -17,6%
+```
+
+**The gate works; the predictor is not worth gating.** It is *not* the +1,9% regression that
+unconditional continuation produced — the gating and the per-context regions did suppress the tail,
+so the mechanism does what it was designed to do. It simply buys very little, and it loses to
+`SEGMENT_PAIR` by a factor of six.
+
+**Why, measured directly** (NY z14, 300 buffers, share of vertices per context and mean residual
+width in bits):
+
+| `missThreshold` | c0 | c1 | c2 | c3 |
+|---|---|---|---|---|
+| 8 | 58,4% w=14,40 | 35,5% w=10,67 | **4,1%** w=9,05 | **1,9%** w=8,86 |
+| 32 | 47,7% w=15,07 | 35,5% w=10,55 | 8,2% w=9,82 | 8,5% w=9,60 |
+| unbounded | 34,3% w=16,09 | 33,5% w=10,67 | 10,9% w=11,22 | 21,4% w=11,30 |
+
+**Only ~6% of vertices ever reach context 2 or 3.** The multi-edge smoothing that was supposed to
+damp quantization noise almost never fires; 94% of the buffer sits in c0 (plain delta) or c1 (plain
+continuation), so the encoding is essentially the baseline plus the continuation that was already
+known to be worth nothing here. And the parameter cannot be tuned out of it: loosening
+`missThreshold` grows c2/c3 but **their residuals widen in lockstep** (8,86 -> 11,30 bits), because
+the vertices it admits are exactly the ones the predictor handles badly. There is no setting at
+which a large *and* narrow population exists.
+
+**The structural reason, and the limit of the whole approach.** The context of vertex `i` is read
+*before* `i` is decoded, so it describes the run as of `p[i-1]` — the machine cannot know the line
+turns at `i` until it has seen it turn. Every corner is therefore coded once at full context, with a
+residual *wider* than a plain delta would have been, and only the following vertex is corrected.
+That one-vertex lag is not an implementation detail to be fixed; it is what "derived from already
+decoded data" means. A road at z14 turns often enough that the lag consumes the gain.
+
+**One honest cost this pays that the other region-splitting encodings do not.** `SEGMENT_PAIR` and
+`SEGMENT_QUAD_CORNER` classify each vertex from the topology streams, so a decoder computes every
+region's offset before decoding anything. Here the context depends on the vertices being
+reconstructed, so region sizes are not derivable — the four counts are written into the payload
+(a handful of bytes, charged in `totalBytes()` via a second `StreamMetadata` header). This is why it
+is an `Encoding` directly rather than a `VertexTransform`.
+
+**Verdict.** Registered with its mechanism test so the negative need not be re-derived, same status
+as `RIGHT_ANGLE_TURN`. The per-buffer oracle picks a `CONTEXT_DELTA` variant on 149 of 8.366 Munich
+buffers (~2,4 KB), so it is never worth shipping as a whole-buffer encoding. **The trail now points
+back to `ideen.md`'s *Idee 1*:** an entropy coder prices the median, a bit packer the maximum —
+continuation's gain is real in the distribution and only invisible to FastPFOR, so rANS remains the
+one measured constellation where it could survive. What this result adds is that the cheaper escape
+route is closed: the tail cannot be gated away by a derivable rule, because the rule is one vertex
+too late.
+
+### Signalling the turn — `RIGHT_ANGLE_TURN_FASTPFOR`, regression, registered
+
+`RingPriorCli` measured the turn direction as a *free* per-vertex oracle (`R rot-best`, 8,81 →
+7,78 bits on `building`). `RIGHT_ANGLE_TURN_FASTPFOR` is the honest, decodable version of that:
+for every interior vertex of a >4-vertex ring it predicts `p[i-1] + rot90(prevEdge)`, picks the
+turn direction (cw/ccw) with the smaller residual, and **signals it as one bit per such vertex**
+in a side stream. It is the first encoding here that adds a signalled channel rather than only
+reordering, so it is an `Encoding` directly (not a `VertexTransform`) and counts a second
+`StreamMetadata` header for the bit stream, so `totalBytes()` carries the true signal cost.
+
+Measured end-to-end, it is a regression on every layer — **`building` +1,5%** (3.277.603 vs
+3.228.047), `transportation` +2,3%, `landcover` +6,2%, `water` +8,6%; **POLYGON +3,8%** — and
+the per-buffer oracle picks it on **1 of 8366 buffers** (8 bytes). This confirms the
+`RingPriorCli` inference at the byte level: the ≈1,0-bit direction saving on `building` does not
+cover the 1-bit signal, and the edge *length* still carries a full residual (rot90 leaves only
+1,9% of residuals ≤1 bit). Kept, with its mechanism test, so the negative result need not be
+re-derived — same status as the removed `QUAD_CORNER`, but registered because there is a concrete
+encoder to keep.
+
+### Composing turn with quad-corner — `SEGMENT_QUAD_CORNER_TURN_FASTPFOR`, regression, registered
+
+`SEGMENT_QUAD_CORNER` wins on exactly-four-vertex rings but leaves >4-vertex rings on plain delta.
+The natural composition routes by ring length: a 4-ring keeps the parallelogram corner, a >4-ring
+gets `RIGHT_ANGLE_TURN`'s signalled 90°-turn predictor on its interior vertices (`i >= start+2`),
+and the residuals segment into four FastPFOR regions (starts | interior | corners | turns). Unlike
+`SEGMENT_QUAD_CORNER` it therefore carries the signalled turn-bit side channel, so it is an
+`Encoding` directly.
+
+It is **worse than plain `SEGMENT_QUAD_CORNER` on every layer** — `building` -11,6% (against
+-12,2%), `landcover` +3,6% (against -2,8%), `water` +7,5% (against -1,2%); **POLYGON -4,6% against
+-8,0%**. The turn path is net-negative wherever it fires (the standalone `RIGHT_ANGLE_TURN` result),
+so adding it to the winning quad-corner path only dilutes the winner: it costs little on `building`
+(few >4 rings, so only 0,6pp given back) and flips `landcover`/`water` (68%/67% >4 rings) from a win
+to a loss. The per-buffer oracle still picks it on **74 of 8366 buffers** (84.126 bytes) — a small
+tail of strongly rectilinear buffers — but as a whole-buffer encoding it never beats plain
+quad-corner. Registered with its mechanism test so the composition need not be re-derived.
 
 ### Midpoint reflection — regression, unregistered
 
@@ -487,6 +801,8 @@ research-java/
   build.gradle
   src/main/java/org/maplibre/mlt/research/
     BenchmarkCli.java             encode everything, report sizes overall and per layer
+    RingPriorCli.java             measure predictor residual bit widths on >4-vertex rings (encodes nothing)
+    BuildingShapeCli.java         characterize geometric properties of >4-vertex building rings (encodes nothing)
     extraction/
       VertexBufferExtractor.java   core flattening logic (copied from GeometryEncoder)
       MbtilesSource.java           .mbtiles reading + decompression + TMS->XYZ
@@ -501,14 +817,24 @@ research-java/
                                  BufferContext and EncodedBuffer
       StreamMetadata.java      size of the header MLT writes in front of a stream
       Baselines.java           the two baselines + the research registry
+      GeometryEquivalence.java order-independent geometry check, for the reordering pre-pass
       research/
+        GeometryReorder.java   greedy endpoint chaining of whole features (a pre-pass, not an Encoding)
         SegmentPair.java       groups part-start residuals ahead of interior deltas
         SegmentQuadCorner.java part starts + 4th-corner (p0+p2-p1) prediction, 3 grouped populations
+        RightAngleTurn.java    >4-ring 90°-turn predictor with a signalled cw/ccw bit stream (regression)
+        SegmentQuadCornerTurn.java  quad-corner for 4-rings + signalled 90°-turn for >4-rings, 4 regions (regression)
+        ContextDelta.java      run-length context over recent deltas picks predictor + FastPFOR region (weak win)
   src/test/java/org/maplibre/mlt/research/
     extraction/VertexBufferExtractorFidelityTest.java   reflective pin against mlt-core
     encoding/IntCodecTest.java            physical-layer round trips
     encoding/VertexTransformTest.java     logical-layer round trips
     encoding/VertexBufferCodecTest.java   round trips every registered encoding
+    encoding/research/GeometryReorderMechanismTest.java   pins the chain, the topology rebuild and the equivalence gate
+    encoding/research/GeometryReorderGridTest.java        pins the spatial index against a brute-force chain
     encoding/research/SegmentPairMechanismTest.java   pins SegmentPair's grouping and decode
     encoding/research/SegmentQuadCornerMechanismTest.java   pins the composition reduces to each part
+    encoding/research/RightAngleTurnMechanismTest.java   pins the signalled 90°-turn predictor + decode
+    encoding/research/SegmentQuadCornerTurnMechanismTest.java   pins the length-routed corner/turn composition
+    encoding/research/ContextDeltaMechanismTest.java   pins the context build-up, both reset paths and the causal one-vertex lag
 ```

@@ -1,6 +1,7 @@
 package org.maplibre.mlt.research.encoding;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -70,7 +71,31 @@ class VertexBufferCodecTest {
 
     var encoded = encoding.encode(ctx);
 
-    assertEquals(column.vertexBuffer(), encoding.decode(encoded, ctx, column.vertexBuffer().size()));
+    assertReconstructs(encoding, ctx, encoded);
+  }
+
+  /**
+   * Asserts the decode reconstructed the buffer, by the contract the encoding actually claims.
+   *
+   * <p>Mirrors {@code BenchmarkCli.verifyRoundTrip}: an encoding declaring {@link
+   * Encoding#reordersGeometries()} reconstructs an <em>equivalent</em> buffer rather than an
+   * identical one, so it is checked for
+   * geometry preservation plus a faithful decode of what it emitted. Everything else is held to
+   * exact equality. Without the split these tests would either fail on a correct reordering
+   * encoding or, if loosened for all, stop catching a lossy one.
+   */
+  private static void assertReconstructs(
+      Encoding encoding, BufferContext ctx, VertexBufferCodec.EncodedBuffer encoded) {
+    var decoded = encoding.decode(encoded, ctx, ctx.vertices().size());
+    if (encoding.reordersGeometries()) {
+      var emitted = encoding.emitted(ctx);
+      assertEquals(emitted.vertices(), decoded, "must decode to the buffer it emitted");
+      assertTrue(
+          GeometryEquivalence.holds(ctx, emitted),
+          "reordering must preserve every geometry: " + GeometryEquivalence.describe(ctx, emitted));
+    } else {
+      assertEquals(ctx.vertices(), decoded);
+    }
   }
 
   /**
@@ -91,7 +116,7 @@ class VertexBufferCodecTest {
 
     var encoded = encoding.encode(ctx);
 
-    assertEquals(column.vertexBuffer(), encoding.decode(encoded, ctx, column.vertexBuffer().size()));
+    assertReconstructs(encoding, ctx, encoded);
   }
 
   @ParameterizedTest

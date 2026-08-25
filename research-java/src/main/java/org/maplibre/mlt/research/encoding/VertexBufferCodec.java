@@ -2,11 +2,24 @@ package org.maplibre.mlt.research.encoding;
 
 import java.util.List;
 import org.maplibre.mlt.converter.geometry.Vertex;
+import org.maplibre.mlt.research.encoding.research.GeometryReorder;
 
 /**
  * Pairs a {@link VertexTransform} (logical) with an {@link IntCodec} (physical), forming a complete
  * {@link Encoding}: the transform and codec supply encode/decode, and this class adds the
  * stream-metadata accounting the benchmark compares on.
+ *
+ * <p>A {@link GeometryReorder} is an optional third component, defaulting to {@link
+ * GeometryReorder#NONE}. It is a component rather than a wrapper encoding because reordering is
+ * orthogonal to both other layers — any transform over any codec can be measured with or without
+ * it — so expressing it as one more constructor argument keeps every encoding a single uniform
+ * {@code (transform, codec, reorder)} triple instead of two shapes that have to be handled
+ * separately at every call site.
+ *
+ * <p>Reordering is deliberately applied <em>before</em> the transform and is never part of a
+ * baseline: the baseline is the fixed yardstick every percentage in the report is computed
+ * against, and an earlier version of this work reordered the baselines too, which moved the
+ * yardstick and made the gain invisible.
  */
 public final class VertexBufferCodec implements Encoding {
 
@@ -45,30 +58,67 @@ public final class VertexBufferCodec implements Encoding {
     }
   }
 
-  private final String name;
   private final VertexTransform transform;
   private final IntCodec codec;
+  private final GeometryReorder reorder;
 
-  public VertexBufferCodec(String name, VertexTransform transform, IntCodec codec) {
-    this.name = name;
+  /** An encoding that leaves the geometry order untouched. */
+  public VertexBufferCodec(VertexTransform transform, IntCodec codec) {
+    this(transform, codec, GeometryReorder.NONE);
+  }
+
+  public VertexBufferCodec(VertexTransform transform, IntCodec codec, GeometryReorder reorder) {
     this.transform = transform;
     this.codec = codec;
+    this.reorder = reorder;
+  }
+
+  /**
+   * Composed from the components, so a name can neither drift from what it describes nor collide
+   * with another combination's — e.g. {@code SEGMENT_PAIR_FASTPFOR_REORDER_REV}.
+   */
+  @Override
+  public String name() {
+    return transform.name() + "_" + codec.name() + reorder.nameSuffix();
+  }
+
+  /** So a parameterized test failure names the encoding rather than an object identity. */
+  @Override
+  public String toString() {
+    return name();
   }
 
   @Override
-  public String name() {
-    return name;
+  public boolean reordersGeometries() {
+    return reorder.reorders();
+  }
+
+  /** The buffer this encoding actually emits — what a decoder reconstructs, and what it must equal. */
+  @Override
+  public BufferContext emitted(BufferContext ctx) {
+    return reorder.apply(ctx);
   }
 
   @Override
   public EncodedBuffer encode(BufferContext ctx) {
-    final var payload = codec.encode(transform.apply(ctx));
+    final var emitted = reorder.apply(ctx);
+    final var payload = codec.encode(transform.apply(emitted));
     return new EncodedBuffer(
-        payload, StreamMetadata.bytes(ctx.vertices().size() * 2, payload.length));
+        payload, StreamMetadata.bytes(emitted.vertices().size() * 2, payload.length));
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Under a reorder, {@code ctx} carries the topology streams of the <em>original</em> buffer
+   * while the payload describes the reordered one, and the transform derives its part boundaries
+   * from whatever context it is given — so it is handed the reordered topology, exactly as a real
+   * decoder would read it from the tile. {@link GeometryReorder#topology} recomputes it without
+   * touching the vertices, which this method is forbidden to read.
+   */
   @Override
   public List<Vertex> decode(EncodedBuffer encoded, BufferContext ctx, int vertexCount) {
-    return transform.invert(codec.decode(encoded.payload(), vertexCount * 2), ctx);
+    return transform.invert(
+        codec.decode(encoded.payload(), vertexCount * 2), reorder.topology(ctx, vertexCount));
   }
 }

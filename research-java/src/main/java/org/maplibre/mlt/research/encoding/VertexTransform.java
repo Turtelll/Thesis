@@ -10,6 +10,9 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 /** Logical-layer transform between a vertex buffer and the interleaved int stream a codec sees. */
 public interface VertexTransform {
 
+  /** The transform's contribution to an encoding's name, e.g. {@code DELTA_ZIGZAG}. */
+  String name();
+
   /**
    * Transforms a buffer into the interleaved int stream. {@code ctx} carries the topology streams
    * for transforms that reset at part/ring boundaries; {@link #invert} is given the same streams,
@@ -29,6 +32,11 @@ public interface VertexTransform {
    * independently), matching {@link GeometryEncoder#zigZagDeltaEncodeVertices}.
    */
   final class ZigZagDelta implements VertexTransform {
+
+    @Override
+    public String name() {
+      return "DELTA_ZIGZAG";
+    }
 
     @Override
     public int[] apply(BufferContext ctx) {

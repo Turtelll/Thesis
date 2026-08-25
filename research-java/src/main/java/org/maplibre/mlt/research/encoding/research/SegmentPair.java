@@ -28,6 +28,11 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 public final class SegmentPair implements VertexTransform {
 
   @Override
+  public String name() {
+    return "SEGMENT_PAIR";
+  }
+
+  @Override
   public int[] apply(BufferContext ctx) {
     final var vertices = ctx.vertices();
     final var starts = PartBoundaries.of(ctx, vertices.size());

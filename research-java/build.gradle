@@ -43,6 +43,22 @@ tasks.register('benchmark', JavaExec) {
     mainClass = 'org.maplibre.mlt.research.BenchmarkCli'
 }
 
+/* Prior measurement (encodes nothing): ./gradlew ringPrior --args="../data/extracted" */
+tasks.register('ringPrior', JavaExec) {
+    group = 'application'
+    description = 'Measures predictor residual bit widths on >4-vertex polygon rings.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.maplibre.mlt.research.RingPriorCli'
+}
+
+/* Geometry characterization (encodes nothing): ./gradlew buildingShape --args="../data/extracted" */
+tasks.register('buildingShape', JavaExec) {
+    group = 'application'
+    description = 'Characterizes geometric properties of >4-vertex building polygon rings.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.maplibre.mlt.research.BuildingShapeCli'
+}
+
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
     testLogging {
