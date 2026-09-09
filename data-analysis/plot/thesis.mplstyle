@@ -1,0 +1,87 @@
+# thesis.mplstyle — Design-Sprache der Bachelorarbeit (MLT / Geometriekompression)
+# Verwendung:  plt.style.use("thesis.mplstyle")   bzw.  import thesisviz
+#
+# Grundregel: Die Grafik ist Teil des Satzspiegels, nicht ein Bild darin.
+# Schrift, Schriftgrad und Strichstaerken entsprechen dem Fliesstext.
+
+# ---- Schrift ---------------------------------------------------------------
+font.family:          serif
+font.serif:           Latin Modern Roman, LM Roman 10, TeX Gyre Termes, DejaVu Serif
+font.sans-serif:      TeX Gyre Heros, DejaVu Sans
+mathtext.fontset:     cm
+font.size:            9
+axes.titlesize:       9
+axes.labelsize:       9
+xtick.labelsize:      8
+ytick.labelsize:      8
+legend.fontsize:      8
+figure.titlesize:     9
+
+# ---- Farben ----------------------------------------------------------------
+# ink, teal, violet, rust, amber  (nach L* aufsteigend sortiert)
+axes.prop_cycle:      cycler('color', ['013556', '006875', '9265AD', 'DD6449', 'EEAD1F'])
+text.color:           2B2B2B
+axes.labelcolor:      2B2B2B
+axes.edgecolor:       6E6E6E
+xtick.color:          6E6E6E
+ytick.color:          6E6E6E
+xtick.labelcolor:     2B2B2B
+ytick.labelcolor:     2B2B2B
+
+# ---- Achsen / Rahmen -------------------------------------------------------
+axes.spines.top:      False
+axes.spines.right:    False
+axes.linewidth:       0.6
+axes.axisbelow:       True
+axes.titlelocation:   left
+axes.titlepad:        6
+axes.labelpad:        3
+
+# ---- Gitter ----------------------------------------------------------------
+axes.grid:            True
+axes.grid.axis:       y
+grid.color:           D6D6D6
+grid.linewidth:       0.5
+grid.alpha:           1.0
+
+# ---- Ticks -----------------------------------------------------------------
+xtick.direction:      out
+ytick.direction:      out
+xtick.major.size:     3
+ytick.major.size:     3
+xtick.major.width:    0.6
+ytick.major.width:    0.6
+xtick.minor.size:     1.5
+ytick.minor.size:     1.5
+
+# ---- Linien / Marker -------------------------------------------------------
+lines.linewidth:      1.4
+lines.markersize:     4
+lines.markeredgewidth: 0.0
+lines.solid_capstyle: round
+scatter.marker:       o
+patch.linewidth:      0.5
+hatch.linewidth:      0.6
+errorbar.capsize:     2
+
+# ---- Legende ---------------------------------------------------------------
+legend.frameon:       False
+legend.handlelength:  1.6
+legend.handletextpad: 0.5
+legend.columnspacing: 1.4
+legend.labelspacing:  0.35
+legend.borderaxespad: 0.0
+
+# ---- Figur / Export --------------------------------------------------------
+figure.figsize:       5.91, 3.65
+figure.dpi:           150
+figure.constrained_layout.use: True
+figure.constrained_layout.h_pad: 0.02
+figure.constrained_layout.w_pad: 0.02
+savefig.dpi:          600
+savefig.format:       pdf
+savefig.bbox:         tight
+savefig.pad_inches:   0.01
+savefig.transparent:  True
+pdf.fonttype:         42
+ps.fonttype:          42

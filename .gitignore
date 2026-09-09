@@ -24,3 +24,6 @@ analysis-python/.venv/
 analysis-python/out/
 __pycache__/
 *.pyc
+
+# Data analysis outputs (scans, figures)
+data-analysis/out/
