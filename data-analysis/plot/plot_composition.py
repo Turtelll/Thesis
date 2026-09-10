@@ -23,7 +23,7 @@ import numpy as np
 import thesisviz as tv
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-OUT_DIR = os.path.join(_HERE, "out")
+OUT_DIR = os.path.join(_HERE, "..", "out")
 
 # Layer unterhalb dieses mittleren Anteils sind als Balken nicht mehr sichtbar
 MIN_LAYER_SHARE = 0.5
@@ -32,7 +32,9 @@ GTYPE_NAMES = {0: "Unknown", 1: "Point", 2: "Line", 3: "Polygon"}
 
 def load() -> list[dict]:
     stats = []
-    for path in sorted(glob.glob(os.path.join(OUT_DIR, "*.json"))):
+    paths = set(glob.glob(os.path.join(OUT_DIR, "*.json")))
+    paths -= set(glob.glob(os.path.join(OUT_DIR, "*.vertices.json")))
+    for path in sorted(paths):
         with open(path, encoding="utf-8") as fh:
             stats.append(json.load(fh))
     if not stats:
