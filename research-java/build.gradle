@@ -59,10 +59,36 @@ tasks.register('buildingShape', JavaExec) {
     mainClass = 'org.maplibre.mlt.research.BuildingShapeCli'
 }
 
+/* WP7 cost-model estimate (encodes nothing beyond SEGMENT_QUAD_CORNER, no new codec): */
+/* ./gradlew entropy --args="../data/extracted --layer building" */
+tasks.register('entropy', JavaExec) {
+    group = 'application'
+    description = 'Order-0 entropy estimate for SEGMENT_QUAD_CORNER residual regions vs FastPFOR bytes.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.maplibre.mlt.research.EntropyCli'
+}
+
+/* ./gradlew condEntropy --args="../data/extracted --layer building" */
+tasks.register('condEntropy', JavaExec) {
+    group = 'application'
+    description = 'Conditional-entropy probe: y|x, bucket/raw split, order-1 bucket context.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.maplibre.mlt.research.CondEntropyCli'
+}
+
+/* ./gradlew featureBoundary --args="../data/extracted" */
+tasks.register('featureBoundary', JavaExec) {
+    group = 'application'
+    description = 'Measures what the continuous delta cursor pays at feature/run boundaries.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.maplibre.mlt.research.FeatureBoundaryCli'
+}
+
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
     testLogging {
         events "passed", "skipped", "failed"
         exceptionFormat = "full"
+        showStandardStreams = true
     }
 }

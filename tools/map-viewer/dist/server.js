@@ -18,14 +18,17 @@ const PORT = Number(process.env.PORT) || 5173;
 const MVT_DIR = node_path_1.default.resolve(__dirname, "..", "..", "..", "data", "MVT");
 const PUBLIC_DIR = node_path_1.default.resolve(__dirname, "..", "public");
 const DATASETS = {
-    munich: node_path_1.default.join(MVT_DIR, "munich.mbtiles"),
-    ny: node_path_1.default.join(MVT_DIR, "NY.mbtiles"),
+    "munich-maptiler": node_path_1.default.join(MVT_DIR, "munich-maptiler.mbtiles"),
+    "germany-rs": node_path_1.default.join(MVT_DIR, "germany-rs.mbtiles"),
+    "ny-maptiler": node_path_1.default.join(MVT_DIR, "NY-maptiler.mbtiles"),
+    "munich-overture": node_path_1.default.join(MVT_DIR, "munich-overture.mbtiles"),
+    "munich-buildings-unmerged": node_path_1.default.join(MVT_DIR, "munich-buildings-unmerged.mbtiles"),
 };
-const DEFAULT_DATASET = "munich";
-const dbs = Object.fromEntries(Object.entries(DATASETS).map(([id, file]) => [
-    id,
-    new better_sqlite3_1.default(file, { readonly: true, fileMustExist: true }),
-]));
+const DEFAULT_DATASET = "munich-maptiler";
+const dbs = Object.fromEntries(Object.entries(DATASETS).map(([id, file]) => [id, new better_sqlite3_1.default(file, {
+        readonly: true,
+        fileMustExist: true
+    }),]));
 function resolveDataset(req) {
     const id = typeof req.query.dataset === "string" ? req.query.dataset : DEFAULT_DATASET;
     return dbs[id];

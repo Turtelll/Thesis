@@ -269,7 +269,7 @@ public final class BenchmarkCli {
       return;
     }
 
-    report(names, overall, byLayer, byGeometry, selection, rawTotal);
+    report(names, overall, byLayer, byGeometry, selection, rawTotal, opts.verbose);
     if (opts.csvFile != null) {
       System.out.printf("%nWrote %s%n", opts.csvFile);
     }
@@ -294,13 +294,14 @@ public final class BenchmarkCli {
       Map<String, Totals> byLayer,
       Map<String, Totals> byGeometry,
       Selection selection,
-      long rawTotal) {
+      long rawTotal,
+      boolean verbose) {
 
     System.out.printf(
         "%d buffers, %s raw bytes%n%n", overall.buffers, String.format("%,d", rawTotal));
 
-    segment("layer", names, byLayer, TOP_LAYERS);
-    segment("geometry", names, byGeometry, Integer.MAX_VALUE);
+    segment("layer", names, byLayer, TOP_LAYERS, verbose);
+    segment("geometry", names, byGeometry, Integer.MAX_VALUE, verbose);
     selection.report(names, overall);
   }
 
@@ -310,7 +311,7 @@ public final class BenchmarkCli {
    * than dropped, so the column totals still add up to the corpus figures above.
    */
   private static void segment(
-      String label, List<String> names, Map<String, Totals> groups, int limit) {
+      String label, List<String> names, Map<String, Totals> groups, int limit, boolean verbose) {
 
     /* Ranked by bytes, not by buffer count: a buffer is one (tile, layer) pair, so counting them
      * measures how many tiles a layer appears in, not how much data it is. `building` is 311
@@ -329,6 +330,12 @@ public final class BenchmarkCli {
         }
       }
       shown.add(Map.entry("(other, " + (sorted.size() - limit) + ")", rest));
+    }
+
+    if (!verbose) {
+      System.out.printf("%n--- by %s ---%n", label);
+      compactTable(label, names, shown);
+      return;
     }
 
     /* Encodings are printed in chunks so a row fits a terminal, the whole table repeating per
@@ -350,6 +357,55 @@ public final class BenchmarkCli {
   }
 
   /**
+   * The default view: one row per group naming only the encoding that won it and what that win is
+   * worth against the best baseline for the same group.
+   *
+   * <p>This is the question asked after every change to an encoding — did it win anything, and
+   * where — and the per-encoding tables answer it only after reading sixteen columns spread over
+   * four repetitions. A {@code saved} of {@code ref} means the winner <em>is</em> a baseline, i.e.
+   * nothing under research helps on that group; {@code --verbose} still has the full field.
+   */
+  private static void compactTable(
+      String label, List<String> names, List<Map.Entry<String, Totals>> shown) {
+
+    var width =
+        Math.max(label.length(), shown.stream().mapToInt(g -> g.getKey().length()).max().orElse(8));
+    var nameWidth = Math.max(6, names.stream().mapToInt(String::length).max().orElse(20));
+    var corpus = shown.stream().mapToLong(g -> bestBaseline(g.getValue())).sum();
+
+    System.out.printf(
+        "%-" + width + "s %8s %7s %14s   %-" + nameWidth + "s %14s %8s%n",
+        label, "buffers", "share", "baseline", "winner", "bytes", "saved");
+
+    for (var group : shown) {
+      var totals = group.getValue();
+      var reference = bestBaseline(totals);
+      var share = corpus == 0 ? 0.0 : 100.0 * reference / corpus;
+
+      /* The folded row sums layers that share nothing but being small, so its "winner" would be
+       * an encoding no tile could ever select. Its bytes still count toward the corpus, so the
+       * row stays — without a winner. */
+      if (group.getKey().startsWith("(other")) {
+        System.out.printf(
+            "%-" + width + "s %8d %6.1f%% %14s   %-" + nameWidth + "s %14s %8s%n",
+            group.getKey(), totals.buffers, share, String.format("%,d", reference), "-", "-", "-");
+        continue;
+      }
+
+      var winner = winner(names, totals);
+      System.out.printf(
+          "%-" + width + "s %8d %6.1f%% %14s   %-" + nameWidth + "s %14s %8s%n",
+          group.getKey(),
+          totals.buffers,
+          share,
+          String.format("%,d", reference),
+          winner,
+          String.format("%,d", totals.get(winner)),
+          delta(totals.get(winner), reference));
+    }
+  }
+
+  /**
    * One table: the given rows, but only {@code chunk}'s columns. {@code withBest} appends the
    * winner column, which is printed once on the last chunk rather than repeated in every one.
    */
@@ -366,7 +422,7 @@ public final class BenchmarkCli {
     var corpus = shown.stream().mapToLong(g -> bestBaseline(g.getValue())).sum();
     var header =
         new StringBuilder(String.format("%-" + width + "s %8s %7s", label, "buffers", "share"));
-    var column = columnWidth(names);
+    var column = columnWidth(chunk);
     for (var name : chunk) {
       header.append(String.format(" %" + column + "s", name));
     }
@@ -454,11 +510,12 @@ public final class BenchmarkCli {
 
   /**
    * Width of one encoding column: wide enough for the widest cell ({@code bytes} + {@code delta} +
-   * the winner star) and for the longest encoding name, so nothing is truncated and no column is
-   * padded further than its content needs.
+   * the winner star) and for the longest name <em>in this chunk</em>. Sizing it to the longest
+   * name in the whole registry instead would pad every column of every table to the widest name
+   * anywhere, which no cell in the table needs.
    */
-  private static int columnWidth(List<String> names) {
-    var widestName = names.stream().mapToInt(String::length).max().orElse(0);
+  private static int columnWidth(List<String> chunk) {
+    var widestName = chunk.stream().mapToInt(String::length).max().orElse(0);
     return Math.max(CELL_WIDTH, widestName);
   }
 
@@ -564,18 +621,21 @@ public final class BenchmarkCli {
     return best < names.length ? names[best] : "UNKNOWN";
   }
 
-  private record Options(String inDir, String csvFile, String layer) {
+  private record Options(String inDir, String csvFile, String layer, boolean verbose) {
 
-    private static final String USAGE = "Usage: <extractionDir> [--csv <file>] [--layer <name>]";
+    private static final String USAGE =
+        "Usage: <extractionDir> [--csv <file>] [--layer <name>] [--verbose]";
 
     static Options parse(String[] args) {
       String in = null;
       String csv = null;
       String layer = null;
+      var verbose = false;
       for (var i = 0; i < args.length; i++) {
         switch (args[i]) {
           case "--csv" -> csv = args[++i];
           case "--layer" -> layer = args[++i];
+          case "--verbose" -> verbose = true;
           case "--help", "-h" -> throw new IllegalArgumentException(USAGE);
           default -> {
             if (args[i].startsWith("-")) {
@@ -592,7 +652,7 @@ public final class BenchmarkCli {
       if (in == null) {
         throw new IllegalArgumentException(USAGE);
       }
-      return new Options(in, csv, layer);
+      return new Options(in, csv, layer, verbose);
     }
   }
 }

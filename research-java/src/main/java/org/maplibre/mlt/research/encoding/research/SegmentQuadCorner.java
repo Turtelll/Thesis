@@ -77,6 +77,28 @@ public final class SegmentQuadCorner implements VertexTransform {
         return values;
     }
 
+    /**
+     * Length in int slots of each contiguous residual region: starts, interior, corners.
+     *
+     * <p>Exposed for {@link org.maplibre.mlt.research.encoding.SegmentedRansCodec}, which prices
+     * each region with its own frequency table rather than one shared table. The regions are the
+     * ones {@link #apply} already writes; this only reports their extents.
+     */
+    public int[] regionLengths(BufferContext ctx, int vertexCount) {
+        final var classes = classify(PartBoundaries.of(ctx, vertexCount), vertexCount);
+        var starts = 0;
+        var corners = 0;
+        for (final var c : classes) {
+            if (c == START) {
+                starts++;
+            } else if (c == CORNER) {
+                corners++;
+            }
+        }
+        final var interior = classes.length - starts - corners;
+        return new int[] {starts * 2, interior * 2, corners * 2};
+    }
+
     @Override
     public List<Vertex> invert(int[] values, BufferContext ctx) {
         final var vertexCount = values.length / 2;

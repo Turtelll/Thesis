@@ -1,4 +1,4 @@
-import maplibregl, { Map as MapLibreMap } from "maplibre-gl";
+import maplibregl, {Map as MapLibreMap} from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 /**
@@ -9,23 +9,24 @@ import "maplibre-gl/dist/maplibre-gl.css";
  */
 
 interface LayerConfig {
-  id: string;
-  sourceLayer: string;
-  label: string;
-  color: string;
-  type: "fill" | "line" | "circle";
+    id: string;
+    sourceLayer: string;
+    label: string;
+    color: string;
+    type: "fill" | "line" | "circle";
 }
 
 const SOURCE_ID = "mbtiles";
 
-const DATASETS = [
-  { id: "munich", label: "Munich" },
-  { id: "ny", label: "New York" },
-];
+const DATASETS = [{id: "munich-maptiler", label: "Munich"}, {id: "ny-maptiler", label: "New York"}, {
+    id: "germany-rs", label: "Germany"
+}, {id: "munich-overture", label: "Munich Overture"}, {
+    id: "munich-buildings-unmerged", label: "Munich Buildings Unmerged"
+},];
 
 function currentDataset(): string {
-  const id = new URLSearchParams(window.location.search).get("dataset");
-  return DATASETS.some((d) => d.id === id) ? id! : DATASETS[0].id;
+    const id = new URLSearchParams(window.location.search).get("dataset");
+    return DATASETS.some((d) => d.id === id) ? id! : DATASETS[0].id;
 }
 
 // Suffix for the companion line layer that traces every polygon ring, so the
@@ -59,45 +60,36 @@ const ARROWHEAD_MAX = 0.00003;
 
 // Palette vertices are colored from, cycling by a hash of the parent
 // geometry's id so adjacent geometries' vertices stay visually separable.
-const VERTEX_PALETTE = [
-  "#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4",
-  "#42d4f4", "#f032e6", "#bfef45", "#fabed4", "#469990",
-];
+const VERTEX_PALETTE = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#42d4f4", "#f032e6", "#bfef45", "#fabed4", "#469990",];
 
 function colorForGeom(key: number): string {
-  return VERTEX_PALETTE[key % VERTEX_PALETTE.length];
+    return VERTEX_PALETTE[key % VERTEX_PALETTE.length];
 }
 
 // Walks a GeoJSON-style coordinate geometry (from a MapLibre feature) and
 // emits one Point feature per vertex, tagged with a per-geometry color key.
-function extractVertices(
-  geometry: GeoJSON.Geometry,
-  geomKey: number,
-  out: GeoJSON.Feature[],
-): void {
-  const emit = (coords: number[]) => {
-    out.push({
-      type: "Feature",
-      properties: { geomKey },
-      geometry: { type: "Point", coordinates: coords },
-    });
-  };
-  switch (geometry.type) {
-    case "Point":
-      emit(geometry.coordinates);
-      break;
-    case "MultiPoint":
-    case "LineString":
-      geometry.coordinates.forEach(emit);
-      break;
-    case "MultiLineString":
-    case "Polygon":
-      geometry.coordinates.forEach((ring) => ring.forEach(emit));
-      break;
-    case "MultiPolygon":
-      geometry.coordinates.forEach((poly) => poly.forEach((ring) => ring.forEach(emit)));
-      break;
-  }
+function extractVertices(geometry: GeoJSON.Geometry, geomKey: number, out: GeoJSON.Feature[],): void {
+    const emit = (coords: number[]) => {
+        out.push({
+            type: "Feature", properties: {geomKey}, geometry: {type: "Point", coordinates: coords},
+        });
+    };
+    switch (geometry.type) {
+        case "Point":
+            emit(geometry.coordinates);
+            break;
+        case "MultiPoint":
+        case "LineString":
+            geometry.coordinates.forEach(emit);
+            break;
+        case "MultiLineString":
+        case "Polygon":
+            geometry.coordinates.forEach((ring) => ring.forEach(emit));
+            break;
+        case "MultiPolygon":
+            geometry.coordinates.forEach((poly) => poly.forEach((ring) => ring.forEach(emit)));
+            break;
+    }
 }
 
 // First / last coordinate of a feature's geometry in encoding order, i.e. the
@@ -105,98 +97,93 @@ function extractVertices(
 // rings repeat their first coordinate at the end, so that duplicate closing
 // coordinate is skipped to report the actual last distinct vertex.
 function endpointsOf(geometry: GeoJSON.Geometry): { first: number[]; last: number[] } | null {
-  const parts: number[][][] = [];
-  switch (geometry.type) {
-    case "Point":
-      parts.push([geometry.coordinates]);
-      break;
-    case "MultiPoint":
-    case "LineString":
-      parts.push(geometry.coordinates);
-      break;
-    case "MultiLineString":
-    case "Polygon":
-      parts.push(...geometry.coordinates);
-      break;
-    case "MultiPolygon":
-      geometry.coordinates.forEach((poly) => parts.push(...poly));
-      break;
-  }
-  const nonEmpty = parts.filter((part) => part.length > 0);
-  if (nonEmpty.length === 0) return null;
-
-  const firstPart = nonEmpty[0];
-  const lastPart = nonEmpty[nonEmpty.length - 1];
-  const first = firstPart[0];
-  let last = lastPart[lastPart.length - 1];
-  if (lastPart.length > 1) {
-    const partFirst = lastPart[0];
-    if (last[0] === partFirst[0] && last[1] === partFirst[1]) {
-      last = lastPart[lastPart.length - 2];
+    const parts: number[][][] = [];
+    switch (geometry.type) {
+        case "Point":
+            parts.push([geometry.coordinates]);
+            break;
+        case "MultiPoint":
+        case "LineString":
+            parts.push(geometry.coordinates);
+            break;
+        case "MultiLineString":
+        case "Polygon":
+            parts.push(...geometry.coordinates);
+            break;
+        case "MultiPolygon":
+            geometry.coordinates.forEach((poly) => parts.push(...poly));
+            break;
     }
-  }
-  return { first, last };
+    const nonEmpty = parts.filter((part) => part.length > 0);
+    if (nonEmpty.length === 0) return null;
+
+    const firstPart = nonEmpty[0];
+    const lastPart = nonEmpty[nonEmpty.length - 1];
+    const first = firstPart[0];
+    let last = lastPart[lastPart.length - 1];
+    if (lastPart.length > 1) {
+        const partFirst = lastPart[0];
+        if (last[0] === partFirst[0] && last[1] === partFirst[1]) {
+            last = lastPart[lastPart.length - 2];
+        }
+    }
+    return {first, last};
 }
 
 // Emits the shaft plus its two arrowhead barbs for one from -> to hop.
 function emitArrow(from: number[], to: number[], geomKey: number, out: GeoJSON.Feature[]): void {
-  const dx = to[0] - from[0];
-  const dy = to[1] - from[1];
-  const length = Math.hypot(dx, dy);
-  if (length === 0) return;
+    const dx = to[0] - from[0];
+    const dy = to[1] - from[1];
+    const length = Math.hypot(dx, dy);
+    if (length === 0) return;
 
-  out.push({
-    type: "Feature",
-    properties: { geomKey, head: false },
-    geometry: { type: "LineString", coordinates: [from, to] },
-  });
-
-  // Two barbs at the tip, each the shaft direction rotated by +/-
-  // ARROWHEAD_ANGLE, fixed length so every arrowhead reads the same size.
-  const barb = ARROWHEAD_MAX;
-  const heading = Math.atan2(dy, dx);
-  for (const sign of [1, -1]) {
-    const angle = heading + Math.PI + sign * ARROWHEAD_ANGLE;
     out.push({
-      type: "Feature",
-      properties: { geomKey, head: true },
-      geometry: {
-        type: "LineString",
-        coordinates: [to, [to[0] + Math.cos(angle) * barb, to[1] + Math.sin(angle) * barb]],
-      },
+        type: "Feature", properties: {geomKey, head: false}, geometry: {type: "LineString", coordinates: [from, to]},
     });
-  }
+
+    // Two barbs at the tip, each the shaft direction rotated by +/-
+    // ARROWHEAD_ANGLE, fixed length so every arrowhead reads the same size.
+    const barb = ARROWHEAD_MAX;
+    const heading = Math.atan2(dy, dx);
+    for (const sign of [1, -1]) {
+        const angle = heading + Math.PI + sign * ARROWHEAD_ANGLE;
+        out.push({
+            type: "Feature", properties: {geomKey, head: true}, geometry: {
+                type: "LineString", coordinates: [to, [to[0] + Math.cos(angle) * barb, to[1] + Math.sin(angle) * barb]],
+            },
+        });
+    }
 }
 
 function refreshCloseArrows(map: MapLibreMap, layer: LayerConfig): void {
-  const source = map.getSource(layer.id + ARROW_SOURCE_SUFFIX) as maplibregl.GeoJSONSource | undefined;
-  if (!source) return;
-  const features = map.querySourceFeatures(SOURCE_ID, { sourceLayer: layer.sourceLayer });
+    const source = map.getSource(layer.id + ARROW_SOURCE_SUFFIX) as maplibregl.GeoJSONSource | undefined;
+    if (!source) return;
+    const features = map.querySourceFeatures(SOURCE_ID, {sourceLayer: layer.sourceLayer});
 
-  // querySourceFeatures returns features from every loaded tile at once, so
-  // "the next feature" is only meaningful inside a single tile: group by the
-  // tile the feature was decoded from, keeping each tile's feature order.
-  const byTile = new Map<string, GeoJSON.Feature[]>();
-  for (const feature of features) {
-    const vtf = (feature as unknown as { _vectorTileFeature?: { _z: number; _x: number; _y: number } })
-      ._vectorTileFeature;
-    const tileKey = vtf ? `${vtf._z}/${vtf._x}/${vtf._y}` : "unknown";
-    const bucket = byTile.get(tileKey);
-    if (bucket) bucket.push(feature);
-    else byTile.set(tileKey, [feature]);
-  }
-
-  const arrows: GeoJSON.Feature[] = [];
-  for (const tileFeatures of byTile.values()) {
-    const endpoints = tileFeatures.map((f) => endpointsOf(f.geometry));
-    for (let i = 0; i + 1 < endpoints.length; i++) {
-      const from = endpoints[i];
-      const to = endpoints[i + 1];
-      if (!from || !to) continue;
-      emitArrow(from.last, to.first, i, arrows);
+    // querySourceFeatures returns features from every loaded tile at once, so
+    // "the next feature" is only meaningful inside a single tile: group by the
+    // tile the feature was decoded from, keeping each tile's feature order.
+    const byTile = new Map<string, GeoJSON.Feature[]>();
+    for (const feature of features) {
+        const vtf = (feature as unknown as {
+            _vectorTileFeature?: { _z: number; _x: number; _y: number }
+        })._vectorTileFeature;
+        const tileKey = vtf ? `${vtf._z}/${vtf._x}/${vtf._y}` : "unknown";
+        const bucket = byTile.get(tileKey);
+        if (bucket) bucket.push(feature); else byTile.set(tileKey, [feature]);
     }
-  }
-  source.setData({ type: "FeatureCollection", features: arrows });
+
+    const arrows: GeoJSON.Feature[] = [];
+    for (const tileFeatures of byTile.values()) {
+        const endpoints = tileFeatures.map((f) => endpointsOf(f.geometry));
+        for (let i = 0; i + 1 < endpoints.length; i++) {
+            const from = endpoints[i];
+            const to = endpoints[i + 1];
+            if (!from || !to) continue;
+            emitArrow(from.last, to.first, i, arrows);
+        }
+    }
+    source.setData({type: "FeatureCollection", features: arrows});
 }
 
 // Greedy nearest-neighbor chain over feature endpoints, mirroring
@@ -207,433 +194,503 @@ function refreshCloseArrows(map: MapLibreMap, layer: LayerConfig): void {
 // no spatial grid (O(n^2) is fine at per-tile feature counts, unlike the
 // ~65k-vertex buffers the Java benchmark corpus scans).
 function greedyChainOrder(endpoints: ({ first: number[]; last: number[] } | null)[]): number[] {
-  const used = new Array(endpoints.length).fill(false);
-  const order: number[] = [];
-  let cursorX = 0;
-  let cursorY = 0;
-  for (let step = 0; step < endpoints.length; step++) {
-    let best = -1;
-    let bestDistance = Infinity;
-    for (let i = 0; i < endpoints.length; i++) {
-      if (used[i] || !endpoints[i]) continue;
-      const first = endpoints[i]!.first;
-      const distance = Math.abs(first[0] - cursorX) + Math.abs(first[1] - cursorY);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = i;
-      }
+    const used = new Array(endpoints.length).fill(false);
+    const order: number[] = [];
+    let cursorX = 0;
+    let cursorY = 0;
+    for (let step = 0; step < endpoints.length; step++) {
+        let best = -1;
+        let bestDistance = Infinity;
+        for (let i = 0; i < endpoints.length; i++) {
+            if (used[i] || !endpoints[i]) continue;
+            const first = endpoints[i]!.first;
+            const distance = Math.abs(first[0] - cursorX) + Math.abs(first[1] - cursorY);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = i;
+            }
+        }
+        if (best === -1) break;
+        used[best] = true;
+        order.push(best);
+        cursorX = endpoints[best]!.last[0];
+        cursorY = endpoints[best]!.last[1];
     }
-    if (best === -1) break;
-    used[best] = true;
-    order.push(best);
-    cursorX = endpoints[best]!.last[0];
-    cursorY = endpoints[best]!.last[1];
-  }
-  return order;
+    return order;
 }
 
 function refreshReorderArrows(map: MapLibreMap, layer: LayerConfig): void {
-  const source = map.getSource(layer.id + REORDER_ARROW_SOURCE_SUFFIX) as
-    | maplibregl.GeoJSONSource
-    | undefined;
-  if (!source) return;
-  const features = map.querySourceFeatures(SOURCE_ID, { sourceLayer: layer.sourceLayer });
+    const source = map.getSource(layer.id + REORDER_ARROW_SOURCE_SUFFIX) as | maplibregl.GeoJSONSource | undefined;
+    if (!source) return;
+    const features = map.querySourceFeatures(SOURCE_ID, {sourceLayer: layer.sourceLayer});
 
-  const byTile = new Map<string, GeoJSON.Feature[]>();
-  for (const feature of features) {
-    const vtf = (feature as unknown as { _vectorTileFeature?: { _z: number; _x: number; _y: number } })
-      ._vectorTileFeature;
-    const tileKey = vtf ? `${vtf._z}/${vtf._x}/${vtf._y}` : "unknown";
-    const bucket = byTile.get(tileKey);
-    if (bucket) bucket.push(feature);
-    else byTile.set(tileKey, [feature]);
-  }
-
-  const arrows: GeoJSON.Feature[] = [];
-  for (const tileFeatures of byTile.values()) {
-    const endpoints = tileFeatures.map((f) => endpointsOf(f.geometry));
-    const order = greedyChainOrder(endpoints);
-    for (let i = 0; i + 1 < order.length; i++) {
-      const from = endpoints[order[i]];
-      const to = endpoints[order[i + 1]];
-      if (!from || !to) continue;
-      emitArrow(from.last, to.first, i, arrows);
+    const byTile = new Map<string, GeoJSON.Feature[]>();
+    for (const feature of features) {
+        const vtf = (feature as unknown as {
+            _vectorTileFeature?: { _z: number; _x: number; _y: number }
+        })._vectorTileFeature;
+        const tileKey = vtf ? `${vtf._z}/${vtf._x}/${vtf._y}` : "unknown";
+        const bucket = byTile.get(tileKey);
+        if (bucket) bucket.push(feature); else byTile.set(tileKey, [feature]);
     }
-  }
-  source.setData({ type: "FeatureCollection", features: arrows });
+
+    const arrows: GeoJSON.Feature[] = [];
+    for (const tileFeatures of byTile.values()) {
+        const endpoints = tileFeatures.map((f) => endpointsOf(f.geometry));
+        const order = greedyChainOrder(endpoints);
+        for (let i = 0; i + 1 < order.length; i++) {
+            const from = endpoints[order[i]];
+            const to = endpoints[order[i + 1]];
+            if (!from || !to) continue;
+            emitArrow(from.last, to.first, i, arrows);
+        }
+    }
+    source.setData({type: "FeatureCollection", features: arrows});
 }
 
 function refreshVertices(map: MapLibreMap, layer: LayerConfig): void {
-  const source = map.getSource(layer.id + VERTEX_SOURCE_SUFFIX) as maplibregl.GeoJSONSource | undefined;
-  if (!source) return;
-  const features = map.querySourceFeatures(SOURCE_ID, { sourceLayer: layer.sourceLayer });
-  const vertices: GeoJSON.Feature[] = [];
-  features.forEach((feature, index) => {
-    const geomKey = typeof feature.id === "number" ? feature.id : index;
-    extractVertices(feature.geometry, geomKey, vertices);
-  });
-  source.setData({ type: "FeatureCollection", features: vertices });
+    const source = map.getSource(layer.id + VERTEX_SOURCE_SUFFIX) as maplibregl.GeoJSONSource | undefined;
+    if (!source) return;
+    const features = map.querySourceFeatures(SOURCE_ID, {sourceLayer: layer.sourceLayer});
+    const vertices: GeoJSON.Feature[] = [];
+    features.forEach((feature, index) => {
+        extractVertices(feature.geometry, index, vertices);
+    });
+    source.setData({type: "FeatureCollection", features: vertices});
 }
 
 // One entry per layer the Java pipeline also extracts (landcover, building,
 // water, transportation), styled distinctly so overlaps stay legible.
-const LAYERS: LayerConfig[] = [
-  { id: "landcover", sourceLayer: "landcover", label: "Landcover", color: "#8fbf7f", type: "fill" },
-  { id: "water", sourceLayer: "water", label: "Water", color: "#6ea8d8", type: "fill" },
-  { id: "building", sourceLayer: "building", label: "Building", color: "#c98f6b", type: "fill" },
-  {
-    id: "transportation",
-    sourceLayer: "transportation",
-    label: "Transportation",
-    color: "#3d3d3d",
-    type: "line",
-  },
-];
+const LAYERS: LayerConfig[] = [{
+    id: "landcover", sourceLayer: "landcover", label: "Landcover", color: "#8fbf7f", type: "fill"
+}, {id: "water", sourceLayer: "water", label: "Water", color: "#6ea8d8", type: "fill"}, {
+    id: "building", sourceLayer: "building", label: "Building", color: "#c98f6b", type: "fill"
+}, {
+    id: "transportation", sourceLayer: "transportation", label: "Transportation", color: "#3d3d3d", type: "line",
+},];
 
 async function loadCenter(dataset: string): Promise<{ center: [number, number]; zoom: number }> {
-  try {
-    const response = await fetch(`/metadata.json?dataset=${dataset}`);
-    const metadata: Record<string, string> = await response.json();
-    const [lon, lat, zoom] = (metadata.center ?? "7.4246,43.7384,14").split(",").map(Number);
-    return { center: [lon, lat], zoom };
-  } catch {
-    return { center: [7.4246, 43.7384], zoom: 14 };
-  }
+    try {
+        const response = await fetch(`/metadata.json?dataset=${dataset}`);
+        const metadata: Record<string, string> = await response.json();
+        const [lon, lat, zoom] = (metadata.center ?? "7.4246,43.7384,14").split(",").map(Number);
+        return {center: [lon, lat], zoom};
+    } catch {
+        return {center: [7.4246, 43.7384], zoom: 14};
+    }
 }
 
 function darken(hexColor: string, factor = 0.55): string {
-  const value = parseInt(hexColor.slice(1), 16);
-  const channels = [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
-  return `#${channels.map((c) => Math.round(c * factor).toString(16).padStart(2, "0")).join("")}`;
+    const value = parseInt(hexColor.slice(1), 16);
+    const channels = [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
+    return `#${channels.map((c) => Math.round(c * factor).toString(16).padStart(2, "0")).join("")}`;
+}
+
+// fill-color/line-color/circle-color expression reading the per-feature
+// geomKey assigned by refreshGeomKeys via setFeatureState, falling back to the
+// layer's flat color for features that haven't been keyed yet (e.g. just
+// loaded, before the next refreshGeomKeys pass). Only applied while the
+// layer's vertices toggle is on, via setGeomKeyColoring.
+function geomKeyColorExpression(layer: LayerConfig): maplibregl.ExpressionSpecification {
+    return ["case", ["!=", ["feature-state", "geomKey"], null], ["match", ["%", ["feature-state", "geomKey"], VERTEX_PALETTE.length], ...VERTEX_PALETTE.flatMap((color, i) => [i, color]), VERTEX_PALETTE[0],], layer.color,] as unknown as maplibregl.ExpressionSpecification;
+}
+
+function colorPaintProperty(layer: LayerConfig): "fill-color" | "line-color" | "circle-color" {
+    return layer.type === "fill" ? "fill-color" : layer.type === "line" ? "line-color" : "circle-color";
+}
+
+// Switches a layer's color paint property between its flat color and the
+// per-feature geomKey expression, so geomKey coloring is only active while
+// the "<layer> vertices" checkbox is checked.
+function setGeomKeyColoring(map: MapLibreMap, layer: LayerConfig, enabled: boolean): void {
+    map.setPaintProperty(layer.id, colorPaintProperty(layer), enabled ? geomKeyColorExpression(layer) : layer.color);
 }
 
 function addLayer(map: MapLibreMap, layer: LayerConfig): void {
-  if (layer.type === "fill") {
-    map.addLayer({
-      id: layer.id,
-      type: "fill",
-      source: SOURCE_ID,
-      "source-layer": layer.sourceLayer,
-      paint: { "fill-color": layer.color, "fill-opacity": 0.55 },
+    if (layer.type === "fill") {
+        map.addLayer({
+            id: layer.id,
+            type: "fill",
+            source: SOURCE_ID,
+            "source-layer": layer.sourceLayer,
+            paint: {"fill-color": layer.color, "fill-opacity": 0.55},
+        });
+    } else if (layer.type === "line") {
+        map.addLayer({
+            id: layer.id, type: "line", source: SOURCE_ID, "source-layer": layer.sourceLayer, paint: {
+                "line-color": layer.color, "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.5, 16, 2.5],
+            },
+        });
+    } else {
+        map.addLayer({
+            id: layer.id,
+            type: "circle",
+            source: SOURCE_ID,
+            "source-layer": layer.sourceLayer,
+            paint: {"circle-color": layer.color, "circle-radius": 3},
+        });
+    }
+}
+
+// Assigns each currently-loaded feature of a layer a geomKey via
+// setFeatureState, keyed by the same per-viewport batch index refreshVertices
+// uses for its vertex points, so a feature's fill/line/circle color always
+// matches the color of its own vertices.
+function refreshGeomKeys(map: MapLibreMap, layer: LayerConfig): void {
+    const features = map.querySourceFeatures(SOURCE_ID, {sourceLayer: layer.sourceLayer});
+    features.forEach((feature, index) => {
+        if (feature.id === undefined) return;
+        map.setFeatureState({source: SOURCE_ID, sourceLayer: layer.sourceLayer, id: feature.id}, {geomKey: index});
     });
-  } else if (layer.type === "line") {
-    map.addLayer({
-      id: layer.id,
-      type: "line",
-      source: SOURCE_ID,
-      "source-layer": layer.sourceLayer,
-      paint: {
-        "line-color": layer.color,
-        "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.5, 16, 2.5],
-      },
-    });
-  } else {
-    map.addLayer({
-      id: layer.id,
-      type: "circle",
-      source: SOURCE_ID,
-      "source-layer": layer.sourceLayer,
-      paint: { "circle-color": layer.color, "circle-radius": 3 },
-    });
-  }
 }
 
 function addVertexLayer(map: MapLibreMap, layer: LayerConfig): void {
-  map.addSource(layer.id + VERTEX_SOURCE_SUFFIX, {
-    type: "geojson",
-    data: { type: "FeatureCollection", features: [] },
-  });
-  map.addLayer({
-    id: layer.id + VERTEX_SUFFIX,
-    type: "circle",
-    source: layer.id + VERTEX_SOURCE_SUFFIX,
-    layout: { visibility: "none" },
-    paint: {
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 18, 4],
-      "circle-color": [
-        "match",
-        ["%", ["get", "geomKey"], VERTEX_PALETTE.length],
-        ...VERTEX_PALETTE.flatMap((color, i) => [i, color]),
-        VERTEX_PALETTE[0],
-      ] as unknown as maplibregl.ExpressionSpecification,
-      "circle-stroke-width": 0.5,
-      "circle-stroke-color": "#000000",
-    },
-  });
+    map.addSource(layer.id + VERTEX_SOURCE_SUFFIX, {
+        type: "geojson", data: {type: "FeatureCollection", features: []},
+    });
+    map.addLayer({
+        id: layer.id + VERTEX_SUFFIX,
+        type: "circle",
+        source: layer.id + VERTEX_SOURCE_SUFFIX,
+        layout: {visibility: "none"},
+        paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 18, 4],
+            "circle-color": ["match", ["%", ["get", "geomKey"], VERTEX_PALETTE.length], ...VERTEX_PALETTE.flatMap((color, i) => [i, color]), VERTEX_PALETTE[0],] as unknown as maplibregl.ExpressionSpecification,
+            "circle-stroke-width": 0.5,
+            "circle-stroke-color": "#000000",
+        },
+    });
 }
 
 function addCloseArrowLayer(map: MapLibreMap, layer: LayerConfig): void {
-  const colorExpression = [
-    "match",
-    ["%", ["get", "geomKey"], VERTEX_PALETTE.length],
-    ...VERTEX_PALETTE.flatMap((color, i) => [i, color]),
-    VERTEX_PALETTE[0],
-  ] as unknown as maplibregl.ExpressionSpecification;
+    const colorExpression = ["match", ["%", ["get", "geomKey"], VERTEX_PALETTE.length], ...VERTEX_PALETTE.flatMap((color, i) => [i, color]), VERTEX_PALETTE[0],] as unknown as maplibregl.ExpressionSpecification;
 
-  map.addSource(layer.id + ARROW_SOURCE_SUFFIX, {
-    type: "geojson",
-    data: { type: "FeatureCollection", features: [] },
-  });
-  map.addLayer({
-    id: layer.id + ARROW_SUFFIX,
-    type: "line",
-    source: layer.id + ARROW_SOURCE_SUFFIX,
-    filter: ["!=", ["get", "head"], true],
-    layout: { visibility: "none" },
-    paint: {
-      "line-color": colorExpression,
-      "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.8, 18, 2],
-    },
-  });
-  // The arrowhead is drawn as an explicit filled triangle (see emitArrow)
-  // rather than a glyph or sprite, since the style ships no glyph server.
-  map.addLayer({
-    id: layer.id + ARROWHEAD_SUFFIX,
-    type: "fill",
-    source: layer.id + ARROW_SOURCE_SUFFIX,
-    filter: ["==", ["get", "head"], true],
-    layout: { visibility: "none" },
-    paint: {
-      "fill-color": colorExpression,
-    },
-  });
+    map.addSource(layer.id + ARROW_SOURCE_SUFFIX, {
+        type: "geojson", data: {type: "FeatureCollection", features: []},
+    });
+    map.addLayer({
+        id: layer.id + ARROW_SUFFIX,
+        type: "line",
+        source: layer.id + ARROW_SOURCE_SUFFIX,
+        filter: ["!=", ["get", "head"], true],
+        layout: {visibility: "none"},
+        paint: {
+            "line-color": colorExpression, "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.8, 18, 2],
+        },
+    });
+    // The arrowhead is drawn as an explicit filled triangle (see emitArrow)
+    // rather than a glyph or sprite, since the style ships no glyph server.
+    map.addLayer({
+        id: layer.id + ARROWHEAD_SUFFIX,
+        type: "fill",
+        source: layer.id + ARROW_SOURCE_SUFFIX,
+        filter: ["==", ["get", "head"], true],
+        layout: {visibility: "none"},
+        paint: {
+            "fill-color": colorExpression,
+        },
+    });
 }
 
 function addReorderArrowLayer(map: MapLibreMap, layer: LayerConfig): void {
-  const colorExpression = [
-    "match",
-    ["%", ["get", "geomKey"], VERTEX_PALETTE.length],
-    ...VERTEX_PALETTE.flatMap((color, i) => [i, color]),
-    VERTEX_PALETTE[0],
-  ] as unknown as maplibregl.ExpressionSpecification;
+    const colorExpression = ["match", ["%", ["get", "geomKey"], VERTEX_PALETTE.length], ...VERTEX_PALETTE.flatMap((color, i) => [i, color]), VERTEX_PALETTE[0],] as unknown as maplibregl.ExpressionSpecification;
 
-  map.addSource(layer.id + REORDER_ARROW_SOURCE_SUFFIX, {
-    type: "geojson",
-    data: { type: "FeatureCollection", features: [] },
-  });
-  map.addLayer({
-    id: layer.id + REORDER_ARROW_SUFFIX,
-    type: "line",
-    source: layer.id + REORDER_ARROW_SOURCE_SUFFIX,
-    filter: ["!=", ["get", "head"], true],
-    layout: { visibility: "none" },
-    paint: {
-      "line-color": colorExpression,
-      "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.8, 18, 2],
-      "line-dasharray": [2, 1],
-    },
-  });
-  map.addLayer({
-    id: layer.id + REORDER_ARROWHEAD_SUFFIX,
-    type: "fill",
-    source: layer.id + REORDER_ARROW_SOURCE_SUFFIX,
-    filter: ["==", ["get", "head"], true],
-    layout: { visibility: "none" },
-    paint: {
-      "fill-color": colorExpression,
-    },
-  });
+    map.addSource(layer.id + REORDER_ARROW_SOURCE_SUFFIX, {
+        type: "geojson", data: {type: "FeatureCollection", features: []},
+    });
+    map.addLayer({
+        id: layer.id + REORDER_ARROW_SUFFIX,
+        type: "line",
+        source: layer.id + REORDER_ARROW_SOURCE_SUFFIX,
+        filter: ["!=", ["get", "head"], true],
+        layout: {visibility: "none"},
+        paint: {
+            "line-color": colorExpression,
+            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.8, 18, 2],
+            "line-dasharray": [2, 1],
+        },
+    });
+    map.addLayer({
+        id: layer.id + REORDER_ARROWHEAD_SUFFIX,
+        type: "fill",
+        source: layer.id + REORDER_ARROW_SOURCE_SUFFIX,
+        filter: ["==", ["get", "head"], true],
+        layout: {visibility: "none"},
+        paint: {
+            "fill-color": colorExpression,
+        },
+    });
 }
 
 function addOutlineLayer(map: MapLibreMap, layer: LayerConfig): void {
-  map.addLayer({
-    id: layer.id + OUTLINE_SUFFIX,
-    type: "line",
-    source: SOURCE_ID,
-    "source-layer": layer.sourceLayer,
-    filter: ["==", ["geometry-type"], "Polygon"],
-    paint: {
-      "line-color": darken(layer.color),
-      "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.4, 14, 1, 18, 2],
-      "line-opacity": 0.9,
-    },
-  });
+    map.addLayer({
+        id: layer.id + OUTLINE_SUFFIX,
+        type: "line",
+        source: SOURCE_ID,
+        "source-layer": layer.sourceLayer,
+        filter: ["==", ["geometry-type"], "Polygon"],
+        paint: {
+            "line-color": darken(layer.color),
+            "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.4, 14, 1, 18, 2],
+            "line-opacity": 0.9,
+        },
+    });
+}
+
+// Rebuilds the vector source at a given maxzoom, preserving each base/outline
+// layer's current visibility. MapLibre has no API to mutate an existing vector
+// source's maxzoom, so locking the zoom level means tearing down and re-adding
+// the source (and every layer bound to it) with the new maxzoom - past that
+// zoom, MapLibre overzooms the last fetched tile instead of requesting a new one.
+function rebuildSource(map: MapLibreMap, dataset: string, maxzoom: number): void {
+    const visibility = new Map<string, string>();
+    for (const layer of LAYERS) {
+        visibility.set(layer.id, map.getLayoutProperty(layer.id, "visibility") ?? "visible");
+        if (layer.type === "fill") {
+            visibility.set(layer.id + OUTLINE_SUFFIX, map.getLayoutProperty(layer.id + OUTLINE_SUFFIX, "visibility") ?? "visible");
+        }
+    }
+
+    for (const layer of LAYERS) {
+        if (layer.type === "fill") map.removeLayer(layer.id + OUTLINE_SUFFIX);
+        map.removeLayer(layer.id);
+    }
+    map.removeSource(SOURCE_ID);
+
+    map.addSource(SOURCE_ID, {
+        type: "vector",
+        tiles: [`${window.location.origin}/tiles/{z}/{x}/{y}.pbf?dataset=${dataset}`],
+        minzoom: 0,
+        maxzoom,
+    });
+
+    for (const layer of LAYERS) {
+        addLayer(map, layer);
+        map.setLayoutProperty(layer.id, "visibility", visibility.get(layer.id)!);
+        setGeomKeyColoring(map, layer, map.getLayoutProperty(layer.id + VERTEX_SUFFIX, "visibility") === "visible");
+    }
+    for (const layer of LAYERS.filter((l) => l.type === "fill")) {
+        addOutlineLayer(map, layer);
+        map.setLayoutProperty(layer.id + OUTLINE_SUFFIX, "visibility", visibility.get(layer.id + OUTLINE_SUFFIX)!);
+    }
+}
+
+// Toggle that locks the source's maxzoom to the zoom level active when it's
+// checked, so zooming in further overzooms the last-fetched tiles instead of
+// requesting new ones - useful for seeing how a fixed tile's geometry looks
+// magnified rather than replaced by the next zoom level's re-tessellation.
+function buildZoomLockToggle(map: MapLibreMap, dataset: string): void {
+    const panel = document.getElementById("layer-panel")!;
+    const item = document.createElement("label");
+    item.className = "layer-toggle";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = false;
+    checkbox.addEventListener("change", () => {
+        if (checkbox.checked) {
+            const lockedZoom = Math.floor(map.getZoom());
+            rebuildSource(map, dataset, lockedZoom);
+        } else {
+            rebuildSource(map, dataset, 14);
+        }
+    });
+
+    const text = document.createElement("span");
+    text.textContent = "Lock zoom level (overzoom)";
+
+    item.append(checkbox, text);
+    panel.appendChild(item);
 }
 
 function buildDatasetSelect(dataset: string): void {
-  const panel = document.getElementById("layer-panel")!;
-  const select = document.createElement("select");
-  select.className = "dataset-select";
-  for (const d of DATASETS) {
-    const option = document.createElement("option");
-    option.value = d.id;
-    option.textContent = d.label;
-    option.selected = d.id === dataset;
-    select.appendChild(option);
-  }
-  select.addEventListener("change", () => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("dataset", select.value);
-    window.location.href = url.toString();
-  });
-  panel.appendChild(select);
+    const panel = document.getElementById("layer-panel")!;
+    const select = document.createElement("select");
+    select.className = "dataset-select";
+    for (const d of DATASETS) {
+        const option = document.createElement("option");
+        option.value = d.id;
+        option.textContent = d.label;
+        option.selected = d.id === dataset;
+        select.appendChild(option);
+    }
+    select.addEventListener("change", () => {
+        const url = new URL(window.location.href);
+        url.searchParams.set("dataset", select.value);
+        window.location.href = url.toString();
+    });
+    panel.appendChild(select);
 }
 
 // MapLibre's built-in debug overlay, drawing each loaded tile's border and its
 // z/x/y label. Useful next to the feature-order arrows, which chain features
 // within a tile and never across tile boundaries.
 function buildTileBoundaryToggle(map: MapLibreMap): void {
-  const panel = document.getElementById("layer-panel")!;
-  const item = document.createElement("label");
-  item.className = "layer-toggle";
-
-  const checkbox = document.createElement("input");
-  checkbox.type = "checkbox";
-  checkbox.checked = false;
-  checkbox.addEventListener("change", () => {
-    map.showTileBoundaries = checkbox.checked;
-  });
-
-  const text = document.createElement("span");
-  text.textContent = "Tile boundaries";
-
-  item.append(checkbox, text);
-  panel.appendChild(item);
-}
-
-function buildLayerToggles(map: MapLibreMap): void {
-  const panel = document.getElementById("layer-panel")!;
-  for (const layer of LAYERS) {
+    const panel = document.getElementById("layer-panel")!;
     const item = document.createElement("label");
     item.className = "layer-toggle";
 
-    const swatch = document.createElement("span");
-    swatch.className = "swatch";
-    swatch.style.backgroundColor = layer.color;
-
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
-    checkbox.checked = true;
+    checkbox.checked = false;
     checkbox.addEventListener("change", () => {
-      const visibility = checkbox.checked ? "visible" : "none";
-      map.setLayoutProperty(layer.id, "visibility", visibility);
-      if (layer.type === "fill") {
-        map.setLayoutProperty(layer.id + OUTLINE_SUFFIX, "visibility", visibility);
-      }
+        map.showTileBoundaries = checkbox.checked;
     });
 
     const text = document.createElement("span");
-    text.textContent = layer.label;
+    text.textContent = "Tile boundaries";
 
-    item.append(checkbox, swatch, text);
+    item.append(checkbox, text);
     panel.appendChild(item);
+}
 
-    const vertexItem = document.createElement("label");
-    vertexItem.className = "layer-toggle vertex-toggle";
+function buildLayerToggles(map: MapLibreMap): void {
+    const panel = document.getElementById("layer-panel")!;
+    for (const layer of LAYERS) {
+        const item = document.createElement("label");
+        item.className = "layer-toggle";
 
-    const vertexCheckbox = document.createElement("input");
-    vertexCheckbox.type = "checkbox";
-    vertexCheckbox.checked = false;
-    vertexCheckbox.addEventListener("change", () => {
-      const visibility = vertexCheckbox.checked ? "visible" : "none";
-      map.setLayoutProperty(layer.id + VERTEX_SUFFIX, "visibility", visibility);
-      if (vertexCheckbox.checked) refreshVertices(map, layer);
-    });
+        const swatch = document.createElement("span");
+        swatch.className = "swatch";
+        swatch.style.backgroundColor = layer.color;
 
-    const vertexText = document.createElement("span");
-    vertexText.textContent = `${layer.label} vertices`;
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = true;
+        checkbox.addEventListener("change", () => {
+            const visibility = checkbox.checked ? "visible" : "none";
+            map.setLayoutProperty(layer.id, "visibility", visibility);
+            if (layer.type === "fill") {
+                map.setLayoutProperty(layer.id + OUTLINE_SUFFIX, "visibility", visibility);
+            }
+        });
 
-    vertexItem.append(vertexCheckbox, vertexText);
-    panel.appendChild(vertexItem);
+        const text = document.createElement("span");
+        text.textContent = layer.label;
 
-    const arrowItem = document.createElement("label");
-    arrowItem.className = "layer-toggle vertex-toggle";
+        item.append(checkbox, swatch, text);
+        panel.appendChild(item);
 
-    const arrowCheckbox = document.createElement("input");
-    arrowCheckbox.type = "checkbox";
-    arrowCheckbox.checked = false;
-    arrowCheckbox.addEventListener("change", () => {
-      const visibility = arrowCheckbox.checked ? "visible" : "none";
-      map.setLayoutProperty(layer.id + ARROW_SUFFIX, "visibility", visibility);
-      map.setLayoutProperty(layer.id + ARROWHEAD_SUFFIX, "visibility", visibility);
-      if (arrowCheckbox.checked) refreshCloseArrows(map, layer);
-    });
+        const vertexItem = document.createElement("label");
+        vertexItem.className = "layer-toggle vertex-toggle";
 
-    const arrowText = document.createElement("span");
-    arrowText.textContent = `${layer.label} feature order`;
+        const vertexCheckbox = document.createElement("input");
+        vertexCheckbox.type = "checkbox";
+        vertexCheckbox.checked = false;
+        vertexCheckbox.addEventListener("change", () => {
+            const visibility = vertexCheckbox.checked ? "visible" : "none";
+            map.setLayoutProperty(layer.id + VERTEX_SUFFIX, "visibility", visibility);
+            setGeomKeyColoring(map, layer, vertexCheckbox.checked);
+            if (vertexCheckbox.checked) {
+                refreshGeomKeys(map, layer);
+                refreshVertices(map, layer);
+            }
+        });
 
-    arrowItem.append(arrowCheckbox, arrowText);
-    panel.appendChild(arrowItem);
+        const vertexText = document.createElement("span");
+        vertexText.textContent = `${layer.label} vertices`;
 
-    const reorderItem = document.createElement("label");
-    reorderItem.className = "layer-toggle vertex-toggle";
+        vertexItem.append(vertexCheckbox, vertexText);
+        panel.appendChild(vertexItem);
 
-    const reorderCheckbox = document.createElement("input");
-    reorderCheckbox.type = "checkbox";
-    reorderCheckbox.checked = false;
-    reorderCheckbox.addEventListener("change", () => {
-      const visibility = reorderCheckbox.checked ? "visible" : "none";
-      map.setLayoutProperty(layer.id + REORDER_ARROW_SUFFIX, "visibility", visibility);
-      map.setLayoutProperty(layer.id + REORDER_ARROWHEAD_SUFFIX, "visibility", visibility);
-      if (reorderCheckbox.checked) refreshReorderArrows(map, layer);
-    });
+        const arrowItem = document.createElement("label");
+        arrowItem.className = "layer-toggle vertex-toggle";
 
-    const reorderText = document.createElement("span");
-    reorderText.textContent = `${layer.label} reordered feature order`;
+        const arrowCheckbox = document.createElement("input");
+        arrowCheckbox.type = "checkbox";
+        arrowCheckbox.checked = false;
+        arrowCheckbox.addEventListener("change", () => {
+            const visibility = arrowCheckbox.checked ? "visible" : "none";
+            map.setLayoutProperty(layer.id + ARROW_SUFFIX, "visibility", visibility);
+            map.setLayoutProperty(layer.id + ARROWHEAD_SUFFIX, "visibility", visibility);
+            if (arrowCheckbox.checked) refreshCloseArrows(map, layer);
+        });
 
-    reorderItem.append(reorderCheckbox, reorderText);
-    panel.appendChild(reorderItem);
-  }
+        const arrowText = document.createElement("span");
+        arrowText.textContent = `${layer.label} feature order`;
+
+        arrowItem.append(arrowCheckbox, arrowText);
+        panel.appendChild(arrowItem);
+
+        const reorderItem = document.createElement("label");
+        reorderItem.className = "layer-toggle vertex-toggle";
+
+        const reorderCheckbox = document.createElement("input");
+        reorderCheckbox.type = "checkbox";
+        reorderCheckbox.checked = false;
+        reorderCheckbox.addEventListener("change", () => {
+            const visibility = reorderCheckbox.checked ? "visible" : "none";
+            map.setLayoutProperty(layer.id + REORDER_ARROW_SUFFIX, "visibility", visibility);
+            map.setLayoutProperty(layer.id + REORDER_ARROWHEAD_SUFFIX, "visibility", visibility);
+            if (reorderCheckbox.checked) refreshReorderArrows(map, layer);
+        });
+
+        const reorderText = document.createElement("span");
+        reorderText.textContent = `${layer.label} reordered feature order`;
+
+        reorderItem.append(reorderCheckbox, reorderText);
+        panel.appendChild(reorderItem);
+    }
 }
 
 async function main(): Promise<void> {
-  const dataset = currentDataset();
-  const { center, zoom } = await loadCenter(dataset);
+    const dataset = currentDataset();
+    const {center, zoom} = await loadCenter(dataset);
 
-  const map = new maplibregl.Map({
-    container: "map",
-    style: {
-      version: 8,
-      sources: {
-        [SOURCE_ID]: {
-          type: "vector",
-          tiles: [`${window.location.origin}/tiles/{z}/{x}/{y}.pbf?dataset=${dataset}`],
-          minzoom: 0,
-          maxzoom: 14,
-        },
-      },
-      layers: [{ id: "background", type: "background", paint: { "background-color": "#eef2f5" } }],
-    },
-    center,
-    zoom,
-  });
+    const map = new maplibregl.Map({
+        container: "map", style: {
+            version: 8, sources: {
+                [SOURCE_ID]: {
+                    type: "vector",
+                    tiles: [`${window.location.origin}/tiles/{z}/{x}/{y}.pbf?dataset=${dataset}`],
+                    minzoom: 0,
+                    maxzoom: 14,
+                },
+            }, layers: [{id: "background", type: "background", paint: {"background-color": "#eef2f5"}}],
+        }, center, zoom,
+    });
 
-  map.addControl(new maplibregl.NavigationControl(), "top-right");
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
 
-  map.on("load", () => {
-    for (const layer of LAYERS) {
-      addLayer(map, layer);
-    }
-    // Outlines go on top of all fills so polygon borders stay visible where
-    // layers overlap (e.g. buildings on top of landcover).
-    for (const layer of LAYERS.filter((l) => l.type === "fill")) {
-      addOutlineLayer(map, layer);
-    }
-    for (const layer of LAYERS) {
-      addVertexLayer(map, layer);
-      addCloseArrowLayer(map, layer);
-      addReorderArrowLayer(map, layer);
-    }
-    buildDatasetSelect(dataset);
-    buildTileBoundaryToggle(map);
-    buildLayerToggles(map);
-
-    const refreshVisibleVertexLayers = () => {
-      for (const layer of LAYERS) {
-        if (map.getLayoutProperty(layer.id + VERTEX_SUFFIX, "visibility") === "visible") {
-          refreshVertices(map, layer);
+    map.on("load", () => {
+        for (const layer of LAYERS) {
+            addLayer(map, layer);
         }
-        if (map.getLayoutProperty(layer.id + ARROW_SUFFIX, "visibility") === "visible") {
-          refreshCloseArrows(map, layer);
+        // Outlines go on top of all fills so polygon borders stay visible where
+        // layers overlap (e.g. buildings on top of landcover).
+        for (const layer of LAYERS.filter((l) => l.type === "fill")) {
+            addOutlineLayer(map, layer);
         }
-        if (map.getLayoutProperty(layer.id + REORDER_ARROW_SUFFIX, "visibility") === "visible") {
-          refreshReorderArrows(map, layer);
+        for (const layer of LAYERS) {
+            addVertexLayer(map, layer);
+            addCloseArrowLayer(map, layer);
+            addReorderArrowLayer(map, layer);
         }
-      }
-    };
-    map.on("moveend", refreshVisibleVertexLayers);
-    map.on("zoomend", refreshVisibleVertexLayers);
-  });
+        buildDatasetSelect(dataset);
+        buildTileBoundaryToggle(map);
+        buildZoomLockToggle(map, dataset);
+        buildLayerToggles(map);
+
+        const refreshVisibleVertexLayers = () => {
+            for (const layer of LAYERS) {
+                if (map.getLayoutProperty(layer.id + VERTEX_SUFFIX, "visibility") === "visible") {
+                    refreshGeomKeys(map, layer);
+                    refreshVertices(map, layer);
+                }
+                if (map.getLayoutProperty(layer.id + ARROW_SUFFIX, "visibility") === "visible") {
+                    refreshCloseArrows(map, layer);
+                }
+                if (map.getLayoutProperty(layer.id + REORDER_ARROW_SUFFIX, "visibility") === "visible") {
+                    refreshReorderArrows(map, layer);
+                }
+            }
+        };
+        map.on("moveend", refreshVisibleVertexLayers);
+        map.on("zoomend", refreshVisibleVertexLayers);
+        map.on("sourcedata", (e) => {
+            if (e.sourceId === SOURCE_ID && e.isSourceLoaded) refreshVisibleVertexLayers();
+        });
+    });
 }
 
 main();
