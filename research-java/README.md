@@ -93,12 +93,16 @@ the topology streams (`tileExtent`, `geometryTypes`, `numGeometries`, `numParts`
 ### 2. Benchmark
 
 ```
-./gradlew benchmark --args="../data/extracted"
+./gradlew benchmark
 ```
+
+Defaults to `../data/extractedBaseline`, the project's current baseline corpus. Pass a
+directory explicitly to run on a different extraction: `./gradlew benchmark
+--args="../data/extracted"`.
 
 | Flag | Required | Description |
 |---|---|---|
-| `<extractionDir>` | yes | Must contain `manifest.json` |
+| `[extractionDir]` | no | Must contain `manifest.json`; defaults to `../data/extractedBaseline` |
 | `--csv <file>` | no | Also dump per-buffer sizes (one column per encoding) |
 | `--layer <name>` | no | Restrict the run to one layer |
 | `--verbose` | no | Full per-encoding tables instead of the compact winner-only table |
@@ -126,6 +130,14 @@ housenumber              244       735.180     base       849.969   +15,6%
 ```
 
 Negative means smaller, which is the goal.
+
+After the layer and geometry breakdowns, an `--- encoding potential (FeatureTable wins)
+---` table lists every registered encoding with how many buffers (FeatureTable instances)
+it is the smallest encoding on, corpus-wide, and the bytes saved against each won buffer's
+best baseline. Every encoding gets a row, including `0`-win ones — that is the signal to
+demote it, see "Excluding an encoding" below. A high win count with negligible bytes saved
+is still not a result: read both columns together (an encoding can win hundreds of buffers
+by a byte each).
 
 With `--reorder`, every buffer is additionally checked for geometry preservation before it is
 encoded: reordering may change the order and nothing else, so the multiset of parts must be
@@ -169,6 +181,21 @@ With `research()` empty the run reports the two baselines only — the null resu
 shows the harness works before any new encoding is judged by it. See
 [`docs/results/`](docs/results/README.md) for what the currently registered encodings do
 and for the ones that were measured and rejected.
+
+## Excluding an encoding
+
+**Zero FeatureTable wins, or wins with negligible bytes saved, means demote now** — do not
+leave a dead encoding registered. There is no tooling for this; it is four manual steps:
+
+1. Delete its line(s) from `Baselines.research()`. This alone drops it from the benchmark
+   and from `VertexBufferCodecTest`, which parameterizes over `Baselines.all()`.
+2. Move the class to `encoding/research/failed/` and fix its `package` line. `Baselines`
+   imports `...encoding.research.*`, so the wildcard no longer reaches it there.
+3. Move its `*MechanismTest.java` to the matching `test/.../research/failed/` package. The
+   mechanism test survives the demotion — it pins how the idea works, independent of
+   whether it won, so the mechanism need not be re-derived if the idea resurfaces.
+4. Add a `docs/results/failed/<name>.md` with `Status:` / `Effect:` / `Corpus:`, following
+   the existing files under `docs/results/failed/`.
 
 ## Docs
 

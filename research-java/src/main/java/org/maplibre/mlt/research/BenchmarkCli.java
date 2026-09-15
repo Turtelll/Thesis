@@ -13,6 +13,7 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Encodes every extracted (tile, layer) VertexBuffer with every registered encoding and reports the
@@ -30,7 +31,8 @@ import java.util.*;
  * small size and would look like the best result in the table <em>because</em> it is broken, so a
  * size from an unverified encoding is not a result.
  *
- * <p>Usage: {@code <extractionDir> [--csv <file>] [--layer <name>]}
+ * <p>Usage: {@code [extractionDir] [--csv <file>] [--layer <name>] [--verbose]}. {@code
+ * extractionDir} defaults to {@code ../data/extractedBaseline} when omitted.
  */
 public final class BenchmarkCli {
     private BenchmarkCli() {
@@ -100,6 +102,56 @@ public final class BenchmarkCli {
             perBufferSizes.add(sizes);
         }
 
+        /**
+         * How many buffers (FeatureTable instances) each encoding is smallest on, corpus-wide — the
+         * "does this have potential on some geometry?" question, answered without reading a full
+         * per-encoding table or exporting the CSV and pivoting it by hand.
+         *
+         * <p>One row per registered encoding, including the ones that win nothing: a {@code 0} row is
+         * the kill signal this table exists to produce, so it is not filtered out. Win <em>count</em>
+         * alone is misleading — {@code docs/results/selection-oracle.md}: an encoding can win hundreds
+         * of buffers by a byte each — so each row also carries the bytes saved against that buffer's
+         * best baseline, summed over every buffer it won.
+         */
+        void winCounts(List<String> names) {
+            var baselineNames = Baselines.baseline().stream().map(Encoding::name).collect(Collectors.toSet());
+            var bytesSaved = new HashMap<String, Long>();
+            for (var sizes : perBufferSizes) {
+                var best = 0;
+                for (var i = 0; i < sizes.size(); i++) {
+                    if (sizes.get(i) < sizes.get(best)) {
+                        best = i;
+                    }
+                }
+                var baselineBest = names.stream()
+                        .filter(baselineNames::contains)
+                        .mapToInt(n -> sizes.get(names.indexOf(n)))
+                        .min()
+                        .orElse(sizes.get(best));
+                bytesSaved.merge(names.get(best), (long) (baselineBest - sizes.get(best)), Long::sum);
+            }
+
+            var nameWidth = Math.max(7, names.stream().mapToInt(String::length).max().orElse(0));
+
+            System.out.printf("%n--- encoding potential (FeatureTable wins) ---%n");
+            System.out.printf("%-" + nameWidth + "s %10s %14s%n", "encoding", "wins", "bytes saved");
+
+            var ranked = new ArrayList<>(names);
+            ranked.sort(
+                    Comparator.<String>comparingInt(n -> wins.getOrDefault(n, 0))
+                            .thenComparingLong(n -> bytesSaved.getOrDefault(n, 0L))
+                            .reversed());
+
+            for (var name : ranked) {
+                var label = baselineNames.contains(name) ? name + " (baseline)" : name;
+                System.out.printf(
+                        "%-" + nameWidth + "s %10d %14s%n",
+                        label,
+                        wins.getOrDefault(name, 0),
+                        String.format("%,d", bytesSaved.getOrDefault(name, 0L)));
+            }
+        }
+
         void report(List<String> names, Totals overall) {
             var fixedBest = names.stream().mapToLong(overall::get).min().orElse(0);
             var fixedName = winner(names, overall);
@@ -107,7 +159,6 @@ public final class BenchmarkCli {
             var fixedBaselineName = referenceName(overall);
             var fixedBaselineIndex = names.indexOf(fixedBaselineName);
 
-            var savedVsBaseline = new TreeMap<String, Long>();
             var buffersImproved = 0;
             for (var sizes : perBufferSizes) {
                 var best = 0;
@@ -116,10 +167,8 @@ public final class BenchmarkCli {
                         best = i;
                     }
                 }
-                var baselineSize = sizes.get(fixedBaselineIndex);
-                if (sizes.get(best) < baselineSize) {
+                if (sizes.get(best) < sizes.get(fixedBaselineIndex)) {
                     buffersImproved++;
-                    savedVsBaseline.merge(names.get(best), (long) (baselineSize - sizes.get(best)), Long::sum);
                 }
             }
 
@@ -159,16 +208,6 @@ public final class BenchmarkCli {
                         100.0 * headroom / fixedBaselineBest,
                         buffersImproved,
                         overall.buffers);
-            }
-            if (!savedVsBaseline.isEmpty()) {
-                System.out.printf("%-24s %12s %10s%n", "  encoding", "bytes saved", "buffers");
-                savedVsBaseline.entrySet().stream()
-                        .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-                        .forEach(
-                                e ->
-                                        System.out.printf(
-                                                "  %-22s %12s %10d%n",
-                                                e.getKey(), String.format("%,d", e.getValue()), wins.getOrDefault(e.getKey(), 0)));
             }
             System.out.printf(
                     "%nThe oracle pays nothing to signal its choice and never guesses wrong, so this is the%n"
@@ -299,6 +338,7 @@ public final class BenchmarkCli {
 
         segment("layer", names, byLayer, TOP_LAYERS, verbose);
         segment("geometry", names, byGeometry, Integer.MAX_VALUE, verbose);
+        selection.winCounts(names);
         selection.report(names, overall);
     }
 
@@ -371,8 +411,8 @@ public final class BenchmarkCli {
         var corpus = shown.stream().mapToLong(g -> bestBaseline(g.getValue())).sum();
 
         System.out.printf(
-                "%-" + width + "s %8s %7s %14s   %-" + nameWidth + "s %14s %8s%n",
-                label, "buffers", "share", "baseline", "winner", "bytes", "saved");
+                "%-" + width + "s %8s %7s %14s   %-" + nameWidth + "s %14s %11s%n",
+                label, "buffers", "share", "baseline bytes", "winner", "winner bytes", "vs baseline");
 
         for (var group : shown) {
             var totals = group.getValue();
@@ -384,14 +424,14 @@ public final class BenchmarkCli {
              * row stays — without a winner. */
             if (group.getKey().startsWith("(other")) {
                 System.out.printf(
-                        "%-" + width + "s %8d %6.1f%% %14s   %-" + nameWidth + "s %14s %8s%n",
+                        "%-" + width + "s %8d %6.1f%% %14s   %-" + nameWidth + "s %14s %11s%n",
                         group.getKey(), totals.buffers, share, String.format("%,d", reference), "-", "-", "-");
                 continue;
             }
 
             var winner = winner(names, totals);
             System.out.printf(
-                    "%-" + width + "s %8d %6.1f%% %14s   %-" + nameWidth + "s %14s %8s%n",
+                    "%-" + width + "s %8d %6.1f%% %14s   %-" + nameWidth + "s %14s %11s%n",
                     group.getKey(),
                     totals.buffers,
                     share,
@@ -605,8 +645,14 @@ public final class BenchmarkCli {
 
     private record Options(String inDir, String csvFile, String layer, boolean verbose) {
 
+        /**
+         * The extraction directory used when none is given on the command line — the project's
+         * current baseline corpus (planetiler-derived, see {@code docs/results/README.md}).
+         */
+        private static final String DEFAULT_IN_DIR = "../data/extractedBaseline";
+
         private static final String USAGE =
-                "Usage: <extractionDir> [--csv <file>] [--layer <name>] [--verbose]";
+                "Usage: [extractionDir] [--csv <file>] [--layer <name>] [--verbose]";
 
         static Options parse(String[] args) {
             String in = null;
@@ -632,7 +678,7 @@ public final class BenchmarkCli {
                 }
             }
             if (in == null) {
-                throw new IllegalArgumentException(USAGE);
+                in = DEFAULT_IN_DIR;
             }
             return new Options(in, csv, layer, verbose);
         }
