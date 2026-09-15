@@ -7,52 +7,39 @@ import org.junit.jupiter.api.Test;
 
 class IntCodecTest {
 
-  @Test
-  void varint_roundTripsRandomValues() {
-    var random = new Random(42);
-    int[] values = new int[500];
-    for (int i = 0; i < values.length; i++) {
-      values[i] = random.nextInt();
-    }
-
-    var codec = new IntCodec.Varint();
+  private static void assertRoundTrip(IntCodec codec, int[] values) {
     byte[] encoded = codec.encode(values);
     int[] decoded = codec.decode(encoded, values.length);
 
     assertArrayEquals(values, decoded);
+  }
+
+  private static int[] randomValues(int count) {
+    var random = new Random(42);
+    int[] values = new int[count];
+    for (int i = 0; i < values.length; i++) {
+      values[i] = random.nextInt();
+    }
+    return values;
+  }
+
+  @Test
+  void varint_roundTripsRandomValues() {
+    assertRoundTrip(new IntCodec.Varint(), randomValues(500));
   }
 
   @Test
   void varint_roundTripsEmpty() {
-    var codec = new IntCodec.Varint();
-    byte[] encoded = codec.encode(new int[0]);
-    int[] decoded = codec.decode(encoded, 0);
-    assertArrayEquals(new int[0], decoded);
+    assertRoundTrip(new IntCodec.Varint(), new int[0]);
   }
 
   @Test
   void fastPfor_roundTripsRandomValues() {
-    var random = new Random(42);
-    int[] values = new int[500];
-    for (int i = 0; i < values.length; i++) {
-      values[i] = random.nextInt();
-    }
-
-    var codec = new IntCodec.FastPfor();
-    byte[] encoded = codec.encode(values);
-    int[] decoded = codec.decode(encoded, values.length);
-
-    assertArrayEquals(values, decoded);
+    assertRoundTrip(new IntCodec.FastPfor(), randomValues(500));
   }
 
   @Test
   void fastPfor_roundTripsSmallNonBlockAlignedArray() {
-    int[] values = {1, -2, 3, -4, 5};
-
-    var codec = new IntCodec.FastPfor();
-    byte[] encoded = codec.encode(values);
-    int[] decoded = codec.decode(encoded, values.length);
-
-    assertArrayEquals(values, decoded);
+    assertRoundTrip(new IntCodec.FastPfor(), new int[] {1, -2, 3, -4, 5});
   }
 }

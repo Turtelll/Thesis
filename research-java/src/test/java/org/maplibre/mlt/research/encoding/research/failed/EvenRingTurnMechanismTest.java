@@ -4,11 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.IntCodec;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
 
 /**
  * Pins the parity rule that is {@code EVEN_RING_TURN}'s whole idea: the signalled 90°-turn predictor
@@ -35,7 +37,7 @@ class EvenRingTurnMechanismTest {
 
   /** A unit-step staircase: every turn is an exact 90°, so a turn-predicted vertex costs nothing. */
   private static List<Vertex> staircase(int n) {
-    final var vertices = new java.util.ArrayList<Vertex>(n);
+    final var vertices = new ArrayList<Vertex>(n);
     var x = 0;
     var y = 0;
     for (var i = 0; i < n; i++) {
@@ -82,18 +84,14 @@ class EvenRingTurnMechanismTest {
   void reconstructsWithoutReadingTheOriginalVertices() {
     final var ctx = ringColumn(staircase(6));
     final var encoded = encoding().encode(ctx);
-    final var blind =
-        new BufferContext(List.of(), ctx.geometryTypes(), ctx.numGeometries(), ctx.numParts(), ctx.numRings());
-    assertEquals(ctx.vertices(), encoding().decode(encoded, blind, 6));
+    assertEquals(ctx.vertices(), encoding().decode(encoded, topologyOnly(ctx), 6));
   }
 
   @Test
   void reconstructsAnOddRingToo() {
     final var ctx = ringColumn(staircase(7));
     final var encoded = encoding().encode(ctx);
-    final var blind =
-        new BufferContext(List.of(), ctx.geometryTypes(), ctx.numGeometries(), ctx.numParts(), ctx.numRings());
-    assertEquals(ctx.vertices(), encoding().decode(encoded, blind, 7));
+    assertEquals(ctx.vertices(), encoding().decode(encoded, topologyOnly(ctx), 7));
   }
 
   @Test
@@ -102,11 +100,12 @@ class EvenRingTurnMechanismTest {
     final var encoded = encoding().encode(ctx);
     final var payload = encoded.payload().clone();
     payload[payload.length - 1] ^= 0x7F;
-    final var corrupted =
-        new org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer(
-            payload, encoded.metadataBytes());
-    final var blind =
-        new BufferContext(List.of(), ctx.geometryTypes(), ctx.numGeometries(), ctx.numParts(), ctx.numRings());
-    assertNotEquals(ctx.vertices(), encoding().decode(corrupted, blind, 6));
+    final var corrupted = new EncodedBuffer(payload, encoded.metadataBytes());
+    assertNotEquals(ctx.vertices(), encoding().decode(corrupted, topologyOnly(ctx), 6));
+  }
+
+  private static BufferContext topologyOnly(BufferContext ctx) {
+    return new BufferContext(
+        List.of(), ctx.geometryTypes(), ctx.numGeometries(), ctx.numParts(), ctx.numRings());
   }
 }

@@ -1,6 +1,5 @@
 package org.maplibre.mlt.research.encoding.research.failed;
 
-import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
@@ -9,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.IntCodec;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
 
 /**
  * Pins that {@code SEGMENT_QUAD_CORNER_TURN} routes by ring length: an exactly-four-vertex ring keeps
@@ -80,8 +80,9 @@ class SegmentQuadCornerTurnMechanismTest {
     final var classes = SegmentQuadCornerTurn.classify(new int[] {0}, vertices.size());
     final var transformed = SegmentQuadCornerTurn.transform(vertices, classes);
     // p0 start (head region), then interior p1/p2, then the corner p3 in the tail region: residual 0.
-    assertEquals(0, transformed.values()[transformed.values().length - 2], "corner x residual is 0");
-    assertEquals(0, transformed.values()[transformed.values().length - 1], "corner y residual is 0");
+    final var values = transformed.values();
+    assertEquals(0, values[values.length - 2], "corner x residual is 0");
+    assertEquals(0, values[values.length - 1], "corner y residual is 0");
     assertEquals(0, transformed.turns().size(), "a 4-ring signals no turn bits");
   }
 
@@ -93,15 +94,15 @@ class SegmentQuadCornerTurnMechanismTest {
     // Turn residuals are the last 2*turnCount slots (their own region); all zero on exact turns.
     final var turnCount = 7; // vertices 2..8 of a 9-vertex ring
     assertEquals(turnCount, transformed.turns().size(), "one bit per turn vertex");
-    for (var s = transformed.values().length - turnCount * 2; s < transformed.values().length; s++) {
-      assertEquals(0, transformed.values()[s], "exact right-angle turn residual must be 0");
+    final var values = transformed.values();
+    for (var s = values.length - turnCount * 2; s < values.length; s++) {
+      assertEquals(0, values[s], "exact right-angle turn residual must be 0");
     }
   }
 
   @Test
   void reconstructsEveryColumnFromTopologyAlone() {
-    for (final var ctx :
-        List.of(parallelogramColumn(), rightAngleRingColumn(), lineColumn())) {
+    for (final var ctx : List.of(parallelogramColumn(), rightAngleRingColumn(), lineColumn())) {
       final var encoding = encoding();
       assertEquals(
           ctx.vertices(),

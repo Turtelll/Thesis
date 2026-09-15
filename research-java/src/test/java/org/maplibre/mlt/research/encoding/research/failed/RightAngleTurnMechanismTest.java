@@ -1,6 +1,5 @@
 package org.maplibre.mlt.research.encoding.research.failed;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
@@ -102,12 +101,13 @@ class RightAngleTurnMechanismTest {
     final var isTurn = RightAngleTurn.classify(new int[] {0}, vertices.size());
     final var transformed = RightAngleTurn.transform(vertices, isTurn);
 
+    final var values = transformed.values();
     var turnCount = 0;
     for (var i = 0; i < vertices.size(); i++) {
       if (isTurn[i]) {
         turnCount++;
-        assertEquals(0, transformed.values()[i * 2], "turn vertex " + i + " x residual must be 0");
-        assertEquals(0, transformed.values()[i * 2 + 1], "turn vertex " + i + " y residual must be 0");
+        assertEquals(0, values[i * 2], "turn vertex " + i + " x residual must be 0");
+        assertEquals(0, values[i * 2 + 1], "turn vertex " + i + " y residual must be 0");
       }
     }
     assertEquals(7, turnCount, "vertices 2..8 of a 9-vertex ring are turn-predicted");

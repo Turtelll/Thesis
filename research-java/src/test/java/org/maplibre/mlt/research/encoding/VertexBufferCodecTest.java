@@ -3,7 +3,7 @@ package org.maplibre.mlt.research.encoding;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -45,8 +45,16 @@ class VertexBufferCodecTest {
   @MethodSource("everyEncoding")
   void roundTripsExtractedVertexBuffer(Encoding encoding) {
     var column = VertexBufferExtractor.extract(List.of(square(100, 200, 50)));
-    var vertices = column.vertexBuffer();
 
+    assertRoundTripsWithoutTopology(encoding, column.vertexBuffer());
+  }
+
+  /**
+   * Round-trips a vertex list through a {@link BufferContext#of} context — no topology streams, so
+   * any codec conditioning on structure degrades to a single run. The multi-part and mixed cases
+   * above are what exercise the structural paths.
+   */
+  private static void assertRoundTripsWithoutTopology(Encoding encoding, List<Vertex> vertices) {
     var ctx = BufferContext.of(vertices);
     var encoded = encoding.encode(ctx);
 
@@ -79,10 +87,9 @@ class VertexBufferCodecTest {
    *
    * <p>Mirrors {@code BenchmarkCli.verifyRoundTrip}: an encoding declaring {@link
    * Encoding#reordersGeometries()} reconstructs an <em>equivalent</em> buffer rather than an
-   * identical one, so it is checked for
-   * geometry preservation plus a faithful decode of what it emitted. Everything else is held to
-   * exact equality. Without the split these tests would either fail on a correct reordering
-   * encoding or, if loosened for all, stop catching a lossy one.
+   * identical one, so it is checked for geometry preservation plus a faithful decode of what it
+   * emitted. Everything else is held to exact equality. Without the split these tests would either
+   * fail on a correct reordering encoding or, if loosened for all, stop catching a lossy one.
    */
   private static void assertReconstructs(
       Encoding encoding, BufferContext ctx, VertexBufferCodec.EncodedBuffer encoded) {
@@ -123,27 +130,17 @@ class VertexBufferCodecTest {
   @MethodSource("everyEncoding")
   void roundTripsSingleVertexBuffer(Encoding encoding) {
     var column = VertexBufferExtractor.extract(List.of(GF.createPoint(new Coordinate(7, 9))));
-    var vertices = column.vertexBuffer();
 
-    var ctx = BufferContext.of(vertices);
-    var encoded = encoding.encode(ctx);
-
-    assertEquals(vertices, encoding.decode(encoded, ctx, vertices.size()));
+    assertRoundTripsWithoutTopology(encoding, column.vertexBuffer());
   }
 
   /** A constant buffer — the degenerate case where every delta is zero. */
   @ParameterizedTest
   @MethodSource("everyEncoding")
   void roundTripsConstantBuffer(Encoding encoding) {
-    var vertices = new ArrayList<Vertex>();
-    for (var i = 0; i < 40; i++) {
-      vertices.add(new Vertex(12, 34));
-    }
+    var vertices = Collections.nCopies(40, new Vertex(12, 34));
 
-    var ctx = BufferContext.of(vertices);
-    var encoded = encoding.encode(ctx);
-
-    assertEquals(vertices, encoding.decode(encoded, ctx, vertices.size()));
+    assertRoundTripsWithoutTopology(encoding, vertices);
   }
 
   /** The two baselines the whole benchmark is measured against must stay stable and named. */
@@ -168,13 +165,7 @@ class VertexBufferCodecTest {
   void bufferContextCarriesTopologyFromExtraction() {
     var column = VertexBufferExtractor.extract(List.of(square(0, 0, 10), square(100, 100, 10)));
 
-    var ctx =
-        new BufferContext(
-            column.vertexBuffer(),
-            column.geometryTypes(),
-            column.numGeometries(),
-            column.numParts(),
-            column.numRings());
+    var ctx = contextOf(column);
 
     assertEquals(column.vertexBuffer(), ctx.vertices());
     assertEquals(2, ctx.geometryTypes().size());

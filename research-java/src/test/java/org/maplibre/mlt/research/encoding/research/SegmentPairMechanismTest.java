@@ -1,15 +1,17 @@
 package org.maplibre.mlt.research.encoding.research;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.Layout;
 import org.maplibre.mlt.research.encoding.PredictedTransform;
-import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.VertexTransform;
 
 /**
  * Pins the two properties that make {@code SEGMENT_PAIR}'s measured win meaningful rather than an
@@ -46,18 +48,16 @@ class SegmentPairMechanismTest {
 
     // Same multiset of residuals, different order: the transform moves values, it does not
     // invent or drop them. If these were equal the encoding would be the baseline in disguise.
-    assertNotEquals(
-        List.of(interleaved), List.of(grouped), "expected a different ordering to the baseline");
+    assertFalse(
+        Arrays.equals(interleaved, grouped), "expected a different ordering to the baseline");
     assertEquals(interleaved.length, grouped.length);
     assertEquals(sorted(interleaved), sorted(grouped), "residual multiset must be preserved");
 
     // The three part starts occupy the first three vertex slots.
     final var partStartCount = 3;
-    final var firstStartX = grouped[0];
-    assertEquals(interleaved[0], firstStartX, "part 0 start is unchanged at the head");
+    assertEquals(interleaved[0], grouped[0], "part 0 start is unchanged at the head");
     // The jump into part 1 is a large residual and must sit in the head group, not the tail.
-    final var jumpIntoPart1 = interleaved[4];
-    assertEquals(grouped[2], jumpIntoPart1, "part 1 start must be grouped with the other starts");
+    assertEquals(interleaved[4], grouped[2], "part 1 start must be grouped with the other starts");
     assertEquals(grouped.length, partStartCount * 2 + 4 * 2);
   }
 
@@ -89,6 +89,6 @@ class SegmentPairMechanismTest {
   }
 
   private static List<Integer> sorted(int[] values) {
-    return java.util.Arrays.stream(values).boxed().sorted().toList();
+    return Arrays.stream(values).boxed().sorted().toList();
   }
 }

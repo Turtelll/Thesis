@@ -9,16 +9,7 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 
 class VertexTransformTest {
 
-  @Test
-  void zigZagDelta_roundTripsVertexBuffer() {
-    var vertices =
-        List.of(
-            new Vertex(100, 200),
-            new Vertex(105, 190),
-            new Vertex(-50, -300),
-            new Vertex(-50, -300),
-            new Vertex(0, 0));
-
+  private static void assertRoundTrip(List<Vertex> vertices) {
     var transform = new VertexTransform.ZigZagDelta();
     var ctx = BufferContext.of(vertices);
     int[] applied = transform.apply(ctx);
@@ -28,11 +19,18 @@ class VertexTransformTest {
   }
 
   @Test
+  void zigZagDelta_roundTripsVertexBuffer() {
+    assertRoundTrip(
+        List.of(
+            new Vertex(100, 200),
+            new Vertex(105, 190),
+            new Vertex(-50, -300),
+            new Vertex(-50, -300),
+            new Vertex(0, 0)));
+  }
+
+  @Test
   void zigZagDelta_roundTripsEmpty() {
-    var transform = new VertexTransform.ZigZagDelta();
-    var ctx = BufferContext.of(List.of());
-    int[] applied = transform.apply(ctx);
-    List<Vertex> restored = transform.invert(applied, ctx);
-    assertEquals(List.of(), restored);
+    assertRoundTrip(List.of());
   }
 }

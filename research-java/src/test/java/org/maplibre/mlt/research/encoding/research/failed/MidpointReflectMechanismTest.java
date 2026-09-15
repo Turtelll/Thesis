@@ -1,8 +1,8 @@
 package org.maplibre.mlt.research.encoding.research.failed;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -73,7 +73,7 @@ class MidpointReflectMechanismTest {
     final var ctx = shortRing();
     final var sym = new MidpointReflect(MidpointReflect.Pairing.SYMMETRIC).apply(ctx);
     final var split = new MidpointReflect(MidpointReflect.Pairing.SPLIT).apply(ctx);
-    assertTrue(java.util.Arrays.equals(sym, split), "no reflect vertices -> pairings identical");
+    assertArrayEquals(sym, split, "no reflect vertices -> pairings identical");
   }
 
   @Test

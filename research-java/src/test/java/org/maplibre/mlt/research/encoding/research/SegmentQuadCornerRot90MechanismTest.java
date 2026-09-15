@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
@@ -55,9 +56,10 @@ class SegmentQuadCornerRot90MechanismTest {
   private static BufferContext mixedColumn() {
     final var p = parallelogramColumn();
     final var l = lShapeColumn();
-    final var vertices = new java.util.ArrayList<Vertex>(p.vertices());
+    final var vertices = new ArrayList<Vertex>(p.vertices());
     vertices.addAll(l.vertices());
-    return new BufferContext(vertices, List.of(POLYGON, POLYGON), List.of(), List.of(1, 1), List.of(4, 6));
+    return new BufferContext(
+        vertices, List.of(POLYGON, POLYGON), List.of(), List.of(1, 1), List.of(4, 6));
   }
 
   private static PredictedTransform segmented() {
@@ -96,19 +98,20 @@ class SegmentQuadCornerRot90MechanismTest {
       if (c == targetClass) {
         break;
       }
-      for (var v : classes) {
-        if (v == c) {
-          offset += 2;
-        }
+      offset += 2 * countOf(classes, c, classes.length);
+    }
+    return offset + 2 * countOf(classes, targetClass, vertexIndex);
+  }
+
+  /** Number of entries equal to {@code target} in {@code classes[0, limit)}. */
+  private static int countOf(int[] classes, int target, int limit) {
+    var count = 0;
+    for (var i = 0; i < limit; i++) {
+      if (classes[i] == target) {
+        count++;
       }
     }
-    var indexWithinClass = 0;
-    for (var i = 0; i < vertexIndex; i++) {
-      if (classes[i] == targetClass) {
-        indexWithinClass++;
-      }
-    }
-    return offset + indexWithinClass * 2;
+    return count;
   }
 
   @Test

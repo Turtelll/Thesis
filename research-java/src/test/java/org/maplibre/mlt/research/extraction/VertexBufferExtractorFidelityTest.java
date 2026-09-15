@@ -12,9 +12,12 @@ import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.LinearRing;
 import org.locationtech.jts.geom.Polygon;
+import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.converter.encodings.GeometryEncoder;
+import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.decoder.DecodingUtils;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor.ExtractedColumn;
 
@@ -35,7 +38,7 @@ class VertexBufferExtractorFidelityTest {
       List<Integer> numGeometries,
       List<Integer> numParts,
       List<Integer> numRings,
-      List<org.maplibre.mlt.converter.geometry.Vertex> vertexBuffer) {}
+      List<Vertex> vertexBuffer) {}
 
   /** Reflectively invokes the real, private {@code GeometryEncoder.prepareGeometry}. */
   private static ReferenceResult runReferencePrepareGeometry(List<Geometry> geometries)
@@ -56,7 +59,7 @@ class VertexBufferExtractorFidelityTest {
 
     var numGeometries = new ArrayList<Integer>();
     var geometryTypes = new ArrayList<Integer>();
-    var vertexBuffer = new ArrayList<org.maplibre.mlt.converter.geometry.Vertex>();
+    var vertexBuffer = new ArrayList<Vertex>();
     var numParts = new ArrayList<Integer>();
     var numRings = new ArrayList<Integer>();
     var numTriangles = new ArrayList<Integer>();
@@ -127,7 +130,7 @@ class VertexBufferExtractorFidelityTest {
   void matchesReference_multiLineString() throws Exception {
     var multi =
         GF.createMultiLineString(
-            new org.locationtech.jts.geom.LineString[] {
+            new LineString[] {
               GF.createLineString(new Coordinate[] {coord(0, 0), coord(1, 1)}),
               GF.createLineString(new Coordinate[] {coord(2, 2), coord(3, 3), coord(4, 4)}),
             });
@@ -143,8 +146,7 @@ class VertexBufferExtractorFidelityTest {
   @Test
   void matchesReference_geometryCollection() throws Exception {
     var collection =
-        GF.createGeometryCollection(
-            new Geometry[] {GF.createPoint(coord(1, 1)), square(0, 0, 10)});
+        GF.createGeometryCollection(new Geometry[] {GF.createPoint(coord(1, 1)), square(0, 0, 10)});
     assertMatchesReference(List.of(collection));
   }
 
@@ -168,7 +170,7 @@ class VertexBufferExtractorFidelityTest {
     assertArrayEquals(shell.getCoordinates(), reconstructedShell);
   }
 
-  private static Coordinate[] closeRing(List<org.maplibre.mlt.converter.geometry.Vertex> ring) {
+  private static Coordinate[] closeRing(List<Vertex> ring) {
     var coords = new Coordinate[ring.size() + 1];
     for (int i = 0; i < ring.size(); i++) {
       coords[i] = new Coordinate(ring.get(i).x(), ring.get(i).y());
@@ -187,8 +189,7 @@ class VertexBufferExtractorFidelityTest {
 
     int[] encoded = GeometryEncoder.zigZagDeltaEncodeVertices(vertices);
 
-    byte[] varintBytes =
-        org.maplibre.mlt.converter.encodings.EncodingUtils.encodeVarints(encoded, false, false);
+    byte[] varintBytes = EncodingUtils.encodeVarints(encoded, false, false);
     int[] decodedZigZagDeltas =
         DecodingUtils.decodeVarints(varintBytes, new IntWrapper(0), encoded.length);
     assertArrayEquals(encoded, decodedZigZagDeltas);

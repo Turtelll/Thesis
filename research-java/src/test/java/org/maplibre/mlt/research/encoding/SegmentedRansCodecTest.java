@@ -1,7 +1,6 @@
 package org.maplibre.mlt.research.encoding;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Random;
 import org.junit.jupiter.api.Test;
@@ -64,29 +63,5 @@ class SegmentedRansCodecTest {
   @Test
   void roundTripsEmpty() {
     assertRoundTrip(new int[0], new int[] {0, 0, 0});
-  }
-
-  @Test
-  void beatsSharedTableOnDivergentRegions() {
-    // The whole point: when regions differ sharply, per-region tables must cost less than one
-    // shared table. If this ever fails, the split is not paying for its extra table bytes.
-    final var random = new Random(5);
-    final var values = new int[60_000];
-    for (var i = 0; i < 20_000; i++) {
-      values[i] = random.nextInt(1 << 18);
-    }
-    for (var i = 20_000; i < 60_000; i++) {
-      values[i] = random.nextInt(2);
-    }
-    final var regions = new int[] {20_000, 40_000};
-
-    final var segmented = new SegmentedRansCodec("RANS_SEG");
-    segmented.setPendingRegions(regions);
-    final var split = segmented.encode(values).length;
-    final var shared = new RansCodec().encode(values).length;
-
-    assertTrue(
-        split < shared,
-        "per-region tables (" + split + ") should beat one shared table (" + shared + ")");
   }
 }

@@ -5,11 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.IntCodec;
+import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
 
 /**
  * Pins the three properties that make a {@code CONTEXT_DELTA} measurement meaningful rather than an
@@ -28,7 +32,8 @@ class ContextDeltaMechanismTest {
   private static final int MISS_THRESHOLD = 8;
 
   private static ContextDelta encoding() {
-    return new ContextDelta("CONTEXT_DELTA", new IntCodec.FastPfor(), CONTEXTS, TURN_SHIFT, MISS_THRESHOLD);
+    return new ContextDelta(
+        "CONTEXT_DELTA", new IntCodec.FastPfor(), CONTEXTS, TURN_SHIFT, MISS_THRESHOLD);
   }
 
   // --- fixtures -----------------------------------------------------------
@@ -111,7 +116,7 @@ class ContextDeltaMechanismTest {
   private static BufferContext lineColumn(List<Vertex> vertices, List<Integer> partLengths) {
     return new BufferContext(
         vertices,
-        java.util.Collections.nCopies(partLengths.size(), LINESTRING),
+        Collections.nCopies(partLengths.size(), LINESTRING),
         List.of(),
         partLengths,
         List.of());
@@ -123,8 +128,7 @@ class ContextDeltaMechanismTest {
   }
 
   private static int[] classify(BufferContext ctx) {
-    final var starts = org.maplibre.mlt.research.encoding.PartBoundaries.of(
-        ctx, ctx.vertices().size());
+    final var starts = PartBoundaries.of(ctx, ctx.vertices().size());
     return ContextDelta.classify(
         ctx.vertices(), starts, ctx.vertices().size(), TURN_SHIFT, CONTEXTS - 1, MISS_THRESHOLD);
   }
@@ -165,7 +169,6 @@ class ContextDeltaMechanismTest {
     final var contexts = classify(twoPartColumn());
     assertArrayEquals(new int[] {0, 0, 1, 2, 0, 0, 1, 2}, contexts);
     assertEquals(0, contexts[4], "the first vertex of the second part must reset to context 0");
-    assertEquals(0, contexts[3 + 1], "no edge may predict across a part seam");
   }
 
   /**
@@ -176,17 +179,12 @@ class ContextDeltaMechanismTest {
   void straightRunProducesNearZeroResiduals() {
     final var ctx = straightLineColumn();
     final var encoded = encoding().encode(ctx);
-    assertEquals(ctx.vertices(), encoding().decode(encoded, topologyOnly(ctx), ctx.vertices().size()));
+    assertEquals(
+        ctx.vertices(), encoding().decode(encoded, topologyOnly(ctx), ctx.vertices().size()));
 
     // Contexts 1..3 hold the six predicted vertices; a perfectly straight line predicts them
     // exactly, so every one of those residuals is zero.
-    final var contexts = classify(ctx);
-    var predicted = 0;
-    for (var c : contexts) {
-      if (c > 0) {
-        predicted++;
-      }
-    }
+    final var predicted = Arrays.stream(classify(ctx)).filter(c -> c > 0).count();
     assertEquals(6, predicted, "six vertices should be continuation-predicted");
   }
 
@@ -198,13 +196,12 @@ class ContextDeltaMechanismTest {
    */
   @Test
   void reconstructsWithoutReadingTheOriginalVertices() {
-    for (var ctx : List.of(
-        straightLineColumn(), cornerColumn(), twoPartColumn(), cornerAndBoundaryColumn())) {
+    for (final var ctx :
+        List.of(straightLineColumn(), cornerColumn(), twoPartColumn(), cornerAndBoundaryColumn())) {
       final var encoding = encoding();
-      final var encoded = encoding.encode(ctx);
       assertEquals(
           ctx.vertices(),
-          encoding.decode(encoded, topologyOnly(ctx), ctx.vertices().size()),
+          encoding.decode(encoding.encode(ctx), topologyOnly(ctx), ctx.vertices().size()),
           "must reconstruct from topology alone");
     }
   }
@@ -235,9 +232,7 @@ class ContextDeltaMechanismTest {
     final var encoded = encoding.encode(ctx);
     final var payload = encoded.payload().clone();
     payload[payload.length - 1] ^= 0x01;
-    final var corrupted =
-        new org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer(
-            payload, encoded.metadataBytes());
+    final var corrupted = new EncodedBuffer(payload, encoded.metadataBytes());
     assertNotEquals(
         ctx.vertices(), encoding.decode(corrupted, topologyOnly(ctx), ctx.vertices().size()));
   }

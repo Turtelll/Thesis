@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.Layout;
 import org.maplibre.mlt.research.encoding.PredictedTransform;
@@ -108,22 +109,18 @@ class Rot90FixedMechanismTest {
     final var values = segmented().apply(ctx);
     // No vertex is turn-classified, so every residual is a plain zigzag delta against the
     // previous vertex in ring order (start region: vertex 0; interior region: vertices 1..6).
-    final var expected = new java.util.ArrayList<Vertex>(ctx.vertices());
-    var prevX = 0;
-    var prevY = 0;
+    final var vertices = ctx.vertices();
+    var prev = new Vertex(0, 0);
     var slot = 2;
-    for (var i = 1; i < expected.size(); i++) {
-      final var v = expected.get(i);
+    for (var i = 1; i < vertices.size(); i++) {
+      final var v = vertices.get(i);
       assertEquals(
-          org.maplibre.mlt.converter.encodings.EncodingUtils.encodeZigZag(v.x() - prevX),
-          values[slot],
-          "vertex " + i + " x residual");
+          EncodingUtils.encodeZigZag(v.x() - prev.x()), values[slot], "vertex " + i + " x residual");
       assertEquals(
-          org.maplibre.mlt.converter.encodings.EncodingUtils.encodeZigZag(v.y() - prevY),
+          EncodingUtils.encodeZigZag(v.y() - prev.y()),
           values[slot + 1],
           "vertex " + i + " y residual");
-      prevX = v.x();
-      prevY = v.y();
+      prev = v;
       slot += 2;
     }
   }
