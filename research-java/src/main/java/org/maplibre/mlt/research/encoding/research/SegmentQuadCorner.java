@@ -8,23 +8,17 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import java.util.List;
 
 /**
- * Composes the two winning transforms — {@link SegmentPair}'s part-start grouping and the
- * parallelogram-corner predictor below — which target disjoint geometry populations, so they
- * stack rather than compete: {@code SegmentPair} wins LINESTRING, the corner predictor wins
- * POLYGON, and this wins both.
+ * Composes {@link SegmentPair}'s part-start grouping with a parallelogram-corner predictor, which
+ * target disjoint geometry populations (LINESTRING vs POLYGON) so they stack rather than compete.
  *
  * <p>Every residual is the same componentwise delta + zigzag as the baseline, split into three
  * populations packed as contiguous regions so FastPFOR can size each to its own width:
  *
  * <ol>
  *   <li><b>part starts</b> — the first vertex of each ring run, delta against the previous vertex.
- *       These are the wide boundary spikes {@code SegmentPair} separates out.
- *   <li><b>interior</b> — every other vertex, delta against the previous vertex. The narrow
- *       population.
+ *   <li><b>interior</b> — every other vertex, delta against the previous vertex.
  *   <li><b>quad corners</b> — the fourth vertex of a run that is exactly four vertices, predicted
- *       as the parallelogram corner {@code p0 + p2 - p1}. Near-zero for the 40,7% of building quads
- *       that are exact parallelograms, and pulled out of its ring's block so it does not inflate to
- *       the width of the three wide edge deltas.
+ *       as the parallelogram corner {@code p0 + p2 - p1}.
  * </ol>
  *
  * <p>The three classes are mutually exclusive: a run's fourth vertex ({@code start+3}) is never its
@@ -32,12 +26,7 @@ import java.util.List;
  * no reset seeds. The class of every vertex is derivable from the topology streams on both sides, so
  * nothing is signalled; the values are only reordered.
  *
- * <p>The corner predictor's win is entirely a segmentation effect: measured under {@link
- * org.maplibre.mlt.research.encoding.Layout#INTERLEAVED} it is <b>-0,0%</b> bytes despite a
- * <b>-9,6%</b> per-value zigzag-bit saving (see {@code research-java/README.md}, "Composing
- * both") — one near-zero value in a block of wide edge deltas changes nothing under FastPFOR's
- * block-maximum pricing. {@link org.maplibre.mlt.research.encoding.Layout#SEGMENTED} is what
- * makes it a real byte win.
+ * <p>Measured: {@code docs/results/segment-quad-corner.md}.
  */
 public final class SegmentQuadCorner implements ClassifiedPredictor {
 
@@ -104,9 +93,6 @@ public final class SegmentQuadCorner implements ClassifiedPredictor {
         return new int[]{starts * 2, interior * 2, corners * 2};
     }
 
-    /**
-     * Per-vertex class: START (run start), CORNER (4th vertex of a 4-run), INTERIOR otherwise.
-     */
     private static int[] classify(int[] starts, int vertexCount) {
         final var classes = new int[vertexCount];
         for (var i = 0; i < starts.length; i++) {

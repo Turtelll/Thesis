@@ -16,7 +16,8 @@ Data will be provided in MVT
     [`research-java/`](research-java/README.md) - see its README for how to run extraction,
     the benchmark, and the round-trip tests.
 #### new Encoding Results
-- Different Results of diffrent prediction experiments
+- See [`research-java/docs/results/`](research-java/docs/results/README.md) for every
+  encoding tried so far - what won, what regressed, and why, with measured numbers.
 ### Testing
 - Starting with tests for Baseline that encodes the Basline data and decodes it and compares it to the MVT extractions
 - every newly added encoding also has to follow these testing strategies to make sure data is not lossy or wrong 

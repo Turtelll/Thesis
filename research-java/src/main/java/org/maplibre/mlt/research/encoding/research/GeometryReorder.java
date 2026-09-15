@@ -17,20 +17,12 @@ import java.util.List;
  *
  * <pre>ctx --[GeometryReorder]--&gt; ctx' --[any Encoding]--&gt; bytes</pre>
  *
- * <p>The reason this can pay at all, where the junction/reordering experiments in {@code
- * research-java/README.md} could not, is that <b>no permutation is transmitted</b>. Those
- * experiments charged ceil(log2 P)+1 bits per part to describe the new order and were net-positive
- * because of it. The order need not be recovered: no coordinates change, only a geometry's position
- * <em>within</em> the buffer, and the MLT spec makes that explicit ({@code docs/specification.md}):
- *
- * <blockquote>
- * Feature order is not necessarily a stable round-trip property. [...] MLT encoders may preserve
- * order, but they may also sort features by id or spatial locality to improve compression when that
- * optimization is enabled.
- * </blockquote>
- *
- * <p>So the decoder does not reconstruct the original layout and is not asked to — it emits the
- * order it reads. What must be preserved is the <em>set</em> of geometries, which {@link
+ * <p>The reason this can pay at all is that <b>no permutation is transmitted</b> — the order need
+ * not be recovered: no coordinates change, only a geometry's position <em>within</em> the buffer,
+ * which the MLT spec allows (see {@link org.maplibre.mlt.research.encoding.Encoding#reordersGeometries()}
+ * and {@code docs/results/reordering.md} for the earlier experiments that assumed otherwise). The
+ * decoder does not reconstruct the original layout and is not asked to — it emits the order it
+ * reads. What must be preserved is the <em>set</em> of geometries, which {@link
  * org.maplibre.mlt.research.encoding.GeometryEquivalence} checks.
  *
  * <p>Two constraints the greedy chain respects:
@@ -98,16 +90,10 @@ public final class GeometryReorder {
         this.allowReversal = mode.allowReversal;
     }
 
-    /**
-     * Suffix this reorder contributes to an encoding's name; empty for {@link #NONE}.
-     */
     public String nameSuffix() {
         return mode.suffix;
     }
 
-    /**
-     * Whether this reorder may emit geometries in an order other than the one it received.
-     */
     public boolean reorders() {
         return mode != Mode.NONE;
     }

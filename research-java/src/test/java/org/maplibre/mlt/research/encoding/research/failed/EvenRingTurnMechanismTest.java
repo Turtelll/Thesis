@@ -18,7 +18,7 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
  * topology streams alone either way.
  *
  * <p>Kept with the encoding as a measured negative result — the predictor is genuinely narrower on
- * even rings (see {@code research-java/README.md}) but the signal bit costs more than it returns.
+ * even rings (see {@code docs/results/rot90-fixed.md}) but the signal bit costs more than it returns.
  */
 class EvenRingTurnMechanismTest {
 

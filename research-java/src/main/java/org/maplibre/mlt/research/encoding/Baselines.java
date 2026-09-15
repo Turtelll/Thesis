@@ -21,7 +21,7 @@ public final class Baselines {
     }
 
     /**
-     * Baselines 1 and 2 from the root {@code README.md}: componentwise delta + zigzag over a
+     * The two baselines (see {@code docs/architecture.md}): componentwise delta + zigzag over a
      * bit-aligned (FastPFOR) and a byte-aligned (Varint) physical codec. Every new encoding is
      * measured against these.
      */
@@ -70,10 +70,8 @@ public final class Baselines {
 
                 // --- Interleaved controls (evaluation protocol Stage 1) ---
                 // The same predictors as above with no region separation: isolates whether a predictor's
-                // win depends on SEGMENTED layout at all, or survives interleaved. SEGMENT_QUAD_CORNER's
-                // corner predictor is the documented case where this matters: -9,6% per-value zigzag bits
-                // but -0,0% bytes here under FastPFOR (see research-java/README.md, "Composing both") —
-                // the segmented row above is where that predictor's win actually shows up.
+                // win depends on SEGMENTED layout at all, or survives interleaved. See
+                // docs/results/segment-quad-corner.md for the documented case where this matters.
                 new VertexBufferCodec(interleaved(new SegmentQuadCorner()), IntCodec.FASTPFOR),
                 new VertexBufferCodec(interleaved(new SegmentQuadCorner()), RANS));
     }

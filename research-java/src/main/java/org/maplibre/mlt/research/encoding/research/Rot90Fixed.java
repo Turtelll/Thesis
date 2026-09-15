@@ -13,14 +13,6 @@ import java.util.List;
  * direction fixed by winding (CCW, since {@code building} is 99,3% CCW-wound per {@code
  * BuildingShapeCli}) rather than signalled per vertex.
  *
- * <p>This exists because the pooled {@code >4}-vertex measurement in {@code RingPriorCli} made fixed
- * rot90 look worthless (8,81 -&gt; 8,71 bits on {@code building}, a 0,10-bit win): a closed rectilinear
- * ring must have an even vertex count, so pooling odd-length rings in with even ones dilutes the
- * effect. Resolved to ring size, fixed {@code rot90-ccw} is -0,91 bit on 6-vertex rings (9,13 -&gt;
- * 8,22) and -0,32 bit on 8-vertex rings (8,89 -&gt; 8,57) — see {@code research-java/README.md}. This
- * measures whether that median win survives FastPFOR's block-maximum pricing, the same test that
- * sank {@code CONTEXT_DELTA} and the delta-of-delta family.
- *
  * <p>Unlike {@link RightAngleTurn}-style predictors, the direction here is fixed rather than chosen
  * per vertex, so nothing is signalled: the class of every vertex (start / interior / turn) is
  * derivable from the topology streams on both sides, and residuals are only reordered into three
@@ -33,6 +25,8 @@ import java.util.List;
  * p[i-1]-p[i-2]} is defined. Everything else — every vertex of an odd-length or {@code &lt;=4}-vertex
  * ring, and the first two vertices of an even long ring — stays first-order delta. {@code
  * prevX/prevY} advance continuously through the actual vertices regardless of class; no reset seeds.
+ *
+ * <p>Measured: {@code docs/results/rot90-fixed.md}.
  */
 public final class Rot90Fixed implements ClassifiedPredictor {
 
@@ -81,10 +75,6 @@ public final class Rot90Fixed implements ClassifiedPredictor {
         return p1.y() + edgeX;
     }
 
-    /**
-     * Per-vertex class: START (run start), TURN (interior vertex, {@code i >= start+2}, of an
-     * even-length run longer than four vertices), INTERIOR otherwise.
-     */
     static int[] classify(int[] starts, int vertexCount) {
         final var classes = new int[vertexCount];
         for (var s = 0; s < starts.length; s++) {

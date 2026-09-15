@@ -26,7 +26,7 @@ import java.util.function.ToDoubleFunction;
  * pooled). The per-size resolution is load-bearing: pooled, this measurement concluded that no
  * predictor beats a first-order delta, but rectilinearity is an even/odd property of a ring — a
  * closed rectilinear ring must have an even vertex count — so the pooled mean averages across two
- * populations that behave differently. See {@code research-java/README.md}.
+ * populations that behave differently. See {@code docs/results/failed/ring-predictors.md}.
  *
  * <ul>
  *   <li><b>B — first-order delta</b> (the baseline): {@code pred = p[i-1]}.
@@ -42,8 +42,9 @@ import java.util.function.ToDoubleFunction;
  *
  * <p>A predictor only earns an encoder if, on a population large enough to matter, its residual is
  * clearly narrower than B — bit width is the right currency because FastPFOR packs a block to the
- * width of its widest value (README §Results). The prior negative results (uniform delta-of-delta,
- * central-symmetry reflection) are the bar: both were <em>wider</em> than a short-edge delta.
+ * width of its widest value. The prior negative results (uniform delta-of-delta, central-symmetry
+ * reflection — see {@code docs/results/failed/}) are the bar: both were <em>wider</em> than a
+ * short-edge delta.
  *
  * <p><b>Scope: pure-polygon columns only.</b> Columns that mix polygons and linestrings fold the
  * linestring vertex counts into the same {@code numRings} stream, so a run there is not necessarily a

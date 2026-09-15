@@ -13,12 +13,10 @@ import java.util.List;
  * predictor, while exactly-four-vertex rings keep the parallelogram corner ({@code p0+p2-p1}) that
  * wins {@code building} outright.
  *
- * <p>Both component predictors are already measured standalone: {@code SEGMENT_QUAD_CORNER_FASTPFOR}
- * is -12,2% on {@code building} but only reaches {@code n=4} rings (76,4% of the population);
- * {@code ROT90_FIXED_FASTPFOR} is -5,0% but touches every ring, so most of its win is diluted by
- * the {@code n=4} rings it shares with quad-corner and does not improve on. This composition targets
- * disjoint populations exactly the way {@code SEGMENT_QUAD_CORNER} itself composes {@link SegmentPair}
- * and the corner predictor — see {@code research-java/README.md}.
+ * <p>This composition targets disjoint populations, the same pattern {@code SEGMENT_QUAD_CORNER}
+ * itself uses to compose {@link SegmentPair} and the corner predictor. Measured:
+ * {@code docs/results/rot90-fixed.md} ("It does not compose with SEGMENT_QUAD_CORNER") — the
+ * composition does not improve on plain quad-corner.
  *
  * <p>Unlike {@link org.maplibre.mlt.research.encoding.research.failed.SegmentQuadCornerTurn}, the
  * turn direction here is <b>fixed</b> by winding, not signalled, so this needs no side channel.
@@ -92,10 +90,6 @@ public final class SegmentQuadCornerRot90 implements ClassifiedPredictor {
         return p1.y() + edgeX;
     }
 
-    /**
-     * Per-vertex class: START (run start), CORNER (4th vertex of a 4-run), TURN (interior vertex,
-     * {@code i >= start+2}, of an even-length run longer than four vertices), INTERIOR otherwise.
-     */
     static int[] classify(int[] starts, int vertexCount) {
         final var classes = new int[vertexCount];
         for (var s = 0; s < starts.length; s++) {

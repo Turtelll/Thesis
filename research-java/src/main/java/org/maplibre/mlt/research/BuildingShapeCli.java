@@ -12,24 +12,9 @@ import java.util.function.ToDoubleFunction;
 
 /**
  * Characterizes the <em>geometry</em> of polygon rings <strong>resolved per vertex count</strong>
- * — 4, 5, 6, 7, 8, {@code >8}, and pooled. Bucket 4 is the population {@link
- * org.maplibre.mlt.research.encoding.research.SegmentQuadCorner}'s parallelogram-corner predictor
- * already wins, and is included precisely so every other bucket can be read against it.
- *
- * <p>The resolution is the point. {@link RingPriorCli} pooled every {@code >4}-vertex ring into one
- * population and concluded no predictor beats a first-order delta there; that conclusion cannot
- * distinguish a pentagon from a fourteen-vertex landcover blob, so a prior holding on one ring size
- * and not another would be invisible to it.
- *
- * <p>{@link RingPriorCli} already settled the <em>predictor</em> question on this population: no
- * fixed model (delta, edge-continuation, rot90, alternating staircase) beats a plain first-order
- * delta on the interior vertices, because the near-zero residual population that made
- * {@code QUAD_CORNER} win does not exist there. This CLI asks the <em>structural</em> question it
- * left open: what do these rings actually look like, and is any of their shape derivable enough to
- * be an encoding lever a codec could exploit without signalling it?
- *
- * <p>It encodes nothing and reconstructs nothing. It walks every {@code >4}-vertex ring in the
- * pure-polygon columns of one layer (default {@code building}) and accumulates, per corpus:
+ * — 4, 5, 6, 7, 8, {@code >8}, and pooled. Encodes nothing and reconstructs nothing: walks every
+ * {@code >4}-vertex ring in the pure-polygon columns of one layer (default {@code building}) and
+ * accumulates, per corpus:
  *
  * <ul>
  *   <li><b>Shape/regularity</b>: vertex-count distribution; rectilinearity (share of interior turns
@@ -39,10 +24,9 @@ import java.util.function.ToDoubleFunction;
  *   <li><b>Size/extent</b>: bounding-box aspect ratio; the share of edges axis-parallel to the tile
  *       grid; the edge-length distribution.
  *   <li><b>Compression-relevant</b>: within-ring repeated edge vectors; the share of interior
- *       first-order residuals that are near-zero (cross-check against {@code RingPriorCli}); and
- *       exact-shape repetition — a rotation-canonical, translation-invariant ring signature hashed
- *       across the corpus, split into same-tile vs cross-tile recurrence (the "addressing
- *       expensive" wall the README records, quantified for this population).
+ *       first-order residuals that are near-zero; and exact-shape repetition — a
+ *       rotation-canonical, translation-invariant ring signature hashed across the corpus, split
+ *       into same-tile vs cross-tile recurrence.
  *   <li><b>Structural</b>: share of these rings whose owning polygon has {@code numParts > 1}
  *       (holes/multipart); winding-order (signed-area sign) consistency; and whether the stored
  *       first vertex is the ring's min-(x,y) corner (a derivable start ⇒ no seed to signal).
@@ -54,6 +38,8 @@ import java.util.function.ToDoubleFunction;
  *
  * <p>Usage: {@code ./gradlew buildingShape --args="../data/extracted"} or with a different layer
  * {@code --args="../data/extracted --layer landcover"}.
+ *
+ * <p>Measured: {@code docs/results/failed/ring-predictors.md}, {@code docs/results/failed/shape-reuse.md}.
  */
 public final class BuildingShapeCli {
     private BuildingShapeCli() {
@@ -67,14 +53,10 @@ public final class BuildingShapeCli {
      */
     private static final int DIR_BUCKETS = 16;
 
-    /**
-     * Ring-size bucket collecting every ring with more than 8 vertices.
-     */
+    /** Ring-size bucket for {@code >8} vertices. */
     private static final int MANY = 9;
 
-    /**
-     * Pseudo-bucket key for the pooled "every ring" accumulator; sorts after {@link #MANY}.
-     */
+    /** Pooled "every ring" accumulator; sorts after {@link #MANY}. */
     private static final int ALL = 99;
 
     /**

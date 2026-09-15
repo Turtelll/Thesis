@@ -11,14 +11,6 @@ import java.util.List;
  * Componentwise delta + zigzag as in the baseline, but emitted as two grouped populations: every
  * part-start residual first, then every within-part delta.
  *
- * <p>The motivation is a property of the {@code transportation} layer specifically. 70% of its
- * parts are exactly two vertices, so part boundaries are not rare events between long runs — they
- * are 30% of all deltas, and they carry 35% of the buffer's zigzag bits at a mean width of 13,1
- * bits against 10,3 for interior deltas. Interleaved, as the baseline emits them, the wide
- * population sets the block width for the narrow one: FastPFOR packs a block to the width of its
- * widest value, and a varint crossing 127 costs another whole byte. Separating them lets each be
- * packed at its own width.
- *
  * <p>The values are the same values in a different order, so this neither adds nor removes
  * information — it only changes what shares a block. Nothing is signalled: the split point is
  * derivable from the topology streams on both sides.
@@ -27,8 +19,9 @@ import java.util.List;
  * #hasPrediction} is always {@code false}) — so the whole idea under test <em>is</em> the region
  * split; pair with {@link org.maplibre.mlt.research.encoding.PredictedTransform} under {@link
  * org.maplibre.mlt.research.encoding.Layout#INTERLEAVED} to confirm it (byte-identical to the
- * plain baseline, since reordering identical-prediction values changes nothing outside a
- * block-packed codec).
+ * plain baseline).
+ *
+ * <p>Measured: {@code docs/results/segment-pair.md}.
  */
 public final class SegmentPair implements ClassifiedPredictor {
 

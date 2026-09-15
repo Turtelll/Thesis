@@ -11,16 +11,10 @@ import java.util.List;
  * stream-metadata accounting the benchmark compares on.
  *
  * <p>A {@link GeometryReorder} is an optional third component, defaulting to {@link
- * GeometryReorder#NONE}. It is a component rather than a wrapper encoding because reordering is
- * orthogonal to both other layers — any transform over any codec can be measured with or without
- * it — so expressing it as one more constructor argument keeps every encoding a single uniform
- * {@code (transform, codec, reorder)} triple instead of two shapes that have to be handled
- * separately at every call site.
- *
- * <p>Reordering is deliberately applied <em>before</em> the transform and is never part of a
- * baseline: the baseline is the fixed yardstick every percentage in the report is computed
- * against, and an earlier version of this work reordered the baselines too, which moved the
- * yardstick and made the gain invisible.
+ * GeometryReorder#NONE} — every encoding is a uniform {@code (transform, codec, reorder)} triple.
+ * Reordering is applied <em>before</em> the transform and is never part of a baseline: the
+ * baseline is the fixed yardstick every percentage is computed against (see
+ * {@code docs/results/reordering.md}).
  */
 public final class VertexBufferCodec implements Encoding {
 
@@ -87,9 +81,6 @@ public final class VertexBufferCodec implements Encoding {
         return transform.name() + "_" + codec.name() + reorder.nameSuffix();
     }
 
-    /**
-     * So a parameterized test failure names the encoding rather than an object identity.
-     */
     @Override
     public String toString() {
         return name();

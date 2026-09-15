@@ -9,13 +9,8 @@ import java.util.List;
 /**
  * One vertex-buffer encoding: the single abstraction the harness measures and verifies.
  *
- * <p>{@link #decode} is deliberately part of the contract rather than a separate capability. An
- * encoding that cannot be decoded cannot be shown to be lossless, and a size number from such an
- * encoding is meaningless — an encoder that emits one byte and loses the buffer would otherwise look
- * like the best result in the table. Requiring the inverse here is what lets {@code BenchmarkCli}
- * round-trip every encoding over the real corpus on every run, which is the thesis testing
- * convention (encode, decode, compare against the original extraction) applied where the numbers are
- * actually produced.
+ * <p>{@link #decode} is mandatory: an encoding that cannot be decoded cannot be shown to be
+ * lossless, so {@code BenchmarkCli} round-trips every encoding over the real corpus on every run.
  */
 public interface Encoding {
 
@@ -42,23 +37,11 @@ public interface Encoding {
     /**
      * Whether this encoding may emit geometries in an order other than the one it received.
      *
-     * <p>Such an encoding cannot satisfy {@link #decode}'s usual contract — it does not reconstruct
-     * the original vertex sequence, it reconstructs an equivalent one — so the benchmark verifies it
-     * with {@link GeometryEquivalence} instead of exact equality. Defaulting to {@code false} is what
-     * keeps that relaxation <b>opt-in</b>: without it the check would have to be loosened for every
-     * encoding, and a genuinely lossy encoder would stop being caught.
-     *
-     * <p>The relaxation is exactly what the MLT spec allows and no more ({@code
-     * docs/specification.md}):
-     *
-     * <blockquote>
-     * Feature order is not necessarily a stable round-trip property. [...] MLT encoders may preserve
-     * order, but they may also sort features by id or spatial locality to improve compression when
-     * that optimization is enabled.
-     * </blockquote>
-     *
-     * <p>An encoding claiming this still has to preserve every geometry exactly; it is only released
-     * from preserving their <em>order</em>.
+     * <p>Such an encoding is verified with {@link GeometryEquivalence} instead of exact equality.
+     * Defaults to {@code false} so the relaxation is opt-in. The relaxation is exactly what the MLT
+     * spec allows and no more ({@code maplibre-tile-spec/docs/specification.md}): feature order is
+     * not a stable round-trip property, but every geometry must still be preserved exactly — only
+     * its <em>order</em> is released. See {@code docs/architecture.md}.
      */
     default boolean reordersGeometries() {
         return false;

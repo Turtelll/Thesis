@@ -8,24 +8,12 @@ import java.util.HashMap;
 import java.util.List;
 
 /**
- * The one place the strict round-trip contract is weakened, and deliberately the only one.
- *
- * <p>{@link Encoding} requires {@code decode} to reproduce the vertex buffer exactly, and {@code
- * BenchmarkCli} enforces it on every buffer. A reordering pre-pass cannot satisfy that: it emits
- * the same geometries in a different order on purpose. The MLT spec permits precisely that and no
- * more ({@code docs/specification.md}):
- *
- * <blockquote>
- * Feature order is not necessarily a stable round-trip property. [...] MLT encoders may preserve
- * order, but they may also sort features by id or spatial locality to improve compression when that
- * optimization is enabled.
- * </blockquote>
- *
- * <p>So the property that must still hold is that the buffer describes <em>the same set of
- * geometries</em>: same coordinates, same part structure, nothing dropped, nothing duplicated,
- * nothing silently deformed. This class is that check, kept separate from {@link Encoding} so the
- * weaker contract cannot be applied to an encoding by accident — an encoding that merely permuted
- * its output would pass this and must not.
+ * The one place the strict round-trip contract is weakened, and deliberately the only one — see
+ * {@link Encoding#reordersGeometries()} for what the MLT spec permits. The property that must
+ * still hold: the buffer describes <em>the same set of geometries</em> — same coordinates, same
+ * part structure, nothing dropped, nothing duplicated, nothing silently deformed. Kept separate
+ * from {@link Encoding} so the weaker contract cannot be applied to an encoding by accident — one
+ * that merely permuted its output would pass this and must not.
  *
  * <p>Two failure modes it exists to catch, both silent otherwise:
  *

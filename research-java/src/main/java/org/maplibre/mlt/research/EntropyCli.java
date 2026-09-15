@@ -19,7 +19,7 @@ import java.util.Map;
  * on the corpus's current best encoding, {@link SegmentQuadCorner}. This does not implement a coder —
  * no candidate entropy coder exists in the repo, and the design questions a real one would raise
  * (context plumbing through {@link IntCodec}, static vs per-buffer tables) are recorded in {@code
- * research-java/README.md} rather than answered here. It only measures the two numbers a real coder
+ * docs/results/rans-entropy-coder.md} rather than answered here. It only measures the two numbers a real coder
  * would need to beat: order-0 entropy of the residual stream, and what FastPFOR actually charges for
  * the same stream — the gap between them is the entire case for building one.
  *

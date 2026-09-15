@@ -4,11 +4,11 @@ package org.maplibre.mlt.research.encoding;
  * {@link RansCodec} with one frequency table per residual region instead of one shared table.
  *
  * <p>A transform like {@code SEGMENT_QUAD_CORNER} already packs its residuals into contiguous
- * regions (starts | interior | corners) whose distributions differ sharply — on the Munich building
- * layer the bucket entropies are 3,42 / 2,89 / 1,56 bits. Coding them with a single table prices
- * every region at the mixture of all three, which is strictly worse than pricing each at its own
- * distribution. {@code CondEntropyCli}'s C4 measures that mixture penalty on the bucket alphabet at
- * ~16,8%, against an extra table cost of 132 bytes — so the split is worth taking.
+ * regions (starts | interior | corners) whose distributions differ sharply. Coding them with a
+ * single table prices every region at the mixture of all three, which is strictly worse than
+ * pricing each at its own distribution — measured in {@code docs/results/rans-entropy-coder.md}
+ * ("Does the region split help rANS?"), including the buffer-size threshold below which the extra
+ * tables cost more than the split saves.
  *
  * <p><b>Why the boundaries are written into the payload.</b> {@link IntCodec} is context-free: it
  * receives a flat {@code int[]} and cannot see the topology streams the transform used to place its

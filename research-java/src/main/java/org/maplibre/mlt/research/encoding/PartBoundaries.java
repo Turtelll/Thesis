@@ -58,10 +58,6 @@ public final class PartBoundaries {
         return offset == vertexCount ? starts : new int[]{0};
     }
 
-    /**
-     * The stream that holds vertex counts per run: {@code numRings} for a column containing any
-     * (Multi)Polygon, {@code numParts} otherwise.
-     */
     private static List<Integer> vertexRunLengths(BufferContext ctx) {
         return containsPolygon(ctx.geometryTypes()) ? ctx.numRings() : ctx.numParts();
     }
@@ -75,9 +71,6 @@ public final class PartBoundaries {
         return false;
     }
 
-    /**
-     * The {@code GeometryType} ordinals as they are persisted in the sidecar.
-     */
     private static final class GeometryTypeOrdinal {
         private static final int POLYGON = 2;
         private static final int MULTIPOLYGON = 5;
