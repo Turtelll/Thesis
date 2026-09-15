@@ -1,10 +1,11 @@
 package org.maplibre.mlt.research.encoding.research;
 
-import java.util.List;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.ClassifiedPredictor;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+
+import java.util.List;
 
 /**
  * Componentwise delta + zigzag as in the baseline, but emitted as two grouped populations: every
@@ -31,48 +32,48 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
  */
 public final class SegmentPair implements ClassifiedPredictor {
 
-  // INTERIOR is 0 so the default-zeroed class array already means "interior".
-  private static final int INTERIOR = 0;
-  private static final int START = 1;
+    // INTERIOR is 0 so the default-zeroed class array already means "interior".
+    private static final int INTERIOR = 0;
+    private static final int START = 1;
 
-  @Override
-  public String name() {
-    return "SEGMENT_PAIR";
-  }
-
-  @Override
-  public int classCount() {
-    return 2;
-  }
-
-  @Override
-  public int[] regionOrder() {
-    return new int[] {START, INTERIOR};
-  }
-
-  @Override
-  public int[] classify(BufferContext ctx, int vertexCount) {
-    final var classes = new int[vertexCount];
-    for (final var start : PartBoundaries.of(ctx, vertexCount)) {
-      if (start < vertexCount) {
-        classes[start] = START;
-      }
+    @Override
+    public String name() {
+        return "SEGMENT_PAIR";
     }
-    return classes;
-  }
 
-  @Override
-  public boolean hasPrediction(int vertexClass) {
-    return false;
-  }
+    @Override
+    public int classCount() {
+        return 2;
+    }
 
-  @Override
-  public int predictX(int vertexClass, int i, List<Vertex> vertices) {
-    throw new UnsupportedOperationException("SEGMENT_PAIR has no class with a real predictor");
-  }
+    @Override
+    public int[] regionOrder() {
+        return new int[]{START, INTERIOR};
+    }
 
-  @Override
-  public int predictY(int vertexClass, int i, List<Vertex> vertices) {
-    throw new UnsupportedOperationException("SEGMENT_PAIR has no class with a real predictor");
-  }
+    @Override
+    public int[] classify(BufferContext ctx, int vertexCount) {
+        final var classes = new int[vertexCount];
+        for (final var start : PartBoundaries.of(ctx, vertexCount)) {
+            if (start < vertexCount) {
+                classes[start] = START;
+            }
+        }
+        return classes;
+    }
+
+    @Override
+    public boolean hasPrediction(int vertexClass) {
+        return false;
+    }
+
+    @Override
+    public int predictX(int vertexClass, int i, List<Vertex> vertices) {
+        throw new UnsupportedOperationException("SEGMENT_PAIR has no class with a real predictor");
+    }
+
+    @Override
+    public int predictY(int vertexClass, int i, List<Vertex> vertices) {
+        throw new UnsupportedOperationException("SEGMENT_PAIR has no class with a real predictor");
+    }
 }

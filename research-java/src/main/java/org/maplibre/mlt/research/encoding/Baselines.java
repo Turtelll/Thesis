@@ -1,20 +1,16 @@
 package org.maplibre.mlt.research.encoding;
 
+import org.maplibre.mlt.research.encoding.research.*;
+
 import java.util.ArrayList;
 import java.util.List;
 
-import org.maplibre.mlt.research.encoding.research.GeometryReorder;
-import org.maplibre.mlt.research.encoding.research.Rot90Fixed;
-import org.maplibre.mlt.research.encoding.research.SegmentPair;
-import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
-import org.maplibre.mlt.research.encoding.research.SegmentQuadCornerRot90;
-
 public final class Baselines {
+
+    private static final IntCodec RANS = new RansCodec();
 
     private Baselines() {
     }
-
-    private static final IntCodec RANS = new RansCodec();
 
     private static VertexTransform segmented(ClassifiedPredictor predictor) {
         return new PredictedTransform(predictor, Layout.SEGMENTED);

@@ -1,11 +1,11 @@
 package org.maplibre.mlt.research.encoding.research;
 
-import java.util.List;
-
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.ClassifiedPredictor;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+
+import java.util.List;
 
 /**
  * Extends {@link SegmentQuadCorner} by giving <b>even-length</b> rings longer than four vertices —
@@ -40,79 +40,79 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
  */
 public final class SegmentQuadCornerRot90 implements ClassifiedPredictor {
 
-  // INTERIOR is 0 so the default-zeroed class array already means "interior".
-  private static final int INTERIOR = 0;
-  private static final int START = 1;
-  private static final int CORNER = 2;
-  private static final int TURN = 3;
+    // INTERIOR is 0 so the default-zeroed class array already means "interior".
+    private static final int INTERIOR = 0;
+    private static final int START = 1;
+    private static final int CORNER = 2;
+    private static final int TURN = 3;
 
-  @Override
-  public String name() {
-    return "SEGMENT_QUAD_CORNER_ROT90";
-  }
-
-  @Override
-  public int classCount() {
-    return 4;
-  }
-
-  @Override
-  public int[] regionOrder() {
-    return new int[] {START, INTERIOR, CORNER, TURN};
-  }
-
-  @Override
-  public int[] classify(BufferContext ctx, int vertexCount) {
-    return classify(PartBoundaries.of(ctx, vertexCount), vertexCount);
-  }
-
-  @Override
-  public boolean hasPrediction(int vertexClass) {
-    return vertexClass == CORNER || vertexClass == TURN;
-  }
-
-  @Override
-  public int predictX(int vertexClass, int i, List<Vertex> vertices) {
-    if (vertexClass == CORNER) {
-      return vertices.get(i - 3).x() + vertices.get(i - 1).x() - vertices.get(i - 2).x();
+    @Override
+    public String name() {
+        return "SEGMENT_QUAD_CORNER_ROT90";
     }
-    final var p1 = vertices.get(i - 1);
-    final var edgeY = p1.y() - vertices.get(i - 2).y();
-    // rot90 ccw of (edgeX,edgeY) is (-edgeY, edgeX).
-    return p1.x() - edgeY;
-  }
 
-  @Override
-  public int predictY(int vertexClass, int i, List<Vertex> vertices) {
-    if (vertexClass == CORNER) {
-      return vertices.get(i - 3).y() + vertices.get(i - 1).y() - vertices.get(i - 2).y();
+    @Override
+    public int classCount() {
+        return 4;
     }
-    final var p1 = vertices.get(i - 1);
-    final var edgeX = p1.x() - vertices.get(i - 2).x();
-    return p1.y() + edgeX;
-  }
 
-  /**
-   * Per-vertex class: START (run start), CORNER (4th vertex of a 4-run), TURN (interior vertex,
-   * {@code i >= start+2}, of an even-length run longer than four vertices), INTERIOR otherwise.
-   */
-  static int[] classify(int[] starts, int vertexCount) {
-    final var classes = new int[vertexCount];
-    for (var s = 0; s < starts.length; s++) {
-      final var start = starts[s];
-      final var end = s + 1 < starts.length ? starts[s + 1] : vertexCount;
-      if (start < vertexCount) {
-        classes[start] = START;
-      }
-      final var length = end - start;
-      if (length == 4) {
-        classes[start + 3] = CORNER;
-      } else if (length > 4 && length % 2 == 0) {
-        for (var i = start + 2; i < end; i++) {
-          classes[i] = TURN;
+    @Override
+    public int[] regionOrder() {
+        return new int[]{START, INTERIOR, CORNER, TURN};
+    }
+
+    @Override
+    public int[] classify(BufferContext ctx, int vertexCount) {
+        return classify(PartBoundaries.of(ctx, vertexCount), vertexCount);
+    }
+
+    @Override
+    public boolean hasPrediction(int vertexClass) {
+        return vertexClass == CORNER || vertexClass == TURN;
+    }
+
+    @Override
+    public int predictX(int vertexClass, int i, List<Vertex> vertices) {
+        if (vertexClass == CORNER) {
+            return vertices.get(i - 3).x() + vertices.get(i - 1).x() - vertices.get(i - 2).x();
         }
-      }
+        final var p1 = vertices.get(i - 1);
+        final var edgeY = p1.y() - vertices.get(i - 2).y();
+        // rot90 ccw of (edgeX,edgeY) is (-edgeY, edgeX).
+        return p1.x() - edgeY;
     }
-    return classes;
-  }
+
+    @Override
+    public int predictY(int vertexClass, int i, List<Vertex> vertices) {
+        if (vertexClass == CORNER) {
+            return vertices.get(i - 3).y() + vertices.get(i - 1).y() - vertices.get(i - 2).y();
+        }
+        final var p1 = vertices.get(i - 1);
+        final var edgeX = p1.x() - vertices.get(i - 2).x();
+        return p1.y() + edgeX;
+    }
+
+    /**
+     * Per-vertex class: START (run start), CORNER (4th vertex of a 4-run), TURN (interior vertex,
+     * {@code i >= start+2}, of an even-length run longer than four vertices), INTERIOR otherwise.
+     */
+    static int[] classify(int[] starts, int vertexCount) {
+        final var classes = new int[vertexCount];
+        for (var s = 0; s < starts.length; s++) {
+            final var start = starts[s];
+            final var end = s + 1 < starts.length ? starts[s + 1] : vertexCount;
+            if (start < vertexCount) {
+                classes[start] = START;
+            }
+            final var length = end - start;
+            if (length == 4) {
+                classes[start + 3] = CORNER;
+            } else if (length > 4 && length % 2 == 0) {
+                for (var i = start + 2; i < end; i++) {
+                    classes[i] = TURN;
+                }
+            }
+        }
+        return classes;
+    }
 }

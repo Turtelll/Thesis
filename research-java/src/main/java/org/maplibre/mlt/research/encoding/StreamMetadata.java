@@ -11,10 +11,13 @@ import org.maplibre.mlt.converter.encodings.EncodingUtils;
  */
 public final class StreamMetadata {
 
-  private StreamMetadata() {}
+    private StreamMetadata() {
+    }
 
-  /** Two bit-packed bytes plus varint {@code numValues} and varint {@code byteLength}. */
-  public static int bytes(int numValues, int byteLength) {
-    return 2 + EncodingUtils.getVarIntSize(numValues) + EncodingUtils.getVarIntSize(byteLength);
-  }
+    /**
+     * Two bit-packed bytes plus varint {@code numValues} and varint {@code byteLength}.
+     */
+    public static int bytes(int numValues, int byteLength) {
+        return 2 + EncodingUtils.getVarIntSize(numValues) + EncodingUtils.getVarIntSize(byteLength);
+    }
 }

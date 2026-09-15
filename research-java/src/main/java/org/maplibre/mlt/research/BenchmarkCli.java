@@ -1,15 +1,5 @@
 package org.maplibre.mlt.research;
 
-import java.io.IOException;
-import java.io.Writer;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
-
 import org.maplibre.mlt.research.encoding.Baselines;
 import org.maplibre.mlt.research.encoding.Encoding;
 import org.maplibre.mlt.research.encoding.GeometryEquivalence;
@@ -17,6 +7,12 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
+
+import java.io.IOException;
+import java.io.Writer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
 
 /**
  * Encodes every extracted (tile, layer) VertexBuffer with every registered encoding and reports the

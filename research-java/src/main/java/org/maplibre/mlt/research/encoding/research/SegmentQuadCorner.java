@@ -1,11 +1,11 @@
 package org.maplibre.mlt.research.encoding.research;
 
-import java.util.List;
-
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.ClassifiedPredictor;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+
+import java.util.List;
 
 /**
  * Composes the two winning transforms — {@link SegmentPair}'s part-start grouping and the
@@ -41,84 +41,84 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
  */
 public final class SegmentQuadCorner implements ClassifiedPredictor {
 
-  // INTERIOR is 0 so the default-zeroed class array already means "interior".
-  private static final int INTERIOR = 0;
-  private static final int START = 1;
-  private static final int CORNER = 2;
+    // INTERIOR is 0 so the default-zeroed class array already means "interior".
+    private static final int INTERIOR = 0;
+    private static final int START = 1;
+    private static final int CORNER = 2;
 
-  @Override
-  public String name() {
-    return "SEGMENT_QUAD_CORNER";
-  }
-
-  @Override
-  public int classCount() {
-    return 3;
-  }
-
-  @Override
-  public int[] regionOrder() {
-    return new int[] {START, INTERIOR, CORNER};
-  }
-
-  @Override
-  public int[] classify(BufferContext ctx, int vertexCount) {
-    return classify(PartBoundaries.of(ctx, vertexCount), vertexCount);
-  }
-
-  @Override
-  public boolean hasPrediction(int vertexClass) {
-    return vertexClass == CORNER;
-  }
-
-  @Override
-  public int predictX(int vertexClass, int i, List<Vertex> vertices) {
-    return vertices.get(i - 3).x() + vertices.get(i - 1).x() - vertices.get(i - 2).x();
-  }
-
-  @Override
-  public int predictY(int vertexClass, int i, List<Vertex> vertices) {
-    return vertices.get(i - 3).y() + vertices.get(i - 1).y() - vertices.get(i - 2).y();
-  }
-
-  /**
-   * Length in int slots of each contiguous residual region: starts, interior, corners.
-   *
-   * <p>Exposed for {@link org.maplibre.mlt.research.encoding.SegmentedRansCodec}, which prices
-   * each region with its own frequency table rather than one shared table. The regions are the
-   * ones {@link org.maplibre.mlt.research.encoding.PredictedTransform#apply} already writes under
-   * {@link org.maplibre.mlt.research.encoding.Layout#SEGMENTED}; this only reports their extents.
-   */
-  public int[] regionLengths(BufferContext ctx, int vertexCount) {
-    final var classes = classify(PartBoundaries.of(ctx, vertexCount), vertexCount);
-    var starts = 0;
-    var corners = 0;
-    for (final var c : classes) {
-      if (c == START) {
-        starts++;
-      } else if (c == CORNER) {
-        corners++;
-      }
+    @Override
+    public String name() {
+        return "SEGMENT_QUAD_CORNER";
     }
-    final var interior = classes.length - starts - corners;
-    return new int[] {starts * 2, interior * 2, corners * 2};
-  }
 
-  /**
-   * Per-vertex class: START (run start), CORNER (4th vertex of a 4-run), INTERIOR otherwise.
-   */
-  private static int[] classify(int[] starts, int vertexCount) {
-    final var classes = new int[vertexCount];
-    for (var i = 0; i < starts.length; i++) {
-      final var start = starts[i];
-      final var end = i + 1 < starts.length ? starts[i + 1] : vertexCount;
-      if (start < vertexCount) {
-        classes[start] = START;
-      }
-      if (end - start == 4) {
-        classes[start + 3] = CORNER;
-      }
+    @Override
+    public int classCount() {
+        return 3;
     }
-    return classes;
-  }
+
+    @Override
+    public int[] regionOrder() {
+        return new int[]{START, INTERIOR, CORNER};
+    }
+
+    @Override
+    public int[] classify(BufferContext ctx, int vertexCount) {
+        return classify(PartBoundaries.of(ctx, vertexCount), vertexCount);
+    }
+
+    @Override
+    public boolean hasPrediction(int vertexClass) {
+        return vertexClass == CORNER;
+    }
+
+    @Override
+    public int predictX(int vertexClass, int i, List<Vertex> vertices) {
+        return vertices.get(i - 3).x() + vertices.get(i - 1).x() - vertices.get(i - 2).x();
+    }
+
+    @Override
+    public int predictY(int vertexClass, int i, List<Vertex> vertices) {
+        return vertices.get(i - 3).y() + vertices.get(i - 1).y() - vertices.get(i - 2).y();
+    }
+
+    /**
+     * Length in int slots of each contiguous residual region: starts, interior, corners.
+     *
+     * <p>Exposed for {@link org.maplibre.mlt.research.encoding.SegmentedRansCodec}, which prices
+     * each region with its own frequency table rather than one shared table. The regions are the
+     * ones {@link org.maplibre.mlt.research.encoding.PredictedTransform#apply} already writes under
+     * {@link org.maplibre.mlt.research.encoding.Layout#SEGMENTED}; this only reports their extents.
+     */
+    public int[] regionLengths(BufferContext ctx, int vertexCount) {
+        final var classes = classify(PartBoundaries.of(ctx, vertexCount), vertexCount);
+        var starts = 0;
+        var corners = 0;
+        for (final var c : classes) {
+            if (c == START) {
+                starts++;
+            } else if (c == CORNER) {
+                corners++;
+            }
+        }
+        final var interior = classes.length - starts - corners;
+        return new int[]{starts * 2, interior * 2, corners * 2};
+    }
+
+    /**
+     * Per-vertex class: START (run start), CORNER (4th vertex of a 4-run), INTERIOR otherwise.
+     */
+    private static int[] classify(int[] starts, int vertexCount) {
+        final var classes = new int[vertexCount];
+        for (var i = 0; i < starts.length; i++) {
+            final var start = starts[i];
+            final var end = i + 1 < starts.length ? starts[i + 1] : vertexCount;
+            if (start < vertexCount) {
+                classes[start] = START;
+            }
+            if (end - start == 4) {
+                classes[start + 3] = CORNER;
+            }
+        }
+        return classes;
+    }
 }

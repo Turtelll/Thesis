@@ -1,7 +1,8 @@
 package org.maplibre.mlt.research.encoding;
 
-import java.util.List;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+
+import java.util.List;
 
 /**
  * Derives the vertex-run boundaries of a buffer from the topology streams alone.
@@ -27,57 +28,61 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
  */
 public final class PartBoundaries {
 
-  private PartBoundaries() {}
-
-  /**
-   * Start offsets of each vertex run, ascending, always beginning with 0. A buffer whose topology
-   * yields no usable runs gives {@code [0]} — one run covering everything.
-   */
-  public static int[] of(BufferContext ctx, int vertexCount) {
-    if (vertexCount <= 0) {
-      return new int[] {0};
-    }
-    final var lengths = vertexRunLengths(ctx);
-    if (lengths.isEmpty()) {
-      return new int[] {0};
+    private PartBoundaries() {
     }
 
-    final var starts = new int[lengths.size()];
-    var offset = 0;
-    for (var i = 0; i < lengths.size(); i++) {
-      final int length = lengths.get(i);
-      if (length <= 0 || offset > vertexCount) {
-        return new int[] {0};
-      }
-      starts[i] = offset;
-      offset += length;
+    /**
+     * Start offsets of each vertex run, ascending, always beginning with 0. A buffer whose topology
+     * yields no usable runs gives {@code [0]} — one run covering everything.
+     */
+    public static int[] of(BufferContext ctx, int vertexCount) {
+        if (vertexCount <= 0) {
+            return new int[]{0};
+        }
+        final var lengths = vertexRunLengths(ctx);
+        if (lengths.isEmpty()) {
+            return new int[]{0};
+        }
+
+        final var starts = new int[lengths.size()];
+        var offset = 0;
+        for (var i = 0; i < lengths.size(); i++) {
+            final int length = lengths.get(i);
+            if (length <= 0 || offset > vertexCount) {
+                return new int[]{0};
+            }
+            starts[i] = offset;
+            offset += length;
+        }
+        // Runs that do not tile the buffer exactly mean the stream is not what we assumed it is.
+        return offset == vertexCount ? starts : new int[]{0};
     }
-    // Runs that do not tile the buffer exactly mean the stream is not what we assumed it is.
-    return offset == vertexCount ? starts : new int[] {0};
-  }
 
-  /**
-   * The stream that holds vertex counts per run: {@code numRings} for a column containing any
-   * (Multi)Polygon, {@code numParts} otherwise.
-   */
-  private static List<Integer> vertexRunLengths(BufferContext ctx) {
-    return containsPolygon(ctx.geometryTypes()) ? ctx.numRings() : ctx.numParts();
-  }
-
-  private static boolean containsPolygon(List<Integer> geometryTypes) {
-    for (var type : geometryTypes) {
-      if (type == GeometryTypeOrdinal.POLYGON || type == GeometryTypeOrdinal.MULTIPOLYGON) {
-        return true;
-      }
+    /**
+     * The stream that holds vertex counts per run: {@code numRings} for a column containing any
+     * (Multi)Polygon, {@code numParts} otherwise.
+     */
+    private static List<Integer> vertexRunLengths(BufferContext ctx) {
+        return containsPolygon(ctx.geometryTypes()) ? ctx.numRings() : ctx.numParts();
     }
-    return false;
-  }
 
-  /** The {@code GeometryType} ordinals as they are persisted in the sidecar. */
-  private static final class GeometryTypeOrdinal {
-    private static final int POLYGON = 2;
-    private static final int MULTIPOLYGON = 5;
+    private static boolean containsPolygon(List<Integer> geometryTypes) {
+        for (var type : geometryTypes) {
+            if (type == GeometryTypeOrdinal.POLYGON || type == GeometryTypeOrdinal.MULTIPOLYGON) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-    private GeometryTypeOrdinal() {}
-  }
+    /**
+     * The {@code GeometryType} ordinals as they are persisted in the sidecar.
+     */
+    private static final class GeometryTypeOrdinal {
+        private static final int POLYGON = 2;
+        private static final int MULTIPOLYGON = 5;
+
+        private GeometryTypeOrdinal() {
+        }
+    }
 }
