@@ -1,12 +1,6 @@
 package org.maplibre.mlt.research;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
-import java.lang.reflect.Type;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -20,8 +14,7 @@ import java.util.function.ToDoubleFunction;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
-import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
-import org.maplibre.mlt.research.extraction.ExtractionWriter.Sidecar;
+import org.maplibre.mlt.research.extraction.ExtractionReader;
 
 /**
  * Characterizes the <em>geometry</em> of polygon rings <strong>resolved per vertex count</strong>
@@ -71,7 +64,6 @@ import org.maplibre.mlt.research.extraction.ExtractionWriter.Sidecar;
 public final class BuildingShapeCli {
   private BuildingShapeCli() {}
 
-  private static final Gson GSON = new Gson();
   private static final int POLYGON = 2;
   private static final int MULTIPOLYGON = 5;
 
@@ -101,10 +93,7 @@ public final class BuildingShapeCli {
       throw new IllegalArgumentException("Usage: <extractionDir> [--layer <name>]");
     }
     final var inDir = Path.of(inArg);
-
-    final Type manifestType = new TypeToken<List<ManifestEntry>>() {}.getType();
-    final List<ManifestEntry> manifest =
-        GSON.fromJson(Files.readString(inDir.resolve("manifest.json")), manifestType);
+    final var manifest = ExtractionReader.readManifest(inDir);
 
     // One accumulator per ring-size bucket (4,5,6,7,8,9==">8"), plus ALL pooled. The shape
     // index is deliberately shared: shape recurrence is a corpus-wide question, not a per-bucket
@@ -118,13 +107,12 @@ public final class BuildingShapeCli {
       if (!entry.layerName().equals(layer)) {
         continue;
       }
-      final var ctxAndParts = readContext(inDir, entry);
-      final var ctx = ctxAndParts.ctx();
+      final var ctx = ExtractionReader.readContext(inDir, entry);
       if (ctx.vertices().isEmpty() || !isPurePolygon(ctx.geometryTypes())) {
         continue;
       }
       measure(
-          ctx, ctxAndParts.hasHoles(), entry.z(), entry.x(), entry.y(), buckets, shapeIndex,
+          ctx, hasHoles(ctx), entry.z(), entry.x(), entry.y(), buckets, shapeIndex,
           recentSignatures);
     }
 
@@ -757,36 +745,11 @@ public final class BuildingShapeCli {
   }
 
   // ---------------------------------------------------------------------------
-  // Loading (mirrors RingPriorCli.readContext, plus a numParts>1 flag)
+  // Loading
   // ---------------------------------------------------------------------------
 
-  /** A loaded buffer context plus whether its column has any multi-ring (holed) polygon. */
-  private record CtxAndParts(BufferContext ctx, boolean hasHoles) {}
-
-  private static CtxAndParts readContext(Path inDir, ManifestEntry entry) throws IOException {
-    final var buf =
-        ByteBuffer.wrap(Files.readAllBytes(inDir.resolve(entry.binFile())))
-            .order(ByteOrder.LITTLE_ENDIAN);
-    final var vertices = new ArrayList<Vertex>(entry.vertexCount());
-    for (var i = 0; i < entry.vertexCount(); i++) {
-      vertices.add(new Vertex(buf.getInt(), buf.getInt()));
-    }
-    final var sidecar =
-        GSON.fromJson(Files.readString(inDir.resolve(entry.jsonFile())), Sidecar.class);
-    final var ctx =
-        new BufferContext(
-            vertices,
-            sidecar.geometryTypes(),
-            sidecar.numGeometries(),
-            sidecar.numParts(),
-            sidecar.numRings());
-    var hasHoles = false;
-    for (final var p : sidecar.numParts()) {
-      if (p > 1) {
-        hasHoles = true;
-        break;
-      }
-    }
-    return new CtxAndParts(ctx, hasHoles);
+  /** Whether the column contains any multi-ring (holed) polygon. */
+  private static boolean hasHoles(BufferContext ctx) {
+    return ctx.numParts().stream().anyMatch(p -> p > 1);
   }
 }

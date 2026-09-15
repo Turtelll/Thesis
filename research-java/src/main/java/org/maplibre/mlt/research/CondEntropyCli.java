@@ -1,26 +1,17 @@
 package org.maplibre.mlt.research;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
-import java.lang.reflect.Type;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.Layout;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.PredictedTransform;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
-import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
-import org.maplibre.mlt.research.extraction.ExtractionWriter.Sidecar;
+import org.maplibre.mlt.research.extraction.ExtractionReader;
 
 /**
  * Measures whether an rANS coder over {@link SegmentQuadCorner} residuals could beat the order-0
@@ -46,7 +37,6 @@ import org.maplibre.mlt.research.extraction.ExtractionWriter.Sidecar;
 public final class CondEntropyCli {
   private CondEntropyCli() {}
 
-  private static final Gson GSON = new Gson();
   private static final String[] REGION_NAMES = {"starts", "interior", "corners"};
 
   public static void main(String[] args) throws IOException {
@@ -66,10 +56,7 @@ public final class CondEntropyCli {
       throw new IllegalArgumentException("Usage: <extractionDir> [--layer <name>]");
     }
     final var inDir = Path.of(inArg);
-
-    final Type manifestType = new TypeToken<List<ManifestEntry>>() {}.getType();
-    final List<ManifestEntry> manifest =
-        GSON.fromJson(Files.readString(inDir.resolve("manifest.json")), manifestType);
+    final var manifest = ExtractionReader.readManifest(inDir);
 
     // Per region, the x and y residual of every vertex kept paired, so C1 can condition one on the
     // other. Region indices match SegmentQuadCorner: 0=starts, 1=interior, 2=corners.
@@ -85,7 +72,7 @@ public final class CondEntropyCli {
       if (!entry.layerName().equals(layer)) {
         continue;
       }
-      final var ctx = readContext(inDir, entry);
+      final var ctx = ExtractionReader.readContext(inDir, entry);
       if (ctx.vertices().isEmpty()) {
         continue;
       }
@@ -370,21 +357,4 @@ public final class CondEntropyCli {
   /** Bucket alphabet size, mirroring {@code RansCodec}. */
   private static final int MAX_SYMBOL = 33;
 
-  private static BufferContext readContext(Path inDir, ManifestEntry entry) throws IOException {
-    final var buf =
-        ByteBuffer.wrap(Files.readAllBytes(inDir.resolve(entry.binFile())))
-            .order(ByteOrder.LITTLE_ENDIAN);
-    final var vertices = new ArrayList<Vertex>(entry.vertexCount());
-    for (var i = 0; i < entry.vertexCount(); i++) {
-      vertices.add(new Vertex(buf.getInt(), buf.getInt()));
-    }
-    final var sidecar =
-        GSON.fromJson(Files.readString(inDir.resolve(entry.jsonFile())), Sidecar.class);
-    return new BufferContext(
-        vertices,
-        sidecar.geometryTypes(),
-        sidecar.numGeometries(),
-        sidecar.numParts(),
-        sidecar.numRings());
-  }
 }

@@ -1,26 +1,17 @@
 package org.maplibre.mlt.research;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
-import java.lang.reflect.Type;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.IntCodec;
 import org.maplibre.mlt.research.encoding.Layout;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.PredictedTransform;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
-import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
-import org.maplibre.mlt.research.extraction.ExtractionWriter.Sidecar;
+import org.maplibre.mlt.research.extraction.ExtractionReader;
 
 /**
  * WP7: a <b>cost-model estimate</b> for whether an entropy coder (rANS/FSE) could ever beat FastPFOR
@@ -50,8 +41,6 @@ import org.maplibre.mlt.research.extraction.ExtractionWriter.Sidecar;
 public final class EntropyCli {
   private EntropyCli() {}
 
-  private static final Gson GSON = new Gson();
-
   public static void main(String[] args) throws IOException {
     String inArg = null;
     String layer = "building";
@@ -66,10 +55,7 @@ public final class EntropyCli {
       throw new IllegalArgumentException("Usage: <extractionDir> [--layer <name>]");
     }
     final var inDir = Path.of(inArg);
-
-    final Type manifestType = new TypeToken<List<ManifestEntry>>() {}.getType();
-    final List<ManifestEntry> manifest =
-        GSON.fromJson(Files.readString(inDir.resolve("manifest.json")), manifestType);
+    final var manifest = ExtractionReader.readManifest(inDir);
 
     // Region 0 = starts, 1 = interior, 2 = corners — matches SegmentQuadCorner's own layout.
     final List<List<Integer>> regionValues =
@@ -85,7 +71,7 @@ public final class EntropyCli {
       if (!entry.layerName().equals(layer)) {
         continue;
       }
-      final var ctx = readContext(inDir, entry);
+      final var ctx = ExtractionReader.readContext(inDir, entry);
       if (ctx.vertices().isEmpty()) {
         continue;
       }
@@ -223,21 +209,4 @@ public final class EntropyCli {
         tableBytes);
   }
 
-  private static BufferContext readContext(Path inDir, ManifestEntry entry) throws IOException {
-    final var buf =
-        ByteBuffer.wrap(Files.readAllBytes(inDir.resolve(entry.binFile())))
-            .order(ByteOrder.LITTLE_ENDIAN);
-    final var vertices = new ArrayList<Vertex>(entry.vertexCount());
-    for (var i = 0; i < entry.vertexCount(); i++) {
-      vertices.add(new Vertex(buf.getInt(), buf.getInt()));
-    }
-    final var sidecar =
-        GSON.fromJson(Files.readString(inDir.resolve(entry.jsonFile())), Sidecar.class);
-    return new BufferContext(
-        vertices,
-        sidecar.geometryTypes(),
-        sidecar.numGeometries(),
-        sidecar.numParts(),
-        sidecar.numRings());
-  }
 }

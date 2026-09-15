@@ -1,14 +1,7 @@
 package org.maplibre.mlt.research;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
-import java.lang.reflect.Type;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.TreeMap;
@@ -16,11 +9,9 @@ import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.function.ToDoubleFunction;
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
-import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
-import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
-import org.maplibre.mlt.research.extraction.ExtractionWriter.Sidecar;
+import org.maplibre.mlt.research.extraction.ExtractionReader;
 
 /**
  * Measures whether a model-based predictor could beat the baseline first-order delta on the interior
@@ -64,7 +55,6 @@ import org.maplibre.mlt.research.extraction.ExtractionWriter.Sidecar;
 public final class RingPriorCli {
   private RingPriorCli() {}
 
-  private static final Gson GSON = new Gson();
   private static final int POLYGON = 2;
   private static final int MULTIPOLYGON = 5;
 
@@ -151,15 +141,13 @@ public final class RingPriorCli {
     }
     final var inDir = Path.of(args[0]);
 
-    final Type manifestType = new TypeToken<List<ManifestEntry>>() {}.getType();
-    final List<ManifestEntry> manifest =
-        GSON.fromJson(Files.readString(inDir.resolve("manifest.json")), manifestType);
+    final var manifest = ExtractionReader.readManifest(inDir);
 
     // Keyed by ring vertex count (MANY == ">8", ALL == pooled), each holding the per-layer stats.
     final var bySize = new TreeMap<Integer, TreeMap<String, LayerStats>>();
 
     for (final var entry : manifest) {
-      final var ctx = readContext(inDir, entry);
+      final var ctx = ExtractionReader.readContext(inDir, entry);
       if (ctx.vertices().isEmpty() || !isPurePolygon(ctx.geometryTypes())) {
         continue;
       }
@@ -416,22 +404,4 @@ public final class RingPriorCli {
     into.componentBitsNonZero += from.componentBitsNonZero;
   }
 
-  /** Rebuilds a {@link BufferContext} from an extraction's {@code .bin} plus its sidecar. */
-  private static BufferContext readContext(Path inDir, ManifestEntry entry) throws IOException {
-    final var buf =
-        ByteBuffer.wrap(Files.readAllBytes(inDir.resolve(entry.binFile())))
-            .order(ByteOrder.LITTLE_ENDIAN);
-    final var vertices = new ArrayList<Vertex>(entry.vertexCount());
-    for (var i = 0; i < entry.vertexCount(); i++) {
-      vertices.add(new Vertex(buf.getInt(), buf.getInt()));
-    }
-    final var sidecar =
-        GSON.fromJson(Files.readString(inDir.resolve(entry.jsonFile())), Sidecar.class);
-    return new BufferContext(
-        vertices,
-        sidecar.geometryTypes(),
-        sidecar.numGeometries(),
-        sidecar.numParts(),
-        sidecar.numRings());
-  }
 }

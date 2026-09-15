@@ -1,21 +1,13 @@
 package org.maplibre.mlt.research;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
-import java.lang.reflect.Type;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
-import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
-import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
-import org.maplibre.mlt.research.extraction.ExtractionWriter.Sidecar;
+import org.maplibre.mlt.research.extraction.ExtractionReader;
 
 /**
  * Measures what the continuous delta cursor actually pays at run boundaries, to answer whether
@@ -42,8 +34,6 @@ import org.maplibre.mlt.research.extraction.ExtractionWriter.Sidecar;
  */
 public final class FeatureBoundaryCli {
   private FeatureBoundaryCli() {}
-
-  private static final Gson GSON = new Gson();
 
   /** FastPFOR's packing block; the width of one block is set by its largest value. */
   private static final int BLOCK = 128;
@@ -83,16 +73,13 @@ public final class FeatureBoundaryCli {
       throw new IllegalArgumentException("Usage: <extractionDir>");
     }
     final var inDir = Path.of(inArg);
-
-    final Type manifestType = new TypeToken<List<ManifestEntry>>() {}.getType();
-    final List<ManifestEntry> manifest =
-        GSON.fromJson(Files.readString(inDir.resolve("manifest.json")), manifestType);
+    final var manifest = ExtractionReader.readManifest(inDir);
 
     final var byLayer = new TreeMap<String, Stats>();
     final var corpus = new Stats();
 
     for (final var entry : manifest) {
-      final var ctx = readContext(inDir, entry);
+      final var ctx = ExtractionReader.readContext(inDir, entry);
       if (ctx.vertices().isEmpty()) {
         continue;
       }
@@ -387,20 +374,4 @@ public final class FeatureBoundaryCli {
             + "not the price of the relation itself.%n");
   }
 
-  private static BufferContext readContext(Path inDir, ManifestEntry entry) throws IOException {
-    final var buf =
-        ByteBuffer.wrap(Files.readAllBytes(inDir.resolve(entry.binFile())))
-            .order(ByteOrder.LITTLE_ENDIAN);
-    final var vertices = new ArrayList<Vertex>(entry.vertexCount());
-    for (var i = 0; i < entry.vertexCount(); i++) {
-      vertices.add(new Vertex(buf.getInt(), buf.getInt()));
-    }
-    final var sidecar = GSON.fromJson(Files.readString(inDir.resolve(entry.jsonFile())), Sidecar.class);
-    return new BufferContext(
-        vertices,
-        sidecar.geometryTypes(),
-        sidecar.numGeometries(),
-        sidecar.numParts(),
-        sidecar.numRings());
-  }
 }
