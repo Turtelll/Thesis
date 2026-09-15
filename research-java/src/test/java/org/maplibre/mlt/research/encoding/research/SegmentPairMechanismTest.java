@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
+import org.maplibre.mlt.research.encoding.Layout;
+import org.maplibre.mlt.research.encoding.PredictedTransform;
 import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 
@@ -39,7 +41,7 @@ class SegmentPairMechanismTest {
   @Test
   void groupsPartStartsAheadOfInteriorDeltas() {
     final var ctx = lineColumn();
-    final var grouped = new SegmentPair().apply(ctx);
+    final var grouped = new PredictedTransform(new SegmentPair(), Layout.SEGMENTED).apply(ctx);
     final var interleaved = new VertexTransform.ZigZagDelta().apply(ctx);
 
     // Same multiset of residuals, different order: the transform moves values, it does not
@@ -66,7 +68,7 @@ class SegmentPairMechanismTest {
   @Test
   void reconstructsWithoutReadingTheOriginalVertices() {
     final var ctx = lineColumn();
-    final var transform = new SegmentPair();
+    final var transform = new PredictedTransform(new SegmentPair(), Layout.SEGMENTED);
     final var decoded = transform.invert(transform.apply(ctx), topologyOnly(ctx));
     assertEquals(ctx.vertices(), decoded);
   }
@@ -75,7 +77,7 @@ class SegmentPairMechanismTest {
   @Test
   void corruptedStreamDoesNotReconstruct() {
     final var ctx = lineColumn();
-    final var transform = new SegmentPair();
+    final var transform = new PredictedTransform(new SegmentPair(), Layout.SEGMENTED);
     final var values = transform.apply(ctx);
     values[2] += 2; // perturb one part-start residual
     assertNotEquals(ctx.vertices(), transform.invert(values, topologyOnly(ctx)));

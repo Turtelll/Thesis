@@ -14,7 +14,9 @@ import java.util.List;
 import java.util.Map;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.IntCodec;
+import org.maplibre.mlt.research.encoding.Layout;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
+import org.maplibre.mlt.research.encoding.PredictedTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
@@ -76,7 +78,7 @@ public final class EntropyCli {
     var fastPforBytes = 0L;
     var buffers = 0;
 
-    final var transform = new SegmentQuadCorner();
+    final var transform = new PredictedTransform(new SegmentQuadCorner(), Layout.SEGMENTED);
     final var codec = new IntCodec.FastPfor();
 
     for (final var entry : manifest) {

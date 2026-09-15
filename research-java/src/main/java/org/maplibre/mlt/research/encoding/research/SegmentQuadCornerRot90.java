@@ -1,13 +1,10 @@
 package org.maplibre.mlt.research.encoding.research;
 
-import java.util.ArrayList;
 import java.util.List;
 
-import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.decoder.DecodingUtils;
+import org.maplibre.mlt.research.encoding.ClassifiedPredictor;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
-import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 
 /**
@@ -21,12 +18,12 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
  * {@code ROT90_FIXED_FASTPFOR} is -5,0% but touches every ring, so most of its win is diluted by
  * the {@code n=4} rings it shares with quad-corner and does not improve on. This composition targets
  * disjoint populations exactly the way {@code SEGMENT_QUAD_CORNER} itself composes {@link SegmentPair}
- * and {@link QuadCorner} — see {@code research-java/README.md}.
+ * and the corner predictor — see {@code research-java/README.md}.
  *
  * <p>Unlike {@link org.maplibre.mlt.research.encoding.research.failed.SegmentQuadCornerTurn}, the
- * turn direction here is <b>fixed</b> by winding, not signalled, so this is a plain {@link
- * VertexTransform} — no side channel, no {@code Encoding} implementation needed. Every vertex falls
- * in exactly one class, each residual packed into its own contiguous FastPFOR region:
+ * turn direction here is <b>fixed</b> by winding, not signalled, so this needs no side channel.
+ * Every vertex falls in exactly one class, each residual packed into its own contiguous FastPFOR
+ * region:
  *
  * <ol>
  *   <li><b>start</b> — the first vertex of each ring run, delta against the previous vertex.
@@ -41,7 +38,7 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
  * <p>The class of every vertex is derivable from the topology streams on both sides; {@code
  * prevX/prevY} advance continuously through the actual vertices regardless of class, no reset seeds.
  */
-public final class SegmentQuadCornerRot90 implements VertexTransform {
+public final class SegmentQuadCornerRot90 implements ClassifiedPredictor {
 
   // INTERIOR is 0 so the default-zeroed class array already means "interior".
   private static final int INTERIOR = 0;
@@ -55,76 +52,44 @@ public final class SegmentQuadCornerRot90 implements VertexTransform {
   }
 
   @Override
-  public int[] apply(BufferContext ctx) {
-    final var vertices = ctx.vertices();
-    final var classes = classify(PartBoundaries.of(ctx, vertices.size()), vertices.size());
-
-    final var values = new int[vertices.size() * 2];
-    final var cursors = cursors(classes);
-    var prevX = 0;
-    var prevY = 0;
-    for (var i = 0; i < vertices.size(); i++) {
-      final var vertex = vertices.get(i);
-      final int predX;
-      final int predY;
-      if (classes[i] == CORNER) {
-        predX = vertices.get(i - 3).x() + vertices.get(i - 1).x() - vertices.get(i - 2).x();
-        predY = vertices.get(i - 3).y() + vertices.get(i - 1).y() - vertices.get(i - 2).y();
-      } else if (classes[i] == TURN) {
-        final var p1 = vertices.get(i - 1);
-        final var edgeX = p1.x() - vertices.get(i - 2).x();
-        final var edgeY = p1.y() - vertices.get(i - 2).y();
-        // rot90 ccw of (edgeX,edgeY) is (-edgeY, edgeX).
-        predX = p1.x() - edgeY;
-        predY = p1.y() + edgeX;
-      } else {
-        predX = prevX;
-        predY = prevY;
-      }
-      final var slot = cursors[classes[i]];
-      values[slot] = EncodingUtils.encodeZigZag(vertex.x() - predX);
-      values[slot + 1] = EncodingUtils.encodeZigZag(vertex.y() - predY);
-      cursors[classes[i]] += 2;
-      prevX = vertex.x();
-      prevY = vertex.y();
-    }
-    return values;
+  public int classCount() {
+    return 4;
   }
 
   @Override
-  public List<Vertex> invert(int[] values, BufferContext ctx) {
-    final var vertexCount = values.length / 2;
-    final var classes = classify(PartBoundaries.of(ctx, vertexCount), vertexCount);
+  public int[] regionOrder() {
+    return new int[] {START, INTERIOR, CORNER, TURN};
+  }
 
-    final var vertices = new ArrayList<Vertex>(vertexCount);
-    final var cursors = cursors(classes);
-    var prevX = 0;
-    var prevY = 0;
-    for (var i = 0; i < vertexCount; i++) {
-      final var slot = cursors[classes[i]];
-      final int predX;
-      final int predY;
-      if (classes[i] == CORNER) {
-        predX = vertices.get(i - 3).x() + vertices.get(i - 1).x() - vertices.get(i - 2).x();
-        predY = vertices.get(i - 3).y() + vertices.get(i - 1).y() - vertices.get(i - 2).y();
-      } else if (classes[i] == TURN) {
-        final var p1 = vertices.get(i - 1);
-        final var edgeX = p1.x() - vertices.get(i - 2).x();
-        final var edgeY = p1.y() - vertices.get(i - 2).y();
-        predX = p1.x() - edgeY;
-        predY = p1.y() + edgeX;
-      } else {
-        predX = prevX;
-        predY = prevY;
-      }
-      final var x = predX + DecodingUtils.decodeZigZag(values[slot]);
-      final var y = predY + DecodingUtils.decodeZigZag(values[slot + 1]);
-      cursors[classes[i]] += 2;
-      vertices.add(new Vertex(x, y));
-      prevX = x;
-      prevY = y;
+  @Override
+  public int[] classify(BufferContext ctx, int vertexCount) {
+    return classify(PartBoundaries.of(ctx, vertexCount), vertexCount);
+  }
+
+  @Override
+  public boolean hasPrediction(int vertexClass) {
+    return vertexClass == CORNER || vertexClass == TURN;
+  }
+
+  @Override
+  public int predictX(int vertexClass, int i, List<Vertex> vertices) {
+    if (vertexClass == CORNER) {
+      return vertices.get(i - 3).x() + vertices.get(i - 1).x() - vertices.get(i - 2).x();
     }
-    return vertices;
+    final var p1 = vertices.get(i - 1);
+    final var edgeY = p1.y() - vertices.get(i - 2).y();
+    // rot90 ccw of (edgeX,edgeY) is (-edgeY, edgeX).
+    return p1.x() - edgeY;
+  }
+
+  @Override
+  public int predictY(int vertexClass, int i, List<Vertex> vertices) {
+    if (vertexClass == CORNER) {
+      return vertices.get(i - 3).y() + vertices.get(i - 1).y() - vertices.get(i - 2).y();
+    }
+    final var p1 = vertices.get(i - 1);
+    final var edgeX = p1.x() - vertices.get(i - 2).x();
+    return p1.y() + edgeX;
   }
 
   /**
@@ -149,28 +114,5 @@ public final class SegmentQuadCornerRot90 implements VertexTransform {
       }
     }
     return classes;
-  }
-
-  /** Start offset (in int slots) of each class's region: starts, interior, corners, turns. */
-  private static int[] cursors(int[] classes) {
-    var starts = 0;
-    var corners = 0;
-    var turns = 0;
-    for (var c : classes) {
-      if (c == START) {
-        starts++;
-      } else if (c == CORNER) {
-        corners++;
-      } else if (c == TURN) {
-        turns++;
-      }
-    }
-    final var interior = classes.length - starts - corners - turns;
-    final var cursors = new int[4];
-    cursors[START] = 0;
-    cursors[INTERIOR] = starts * 2;
-    cursors[CORNER] = (starts + interior) * 2;
-    cursors[TURN] = (starts + interior + corners) * 2;
-    return cursors;
   }
 }

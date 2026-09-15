@@ -101,7 +101,12 @@ the topology streams (`tileExtent`, `geometryTypes`, `numGeometries`, `numParts`
 | `<extractionDir>` | yes | Must contain `manifest.json` |
 | `--csv <file>` | no | Also dump per-buffer sizes (one column per encoding) |
 | `--layer <name>` | no | Restrict the run to one layer |
-| `--reorder <mode>` | no | Reorder geometries before encoding: `none` (default), `feature`, `feature-rev` |
+| `--verbose` | no | Full per-encoding tables instead of the compact winner-only table |
+
+There is no `--reorder` flag: reordering is the third component of an encoding's
+`(transform, codec, reorder)` triple (see "Adding an encoding" below), so it is selected
+by which registered encoding's row you read, not by a benchmark-wide switch — the
+baselines are never reordered, and neither is any encoding unless its own row says so.
 
 Prints corpus totals, then a breakdown by layer and by dominant geometry type. Each
 encoding is shown as a percentage against the **best baseline for that group**, so a
@@ -161,9 +166,54 @@ would make even a codec that discards the buffer round-trip successfully.
    new test method.
 
 With `research()` empty the run reports the two baselines only — the null result that
-shows the harness works before any new encoding is judged by it. `research()` currently
-holds `SEGMENT_PAIR_FASTPFOR` and `SEGMENT_QUAD_CORNER_FASTPFOR`; see **Results** for what
-they do and for the encodings that have been measured and rejected.
+shows the harness works before any new encoding is judged by it. See **Results** below
+for what the currently registered encodings do and for the ones that were measured and
+rejected.
+
+## Evaluation protocol
+
+**Do not test a new predictor "raw" (interleaved, no rANS, no reorder) against the
+baseline and add layout/codec on top afterwards.** That order silently kills real ideas:
+`SEGMENT_QUAD_CORNER`'s corner predictor measures **-9,6%** per-value zigzag bits but
+**-0,0%** bytes when interleaved under FastPFOR — the region split is not a bonus on top
+of the predictor, it is the mechanism that makes the predictor's win visible to a codec
+that prices a block's *maximum* value (see "Composing both", below). A predictor changes
+the residual *distribution*; the codec decides which part of that distribution gets
+charged for — FastPFOR the maximum, rANS (roughly) the median. "Raw vs baseline" tests
+against one specific pricing model and hides any win that narrows the median without
+narrowing the tail (`CONTEXT_DELTA` is the other documented casualty of this, below).
+
+The protocol that avoids this, in order:
+
+1. **Probe the distribution before writing an `Encoding`.** Reuse `RingPriorCli` /
+   `EntropyCli` / `CondEntropyCli` / `FeatureBoundaryCli` / `BuildingShapeCli`, or a
+   small purpose-built probe in the style of `QuadCornerResidualCli` (`./gradlew
+   quadCornerResidual --args="../data/extracted --layer building"`) when none of those
+   fit. Report **median and tail (p90/p99/p99.9) separately** — a candidate whose median
+   drops while its tail widens is a rANS candidate and a FastPFOR dead end; a candidate
+   that does not move the median is dead outright. Kill it here if the distribution
+   doesn't move; only write an `Encoding` once a probe says it can.
+2. **Report the layout × codec matrix, not one scalar**, for whatever survives Stage 1:
+   `{INTERLEAVED, SEGMENTED} × {FASTPFOR, RANS}` (`Layout` in
+   `encoding.ClassifiedPredictor`/`PredictedTransform`, `IntCodec.FASTPFOR`/`RansCodec`),
+   reorder off. This is what tells "bad idea" apart from "right idea, wrong packaging" —
+   it is exactly the SEGMENT_QUAD_CORNER interleaved-vs-segmented gap above, generalized.
+3. **Add-ons last, as isolated rows, never folded into the headline number.**
+   `GeometryReorder` and per-region rANS tables (`SegmentedRansCodec`) are optional
+   add-ons, not baseline comparators — report with and without, separately. `_RANS_SEG`
+   in particular is conditional (a net corpus loss below ~1.000 vertices per buffer; see
+   "Does the region split help rANS?"), not a universal improvement.
+4. **Check the oracle before calling it a result.** `BenchmarkCli`'s per-buffer selector
+   answers whether an encoding earns a place unconditionally (`SEGMENT_PAIR`: yes) or
+   only wins a war of attrition with itself (`DOD_RESET_*`: no, see "Would a tile ever
+   pick one of these?"). Signalling is not free: `StreamMetadata` has ~2 free
+   `LogicalLevelTechnique` ordinals left in production MLT.
+
+`PredictedTransform`/`ClassifiedPredictor`/`Layout` (package `encoding`) exist so step 2
+is a constructor argument rather than a second hand-written class: a predictor declares a
+per-vertex class and prediction once, and either layout can wrap it.
+`SegmentPair`/`SegmentQuadCorner`/`Rot90Fixed`/`SegmentQuadCornerRot90` are all
+`ClassifiedPredictor`s for this reason.
 
 ## Results
 
@@ -384,14 +434,44 @@ baselines improves on always-using-it by only ~0,4%.
 **What was left on the table.** Exact-shape repetition (32,4% of building rings share a
 translation-invariant shape) was **not** exploited: 90% of repeated shapes span multiple
 tiles, which a single-tile codec cannot address — the "redundancy abundant, addressing
-expensive" wall the junction/reordering experiments hit. The 24,3% of quads that are *not*
-parallelograms are also untouched; a second-order corner predictor was judged unlikely to pay
-on `building` (better prospect on `landcover`).
+expensive" wall the junction/reordering experiments hit. The non-parallelogram quads were
+also untouched at the time; see **Stage 0 worked example** below for the measured answer.
 
 The two sections that follow record the component mechanisms — `SEGMENT_PAIR` (part-start
 grouping) is still registered as it remains the best on LINESTRING; the standalone
 `QUAD_CORNER` was measured (-7,1% building / -1,6% corpus) and **removed once the composition
 strictly dominated it**.
+
+### Stage 0 worked example — second-order corner predictors, killed before an encoder existed
+
+Validates the **Evaluation protocol** above end to end on the one population `SEGMENT_QUAD_CORNER`
+leaves untouched: the ~24-42% (current corpus, layer-dependent) of four-vertex rings that are not
+exact parallelograms, where `p0+p2-p1` is not exact. `QuadCornerResidualCli` (`./gradlew
+quadCornerResidual --args="../data/extracted --layer building"`) measures three candidate
+predictors against that population's residual **distribution** — median and tail, no bytes, no
+`Encoding` written — per Stage 0 of the protocol:
+
+```
+building layer, 143.447 non-parallelogram 4-vertex rings, 286.894 residual values
+predictor                            mean   median      p90      p99    p99.9
+B  previous-vertex delta             4,80        5        7        8        9
+P0 parallelogram (p0+p2-p1)          1,07        1        2        5        7
+H  edge-continuation (2p2-p1)        5,79        6        7        8        9
+D  diagonal-ratio (2nd order)        5,92        6        8       10       12
+```
+
+**Result: both new candidates are dead on arrival, and the existing predictor already wins.**
+`P0` — the *parallelogram* predictor, applied to the very rings it isn't exact for — still beats
+plain delta by a wide margin (median 5 → 1) because deviation from a parallelogram tends to be
+small even when not zero. Neither `H` (continuation, ignoring `p0`) nor `D` (the genuinely
+second-order idea: scale the incoming edge by the outgoing/incoming length ratio) improves on `B`
+in median *or* tail — not a "narrow median, wide tail" case that a rANS cell might rescue, just
+uniformly worse. Same pattern on `landcover` and `landuse` (checked as a reproducibility control,
+not cherry-picked). **No `Encoding` was written; Stage 1's layout × codec matrix was never run,
+because Stage 0 already answers the question.** This is what the protocol is for: the corner
+predictor's own history above (-9,6% per-value bits, -0,0% bytes interleaved) shows a good idea
+can look dead under the wrong test; this shows the converse — a probe can correctly kill an idea
+*before* paying for an encoder, a round-trip test, and a benchmark column.
 
 ### Grouping part starts — `SEGMENT_PAIR_FASTPFOR`, **-4,5% corpus / -6,5% transportation**
 
@@ -721,6 +801,71 @@ shape was judged not to add enough to justify building and verifying separately.
 future pass wants the comparison, the open design question is whether a 1-scalar-per-edge
 residual (rather than a 2D turn residual with one component structurally near-zero)
 packs differently under FastPFOR — untested here.
+
+### Turn-scalar (1-scalar-per-edge) — Stage 0 probe, killed before an encoder existed
+
+Answers the open question the previous section leaves — "untested here" — directly:
+does replacing `Rot90Fixed`'s 2D turn residual with one signed scalar plus a direction
+bit win, on the theory that a right-angled turn should cost one value instead of two?
+A purpose-built probe (`TurnScalarCli`, not kept in the tree — the negative result below
+is recorded instead, per the project's "probe kills it, no code retained" outcome)
+measured the residual **distribution and exactness rate**, no bytes, no `Encoding`
+written, per Stage 0 of the protocol. Re-derive it in the style of
+`QuadCornerResidualCli` if the comparison is ever wanted again.
+
+**The scalar form is not exact for a general 90° turn, which is the reason to probe
+before building.** For a turn vertex with previous edge `e` and rotated basis
+`u = rot90ccw(e)`, the outgoing edge `w` is an exact integer multiple of `u` only when
+`|w|` happens to be an integer multiple of `|e|` — otherwise reconstructing `w` from one
+scalar needs a division. The probe measures two scalarizations against baseline `B`
+(plain delta) and `R2` (`Rot90Fixed`'s existing 2D residual): `S1`, an exact-but-wider
+projection pair, and `S2`, the real candidate — `along` (distance) + `perp` (near-zero
+if the turn is truly 90°), reconstructed by rounding and correcting any escape.
+
+```
+building layer, 582.296 turn-predicted vertices (even, >4-vertex rings)
+  turn is exactly 90 deg (cross(u,w)==0)              12,87%
+  ...and w is an exact integer multiple of u           2,83%   <- one scalar suffices
+  S2 rounded reconstruction exact (no escape needed)  91,55%   (escape rate 8,45%)
+
+predictor                            mean   median      p90      p99    p99.9  %zero-comp
+B  baseline delta (2 values)         4,17        5        6        8        9      8,56%
+R2 Rot90Fixed 2D residual (2 values) 4,20        5        7        8        9      8,64%
+S2-along scalar (1 value)            5,15        5        7        8        9
+S2-perp residual (1 value)           1,52        1        4        7        8     44,48%
+S1 exact projection pair (2 values)  9,11/4,79   9/5     12/8     14/12    16/14
+```
+
+**Result: dead on arrival, confirmed on `landcover` and `landuse` as a reproducibility
+control** (exact-integer-multiple share 0,31% / 0,59%; `S2-perp` median 5 / 4 bits — not
+a near-zero population outside `building`). Both conditions the idea needs fail
+simultaneously:
+
+1. **The exact-integer-multiple share is small everywhere** (2,83% best case, `building`),
+   exactly as the corpus's 4,2%-axis-aligned / 24,8%-grid-aligned priors predict — so a
+   single scalar practically never suffices without an escape, and the escape path (a
+   full 2D delta plus a signalled bit) has to carry the other ~90%.
+2. **`S2-perp` is only near-zero on `building`**, and even there it is not narrow enough
+   to matter: `S2-along` alone (mean 5,15) is already wider than one component of the
+   2-value baseline (mean 4,17/2 ≈ 2,09), so `along` + `perp` does not clearly beat `B`
+   or `R2` before a direction bit and an escape bit are even added. On `landcover`/
+   `landuse`, `perp`'s median (5, 4 bits) is barely narrower than `B`'s own median (5, 5
+   bits) — not the near-zero population the scheme depends on.
+
+**Reproduced on `data/extractedBaseline`** (`munich-buildings-unmerged.mbtiles`, the
+project's baseline tileset — the figures above are from the `germany.mbtiles`-cut
+corpus): building exact-integer-multiple share 3,04% (468.828 turn vertices, escape rate
+8,54%, `S2-along` mean 5,37 vs `S2-perp` mean 1,22); landcover 0,33%, landuse 0,52%, both
+with `S2-perp` medians (5, 4 bits) no narrower than baseline. Same failure pattern, same
+verdict, on the tileset this repo actually targets.
+
+**No `Encoding` was written.** Same verdict shape as the `QuadCornerResidualCli` and
+`RingPriorCli` Stage 0 probes above: a candidate that does not move the distribution
+enough, checked before paying for an encoder, a round-trip test, and a benchmark column.
+This also closes the open question from `Rot90Fixed`'s note above — a 1-scalar-per-edge
+residual does not pack better than the existing 2D residual, because the scalar
+decomposition is not close enough to exact on this corpus to avoid paying for both the
+escape path and a still-nontrivial `along` value.
 
 ### Context-adaptive delta for LineStrings — `CONTEXT_DELTA`, weak win, registered
 
@@ -1184,9 +1329,10 @@ payload but needs a longer header has not necessarily won.
 Baseline 3 (general-purpose Gzip/Zstd) is not currently implemented.
 
 `research()` currently holds `SEGMENT_PAIR`, `SEGMENT_QUAD_CORNER`, `ROT90_FIXED`, and
-`SEGMENT_QUAD_CORNER_ROT90`, each over FastPFOR and/or Varint and, where it helps,
-`GeometryReorder` — see **Results** for what they do, and for what has been measured and
-rejected.
+`SEGMENT_QUAD_CORNER_ROT90` (each a `ClassifiedPredictor` under `Layout.SEGMENTED`, over
+FastPFOR and/or Varint and, where it helps, `GeometryReorder`), the `RansCodec`/
+`SegmentedRansCodec` rows, and two `Layout.INTERLEAVED` controls — see **Results** for
+what they do, and for what has been measured and rejected.
 
 ## Notes on fidelity to MLT
 
@@ -1220,6 +1366,9 @@ research-java/
     BuildingShapeCli.java         characterize geometric properties of >4-vertex building rings (encodes nothing);
                                     also the WP5-E5.1 k-window shape-reuse feasibility scan
     EntropyCli.java                WP7 cost-model estimate: order-0 entropy vs FastPFOR bytes (encodes nothing)
+    CondEntropyCli.java             conditional-entropy probe: y|x, bucket/raw split, order-1 bucket context
+    FeatureBoundaryCli.java         cost of part/feature boundaries under FastPFOR's block-max pricing
+    QuadCornerResidualCli.java      Stage 0 protocol probe: 2nd-order corner predictors, no encoder (encodes nothing)
     extraction/
       VertexBufferExtractor.java   core flattening logic (copied from GeometryEncoder)
       MbtilesSource.java           .mbtiles reading + decompression + TMS->XYZ
@@ -1235,12 +1384,15 @@ research-java/
       StreamMetadata.java      size of the header MLT writes in front of a stream
       Baselines.java           the two baselines + the research registry
       GeometryEquivalence.java order-independent geometry check, for the reordering pre-pass
+      ClassifiedPredictor.java per-vertex class + prediction, layout-agnostic (see Evaluation protocol)
+      Layout.java              INTERLEAVED vs SEGMENTED residual placement for a ClassifiedPredictor
+      PredictedTransform.java  ClassifiedPredictor + Layout -> VertexTransform
       research/
         GeometryReorder.java   greedy endpoint chaining of whole features (a pre-pass, not an Encoding)
-        SegmentPair.java       groups part-start residuals ahead of interior deltas
-        SegmentQuadCorner.java part starts + 4th-corner (p0+p2-p1) prediction, 3 grouped populations
-        Rot90Fixed.java        fixed-ccw 90°-turn predictor on even >4-vertex rings, unsignalled (weak win)
-        SegmentQuadCornerRot90.java  quad-corner for 4-rings + fixed rot90 for even >4-rings, 4 regions (no gain over plain quad-corner)
+        SegmentPair.java       ClassifiedPredictor: groups part-start residuals ahead of interior deltas
+        SegmentQuadCorner.java ClassifiedPredictor: part starts + 4th-corner (p0+p2-p1) prediction, 3 classes
+        Rot90Fixed.java        ClassifiedPredictor: fixed-ccw 90°-turn on even >4-vertex rings (weak win)
+        SegmentQuadCornerRot90.java  ClassifiedPredictor: quad-corner for 4-rings + fixed rot90 for even >4-rings, 4 classes (no gain over plain quad-corner)
         failed/
           RightAngleTurn.java    >4-ring 90°-turn predictor with a signalled cw/ccw bit stream (regression)
           SegmentQuadCornerTurn.java  quad-corner for 4-rings + signalled 90°-turn for >4-rings, 4 regions (regression)

@@ -23,7 +23,8 @@ import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
  */
 public final class SegmentedEncoding implements Encoding {
 
-  private final SegmentQuadCorner transform = new SegmentQuadCorner();
+  private final SegmentQuadCorner predictor = new SegmentQuadCorner();
+  private final VertexTransform transform = new PredictedTransform(predictor, Layout.SEGMENTED);
   private final SegmentedRansCodec codec;
   private final GeometryReorder reorder;
   private final String name;
@@ -53,7 +54,7 @@ public final class SegmentedEncoding implements Encoding {
   public EncodedBuffer encode(BufferContext ctx) {
     final var emitted = reorder.apply(ctx);
     final var values = transform.apply(emitted);
-    codec.setPendingRegions(transform.regionLengths(emitted, emitted.vertices().size()));
+    codec.setPendingRegions(predictor.regionLengths(emitted, emitted.vertices().size()));
     final var payload = codec.encode(values);
     return new EncodedBuffer(
         payload, StreamMetadata.bytes(emitted.vertices().size() * 2, payload.length));

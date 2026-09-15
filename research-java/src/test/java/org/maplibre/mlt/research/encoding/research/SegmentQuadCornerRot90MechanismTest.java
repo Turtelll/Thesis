@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
+import org.maplibre.mlt.research.encoding.Layout;
+import org.maplibre.mlt.research.encoding.PredictedTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 
 /**
@@ -58,12 +60,16 @@ class SegmentQuadCornerRot90MechanismTest {
     return new BufferContext(vertices, List.of(POLYGON, POLYGON), List.of(), List.of(1, 1), List.of(4, 6));
   }
 
+  private static PredictedTransform segmented() {
+    return new PredictedTransform(new SegmentQuadCornerRot90(), Layout.SEGMENTED);
+  }
+
   @Test
   void onAFourVertexRingReducesToQuadCorner() {
     final var ctx = parallelogramColumn();
     assertArrayEquals(
-        new SegmentQuadCorner().apply(ctx),
-        new SegmentQuadCornerRot90().apply(ctx),
+        new PredictedTransform(new SegmentQuadCorner(), Layout.SEGMENTED).apply(ctx),
+        segmented().apply(ctx),
         "with only a four-vertex ring the transform must match SegmentQuadCorner exactly");
   }
 
@@ -73,7 +79,7 @@ class SegmentQuadCornerRot90MechanismTest {
     final var classes = SegmentQuadCornerRot90.classify(new int[] {0, 4}, ctx.vertices().size());
     // The four-ring's corner is global vertex index 3 (CORNER = 2, per the class's constant).
     assertEquals(2, classes[3], "vertex 3 of the four-ring must be classified CORNER");
-    final var values = new SegmentQuadCornerRot90().apply(ctx);
+    final var values = segmented().apply(ctx);
     final var cornerSlot = slotOf(classes, 3);
     assertEquals(0, values[cornerSlot], "corner x residual against p0+p2-p1 must be zero");
     assertEquals(0, values[cornerSlot + 1], "corner y residual against p0+p2-p1 must be zero");
@@ -113,7 +119,7 @@ class SegmentQuadCornerRot90MechanismTest {
     // predicted rot90ccw(prevEdge) residual is exactly zero.
     final var classes = SegmentQuadCornerRot90.classify(new int[] {0, 4}, ctx.vertices().size());
     assertEquals(3, classes[7], "vertex 7 (L-shape vertex 3) must be classified TURN");
-    final var values = new SegmentQuadCornerRot90().apply(ctx);
+    final var values = segmented().apply(ctx);
     final var slot = slotOf(classes, 7);
     assertEquals(0, values[slot], "turn vertex 7 x residual");
     assertEquals(0, values[slot + 1], "turn vertex 7 y residual");
@@ -122,7 +128,7 @@ class SegmentQuadCornerRot90MechanismTest {
   @Test
   void reconstructsFromTopologyAlone() {
     for (final var ctx : List.of(parallelogramColumn(), lShapeColumn(), mixedColumn())) {
-      final var transform = new SegmentQuadCornerRot90();
+      final var transform = segmented();
       assertEquals(ctx.vertices(), transform.invert(transform.apply(ctx), topologyOnly(ctx)));
     }
   }
@@ -130,7 +136,7 @@ class SegmentQuadCornerRot90MechanismTest {
   @Test
   void corruptedStreamDoesNotReconstruct() {
     final var ctx = mixedColumn();
-    final var transform = new SegmentQuadCornerRot90();
+    final var transform = segmented();
     final var values = transform.apply(ctx);
     values[0] += 2;
     assertNotEquals(ctx.vertices(), transform.invert(values, topologyOnly(ctx)));

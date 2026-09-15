@@ -84,6 +84,14 @@ tasks.register('featureBoundary', JavaExec) {
     mainClass = 'org.maplibre.mlt.research.FeatureBoundaryCli'
 }
 
+/* Stage 0 protocol probe (encodes nothing): ./gradlew quadCornerResidual --args="../data/extracted --layer landcover" */
+tasks.register('quadCornerResidual', JavaExec) {
+    group = 'application'
+    description = 'Stage 0 probe: second-order corner predictors on non-parallelogram 4-vertex rings.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.maplibre.mlt.research.QuadCornerResidualCli'
+}
+
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
     testLogging {

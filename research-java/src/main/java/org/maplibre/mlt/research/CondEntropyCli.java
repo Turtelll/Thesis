@@ -13,7 +13,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.maplibre.mlt.converter.geometry.Vertex;
+import org.maplibre.mlt.research.encoding.Layout;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
+import org.maplibre.mlt.research.encoding.PredictedTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
@@ -76,7 +78,9 @@ public final class CondEntropyCli {
     var buffers = 0;
 
     final VertexTransform transform =
-        baseline ? new VertexTransform.ZigZagDelta() : new SegmentQuadCorner();
+        baseline
+            ? new VertexTransform.ZigZagDelta()
+            : new PredictedTransform(new SegmentQuadCorner(), Layout.SEGMENTED);
     for (final var entry : manifest) {
       if (!entry.layerName().equals(layer)) {
         continue;

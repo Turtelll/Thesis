@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
+import org.maplibre.mlt.research.encoding.Layout;
+import org.maplibre.mlt.research.encoding.PredictedTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 
 /**
@@ -50,18 +52,22 @@ class SegmentQuadCornerMechanismTest {
         List.of(4));
   }
 
+  private static PredictedTransform segmented() {
+    return new PredictedTransform(new SegmentQuadCorner(), Layout.SEGMENTED);
+  }
+
   @Test
   void onLinesReducesToSegmentPair() {
     final var ctx = lineColumn();
     assertArrayEquals(
-        new SegmentPair().apply(ctx),
-        new SegmentQuadCorner().apply(ctx),
+        new PredictedTransform(new SegmentPair(), Layout.SEGMENTED).apply(ctx),
+        segmented().apply(ctx),
         "with no four-vertex ring the transform must match SegmentPair exactly");
   }
 
   @Test
   void appliesTheParallelogramPredictor() {
-    final var values = new SegmentQuadCorner().apply(parallelogramColumn());
+    final var values = segmented().apply(parallelogramColumn());
     // p0 is the only start (region head); the corner p3 is the tail two slots and must be (0,0).
     assertEquals(0, values[values.length - 2], "p3 x residual against p0+p2-p1 must be zero");
     assertEquals(0, values[values.length - 1], "p3 y residual against p0+p2-p1 must be zero");
@@ -70,7 +76,7 @@ class SegmentQuadCornerMechanismTest {
   @Test
   void reconstructsBothColumnsFromTopologyAlone() {
     for (final var ctx : List.of(lineColumn(), parallelogramColumn())) {
-      final var transform = new SegmentQuadCorner();
+      final var transform = segmented();
       assertEquals(ctx.vertices(), transform.invert(transform.apply(ctx), topologyOnly(ctx)));
     }
   }
@@ -78,7 +84,7 @@ class SegmentQuadCornerMechanismTest {
   @Test
   void corruptedStreamDoesNotReconstruct() {
     final var ctx = parallelogramColumn();
-    final var transform = new SegmentQuadCorner();
+    final var transform = segmented();
     final var values = transform.apply(ctx);
     values[0] += 2;
     assertNotEquals(ctx.vertices(), transform.invert(values, topologyOnly(ctx)));

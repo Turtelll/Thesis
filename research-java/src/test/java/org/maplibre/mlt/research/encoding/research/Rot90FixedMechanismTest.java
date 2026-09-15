@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
+import org.maplibre.mlt.research.encoding.Layout;
+import org.maplibre.mlt.research.encoding.PredictedTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 
 /**
@@ -79,10 +81,14 @@ class Rot90FixedMechanismTest {
     assertArrayEquals(new int[] {1, 0, 0, 0}, classes);
   }
 
+  private static PredictedTransform segmented() {
+    return new PredictedTransform(new Rot90Fixed(), Layout.SEGMENTED);
+  }
+
   @Test
   void residualIsZeroOnAConsistentCcwTurnAndNonzeroAtTheReflexCorner() {
     final var ctx = ringColumn(lShape());
-    final var values = new Rot90Fixed().apply(ctx);
+    final var values = segmented().apply(ctx);
     // Turn region is the last 4 vertices' worth of slots (vertices 2..5), in ring order.
     final var turnRegion = values.length - 8;
     // Vertex 2 is the ring's one reflex (cw) corner: fixed ccw prediction misses it on y.
@@ -99,7 +105,7 @@ class Rot90FixedMechanismTest {
   @Test
   void onOddRingEveryValueIsAPlainDelta() {
     final var ctx = ringColumn(staircase(7));
-    final var values = new Rot90Fixed().apply(ctx);
+    final var values = segmented().apply(ctx);
     // No vertex is turn-classified, so every residual is a plain zigzag delta against the
     // previous vertex in ring order (start region: vertex 0; interior region: vertices 1..6).
     final var expected = new java.util.ArrayList<Vertex>(ctx.vertices());
@@ -126,7 +132,7 @@ class Rot90FixedMechanismTest {
   void reconstructsFromTopologyAlone() {
     for (final var ring : List.of(lShape(), staircase(7), staircase(4))) {
       final var ctx = ringColumn(ring);
-      final var transform = new Rot90Fixed();
+      final var transform = segmented();
       assertEquals(ctx.vertices(), transform.invert(transform.apply(ctx), topologyOnly(ctx)));
     }
   }
@@ -134,7 +140,7 @@ class Rot90FixedMechanismTest {
   @Test
   void corruptedStreamDoesNotReconstruct() {
     final var ctx = ringColumn(lShape());
-    final var transform = new Rot90Fixed();
+    final var transform = segmented();
     final var values = transform.apply(ctx);
     values[0] += 2;
     assertNotEquals(ctx.vertices(), transform.invert(values, topologyOnly(ctx)));

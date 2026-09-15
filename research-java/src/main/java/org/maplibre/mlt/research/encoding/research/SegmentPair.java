@@ -1,12 +1,9 @@
 package org.maplibre.mlt.research.encoding.research;
 
-import java.util.ArrayList;
 import java.util.List;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.converter.encodings.EncodingUtils;
-import org.maplibre.mlt.decoder.DecodingUtils;
+import org.maplibre.mlt.research.encoding.ClassifiedPredictor;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
-import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 
 /**
@@ -24,8 +21,19 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
  * <p>The values are the same values in a different order, so this neither adds nor removes
  * information — it only changes what shares a block. Nothing is signalled: the split point is
  * derivable from the topology streams on both sides.
+ *
+ * <p>Has no predictor of its own — both classes fall back to first-order delta ({@link
+ * #hasPrediction} is always {@code false}) — so the whole idea under test <em>is</em> the region
+ * split; pair with {@link org.maplibre.mlt.research.encoding.PredictedTransform} under {@link
+ * org.maplibre.mlt.research.encoding.Layout#INTERLEAVED} to confirm it (byte-identical to the
+ * plain baseline, since reordering identical-prediction values changes nothing outside a
+ * block-packed codec).
  */
-public final class SegmentPair implements VertexTransform {
+public final class SegmentPair implements ClassifiedPredictor {
+
+  // INTERIOR is 0 so the default-zeroed class array already means "interior".
+  private static final int INTERIOR = 0;
+  private static final int START = 1;
 
   @Override
   public String name() {
@@ -33,83 +41,38 @@ public final class SegmentPair implements VertexTransform {
   }
 
   @Override
-  public int[] apply(BufferContext ctx) {
-    final var vertices = ctx.vertices();
-    final var starts = PartBoundaries.of(ctx, vertices.size());
-    final var isStart = startFlags(starts, vertices.size());
-
-    final var values = new int[vertices.size() * 2];
-    // Two cursors over one array: part-starts fill from the front, interior deltas from the
-    // boundary between the two populations.
-    var head = 0;
-    var tail = countStarts(isStart) * 2;
-    var prevX = 0;
-    var prevY = 0;
-    for (var i = 0; i < vertices.size(); i++) {
-      final var vertex = vertices.get(i);
-      final var dx = EncodingUtils.encodeZigZag(vertex.x() - prevX);
-      final var dy = EncodingUtils.encodeZigZag(vertex.y() - prevY);
-      if (isStart[i]) {
-        values[head++] = dx;
-        values[head++] = dy;
-      } else {
-        values[tail++] = dx;
-        values[tail++] = dy;
-      }
-      prevX = vertex.x();
-      prevY = vertex.y();
-    }
-    return values;
+  public int classCount() {
+    return 2;
   }
 
   @Override
-  public List<Vertex> invert(int[] values, BufferContext ctx) {
-    final var vertexCount = values.length / 2;
-    final var starts = PartBoundaries.of(ctx, vertexCount);
-    final var isStart = startFlags(starts, vertexCount);
-
-    final var vertices = new ArrayList<Vertex>(vertexCount);
-    var head = 0;
-    var tail = countStarts(isStart) * 2;
-    var prevX = 0;
-    var prevY = 0;
-    for (var i = 0; i < vertexCount; i++) {
-      final int dx;
-      final int dy;
-      if (isStart[i]) {
-        dx = values[head++];
-        dy = values[head++];
-      } else {
-        dx = values[tail++];
-        dy = values[tail++];
-      }
-      final var x = prevX + DecodingUtils.decodeZigZag(dx);
-      final var y = prevY + DecodingUtils.decodeZigZag(dy);
-      vertices.add(new Vertex(x, y));
-      prevX = x;
-      prevY = y;
-    }
-    return vertices;
+  public int[] regionOrder() {
+    return new int[] {START, INTERIOR};
   }
 
-  /** Marks the first vertex of every run. Vertex 0 is always a start. */
-  private static boolean[] startFlags(int[] starts, int vertexCount) {
-    final var flags = new boolean[vertexCount];
-    for (var start : starts) {
+  @Override
+  public int[] classify(BufferContext ctx, int vertexCount) {
+    final var classes = new int[vertexCount];
+    for (final var start : PartBoundaries.of(ctx, vertexCount)) {
       if (start < vertexCount) {
-        flags[start] = true;
+        classes[start] = START;
       }
     }
-    return flags;
+    return classes;
   }
 
-  private static int countStarts(boolean[] isStart) {
-    var count = 0;
-    for (var flag : isStart) {
-      if (flag) {
-        count++;
-      }
-    }
-    return count;
+  @Override
+  public boolean hasPrediction(int vertexClass) {
+    return false;
+  }
+
+  @Override
+  public int predictX(int vertexClass, int i, List<Vertex> vertices) {
+    throw new UnsupportedOperationException("SEGMENT_PAIR has no class with a real predictor");
+  }
+
+  @Override
+  public int predictY(int vertexClass, int i, List<Vertex> vertices) {
+    throw new UnsupportedOperationException("SEGMENT_PAIR has no class with a real predictor");
   }
 }
