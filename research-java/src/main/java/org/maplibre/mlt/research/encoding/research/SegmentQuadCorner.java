@@ -37,7 +37,7 @@ public final class SegmentQuadCorner implements ClassifiedPredictor {
 
     @Override
     public String name() {
-        return "SEGMENT_QUAD_CORNER";
+        return "QUAD_CORNER";
     }
 
     @Override

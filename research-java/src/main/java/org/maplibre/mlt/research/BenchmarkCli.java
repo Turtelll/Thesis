@@ -3,17 +3,28 @@ package org.maplibre.mlt.research;
 import org.maplibre.mlt.research.encoding.Baselines;
 import org.maplibre.mlt.research.encoding.Encoding;
 import org.maplibre.mlt.research.encoding.GeometryEquivalence;
+import org.maplibre.mlt.research.encoding.RansCodec;
+import org.maplibre.mlt.research.encoding.SegmentedEncoding;
+import org.maplibre.mlt.research.encoding.SegmentedRansCodec;
+import org.maplibre.mlt.research.encoding.VertexBufferCodec;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
+import org.maplibre.mlt.research.encoding.VertexTransform;
+import org.maplibre.mlt.research.encoding.research.GeometryReorder;
+import org.maplibre.mlt.research.encoding.research.ReorderedEncoding;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPOutputStream;
+
 
 /**
  * Encodes every extracted (tile, layer) VertexBuffer with every registered encoding and reports the
@@ -31,8 +42,9 @@ import java.util.stream.Collectors;
  * small size and would look like the best result in the table <em>because</em> it is broken, so a
  * size from an unverified encoding is not a result.
  *
- * <p>Usage: {@code [extractionDir] [--csv <file>] [--layer <name>] [--verbose]}. {@code
- * extractionDir} defaults to {@code ../data/extractedBaseline} when omitted.
+ * <p>Usage: {@code [extractionDir] [--csv <file>] [--layer <name>] [--verbose] [--segmented]
+ * [--reorder <feature|feature-rev>]}. {@code extractionDir} defaults to {@code
+ * ../data/extractedBaseline} when omitted.
  */
 public final class BenchmarkCli {
     private BenchmarkCli() {
@@ -50,9 +62,10 @@ public final class BenchmarkCli {
     private static final int COLUMNS_PER_TABLE = 4;
 
     /**
-     * Widest cell content: "13.399.028" + " " + "+15,6%" + the winner star.
+     * Widest cell content: "13.399.028" + " " + "+15,6%". The winner star is written outside this
+     * field, so it is not counted here.
      */
-    private static final int CELL_WIDTH = 21;
+    private static final int CELL_WIDTH = 20;
 
     /**
      * Running byte totals for one encoding within one group (the whole corpus, or one layer).
@@ -68,6 +81,93 @@ public final class BenchmarkCli {
         long get(String encoding) {
             return bytes.getOrDefault(encoding, 0L);
         }
+    }
+
+    /**
+     * Mean residual bit width per {@link VertexTransform}, corpus-wide — a codec-independent
+     * headroom signal, separate from the byte tables above.
+     *
+     * <p>Keyed on the transform's name rather than the encoding's: {@code QUAD_CORNER_VARINT},
+     * {@code QUAD_CORNER_RANS} and {@code QUAD_CORNER_FASTPFOR} all wrap the same transform and so
+     * produce byte-identical residuals, and printing the mean three times would wrongly imply the
+     * codec affects it. A predictor that lowers mean bits has found real structure; whether that
+     * structure survives into fewer bytes depends on layout and codec — the tables above answer that
+     * separately. {@code QUAD_CORNER} is the worked example: -9,6% mean bits, -0,0% bytes interleaved
+     * under FastPFOR, -12,2% bytes once segmented (see {@code docs/evaluation-protocol.md}).
+     *
+     * <p>Only accumulates a running {@code (bitSum, count)} per row, not the residual values
+     * themselves, so memory is proportional to the number of distinct transforms, not corpus size.
+     */
+    private static final class Residuals {
+        private final Map<String, Long> bitSum = new LinkedHashMap<>();
+        private final Map<String, Long> count = new LinkedHashMap<>();
+
+        void add(String transformName, int[] zigzagValues) {
+            var sum = 0L;
+            for (var value : zigzagValues) {
+                sum += bits(value);
+            }
+            bitSum.merge(transformName, sum, Long::sum);
+            count.merge(transformName, (long) zigzagValues.length, Long::sum);
+        }
+
+        /**
+         * Bit width of one zigzag-encoded residual, matching {@code QuadCornerResidualCli.bits()} and
+         * {@code RansCodec}'s bucket symbol: the position of the leading one, zero for a zero value.
+         */
+        private static int bits(int zigzag) {
+            return 32 - Integer.numberOfLeadingZeros(zigzag);
+        }
+
+        private double meanBits(String transformName) {
+            var n = count.getOrDefault(transformName, 0L);
+            return n == 0 ? 0.0 : (double) bitSum.get(transformName) / n;
+        }
+
+        void report() {
+            if (bitSum.isEmpty()) {
+                return;
+            }
+            var reference = "DELTA_ZIGZAG";
+            var refMean = bitSum.containsKey(reference) ? meanBits(reference) : 0.0;
+            var hasRef = bitSum.containsKey(reference);
+
+            var nameWidth =
+                    Math.max("transform".length(), bitSum.keySet().stream().mapToInt(String::length).max().orElse(0));
+
+            System.out.printf("%n--- residual bits ---%n");
+            System.out.printf(
+                    "%-" + nameWidth + "s %14s %10s %17s%n", "transform", "values", "mean bits", "vs DELTA_ZIGZAG");
+            for (var name : bitSum.keySet()) {
+                var mean = meanBits(name);
+                System.out.printf(
+                        "%-" + nameWidth + "s %,14d %10.2f %17s%n",
+                        name,
+                        count.get(name),
+                        mean,
+                        hasRef ? deltaFraction(mean, refMean) : "-");
+            }
+            System.out.printf(
+                    "%nA lower mean is a headroom signal, not a result: a transform that narrows the median%n"
+                            + "while widening the tail can still cost the same or more once a codec prices a%n"
+                            + "block's maximum (FastPFOR) rather than the mean. Whether the reduction above%n"
+                            + "reaches the tile depends on layout and codec - see the byte tables.%n");
+        }
+    }
+
+    /**
+     * A signed percentage of a {@code double} mean against a reference mean, mirroring {@link
+     * #delta(long, long)}'s sign convention (negative = smaller = the goal) for the residual-bits
+     * table, which averages fractional bits rather than whole bytes.
+     */
+    private static String deltaFraction(double value, double reference) {
+        if (reference == 0.0) {
+            return "-";
+        }
+        if (value == reference) {
+            return "ref";
+        }
+        return String.format("%+.1f%%", 100.0 * (value - reference) / reference);
     }
 
     /**
@@ -88,6 +188,7 @@ public final class BenchmarkCli {
 
         private long oracleBytes;
         private final Map<String, Integer> wins = new TreeMap<>();
+        private final Map<String, Long> oracleBytesByName = new TreeMap<>();
         private final List<List<Integer>> perBufferSizes = new ArrayList<>();
 
         void add(List<String> names, List<Integer> sizes) {
@@ -99,6 +200,7 @@ public final class BenchmarkCli {
             }
             oracleBytes += sizes.get(best);
             wins.merge(names.get(best), 1, Integer::sum);
+            oracleBytesByName.merge(names.get(best), (long) sizes.get(best), Long::sum);
             perBufferSizes.add(sizes);
         }
 
@@ -131,7 +233,15 @@ public final class BenchmarkCli {
                 bytesSaved.merge(names.get(best), (long) (baselineBest - sizes.get(best)), Long::sum);
             }
 
-            var nameWidth = Math.max(7, names.stream().mapToInt(String::length).max().orElse(0));
+            /* Measured over the rendered labels, not the raw names: a baseline row carries a
+             * " (baseline)" suffix, so sizing this to the names alone would let those rows overflow
+             * the field and push their two numeric columns out of line with every other row. */
+            var labels = new LinkedHashMap<String, String>();
+            for (var name : names) {
+                labels.put(name, baselineNames.contains(name) ? name + " (baseline)" : name);
+            }
+            var nameWidth =
+                    Math.max(8, labels.values().stream().mapToInt(String::length).max().orElse(0));
 
             System.out.printf("%n--- encoding potential (FeatureTable wins) ---%n");
             System.out.printf("%-" + nameWidth + "s %10s %14s%n", "encoding", "wins", "bytes saved");
@@ -143,10 +253,9 @@ public final class BenchmarkCli {
                             .reversed());
 
             for (var name : ranked) {
-                var label = baselineNames.contains(name) ? name + " (baseline)" : name;
                 System.out.printf(
                         "%-" + nameWidth + "s %10d %14s%n",
-                        label,
+                        labels.get(name),
                         wins.getOrDefault(name, 0),
                         String.format("%,d", bytesSaved.getOrDefault(name, 0L)));
             }
@@ -172,9 +281,33 @@ public final class BenchmarkCli {
                 }
             }
 
+            /* Every row here is "<label><star> <bytes> <delta>", and the label is built from an
+             * encoding name whose length is unbounded — so the width is measured over the labels this
+             * block will actually print rather than hardcoded. With add-ons enabled the names reach
+             * ~40 characters, which any fixed width would overflow, pushing that row's numbers out of
+             * line with the rest of the block. */
+            /* Every row here is "<label> <bytes> <delta>", and the label is built from an encoding
+             * name whose length is unbounded — so the width is measured over the labels this block
+             * will actually print rather than hardcoded. With add-ons enabled the names reach ~40
+             * characters, which any fixed width would overflow, pushing that row's numbers out of
+             * line with the rest of the block. The reference star is part of the label so it stays
+             * beside its name instead of floating in the padding. */
+            var oracleLabels = new ArrayList<String>();
+            oracleLabels.add("always " + fixedName);
+            for (var baseline : Baselines.baseline()) {
+                var name = baseline.name();
+                if (overall.get(name) != 0) {
+                    oracleLabels.add(
+                            "baseline " + name + (name.equals(fixedBaselineName) ? " *" : ""));
+                }
+            }
+            oracleLabels.add("research oracle");
+            var labelWidth = oracleLabels.stream().mapToInt(String::length).max().orElse(15);
+
             System.out.printf("%n--- per-buffer selection (oracle) ---%n");
             System.out.printf(
-                    "always %-24s %14s%n", fixedName, String.format("%,d", fixedBest));
+                    "%-" + labelWidth + "s %14s%n",
+                    "always " + fixedName, String.format("%,d", fixedBest));
             /* Both baselines are printed, not just the smaller one: the encoder picks FastPFOR or
              * Varint per stream, so a gain that only exists against the weaker baseline is not real.
              * The starred row is the reference every percentage here is measured against. */
@@ -185,15 +318,16 @@ public final class BenchmarkCli {
                     continue;
                 }
                 System.out.printf(
-                        "baseline %-15s%s %14s   %s%n",
-                        name,
-                        name.equals(fixedBaselineName) ? "*" : " ",
+                        "%-" + labelWidth + "s %14s   %s%n",
+                        "baseline " + name + (name.equals(fixedBaselineName) ? " *" : ""),
                         String.format("%,d", bytes),
                         delta(bytes, fixedBaselineBest));
             }
             System.out.printf(
-                    "research oracle           %14s   %s%n",
-                    String.format("%,d", oracleBytes), delta(oracleBytes, fixedBaselineBest));
+                    "%-" + labelWidth + "s %14s   %s%n",
+                    "research oracle",
+                    String.format("%,d", oracleBytes),
+                    delta(oracleBytes, fixedBaselineBest));
 
             var headroom = fixedBaselineBest - oracleBytes;
             if (headroom == 0) {
@@ -214,6 +348,102 @@ public final class BenchmarkCli {
                             + "ceiling. A real selector costs signalling per stream plus decoder complexity; if the%n"
                             + "headroom above does not clearly exceed that, per-buffer selection cannot pay for%n"
                             + "itself.%n");
+
+            /* The oracle total alone does not say whether it is carried by one encoding or spread
+             * across many, and that distinction decides whether a per-buffer selector is shippable:
+             * a total dominated by a single encoding is one extra codec to add, while a total spread
+             * thin across many is a signalling and decoder-complexity bill the headroom may not cover. */
+            var baselineNames = Baselines.baseline().stream().map(Encoding::name).collect(Collectors.toSet());
+            var compositionLabels = new LinkedHashMap<String, String>();
+            for (var name : wins.keySet()) {
+                compositionLabels.put(name, baselineNames.contains(name) ? name + " (baseline)" : name);
+            }
+            var compositionWidth = Math.max(
+                    8, compositionLabels.values().stream().mapToInt(String::length).max().orElse(0));
+
+            System.out.printf("%n--- oracle composition ---%n");
+            System.out.printf(
+                    "%-" + compositionWidth + "s %10s %7s %14s%n", "encoding", "buffers", "share", "bytes");
+
+            var ranked = new ArrayList<>(wins.keySet());
+            ranked.sort(
+                    Comparator.<String>comparingInt(wins::get)
+                            .thenComparingLong(oracleBytesByName::get)
+                            .reversed());
+
+            for (var name : ranked) {
+                var bytes = oracleBytesByName.get(name);
+                var share = oracleBytes == 0 ? 0.0 : 100.0 * bytes / oracleBytes;
+                System.out.printf(
+                        "%-" + compositionWidth + "s %10d %6.1f%% %14s%n",
+                        compositionLabels.get(name),
+                        wins.get(name),
+                        share,
+                        String.format("%,d", bytes));
+            }
+        }
+    }
+
+    /**
+     * How much of what an encoding saves survives gzip — the general-purpose compressor a browser
+     * actually applies on top, so this is the realistic delivery size, not an optional check.
+     *
+     * <p>Every other number in this report is the raw encoded size. This answers a different
+     * question: an encoding that wins by shrinking redundancy gzip would have removed anyway has not
+     * found real structure. Corpus-scale only — buffered per encoding and gzipped once at report
+     * time, rather than per buffer, so the result reflects cross-tile redundancy rather than each
+     * gzip stream's own ~18-byte framing overhead. Payload bytes only: {@link StreamMetadata} never
+     * materializes header bytes, only a size, so the header cannot enter the stream.
+     *
+     * <p>Buffers the whole corpus in memory once per selected encoding; with every add-on flag on at
+     * once this multiplies, but stays well within reach for this project's tilesets.
+     */
+    private static final class GzipTotals {
+
+        private final Map<String, ByteArrayOutputStream> streams = new LinkedHashMap<>();
+        private final ByteArrayOutputStream oracle = new ByteArrayOutputStream();
+
+        void add(String encoding, byte[] payload) {
+            streams.computeIfAbsent(encoding, k -> new ByteArrayOutputStream()).writeBytes(payload);
+        }
+
+        void addOracle(byte[] payload) {
+            oracle.writeBytes(payload);
+        }
+
+        void report(List<String> names) {
+            var labels = new ArrayList<>(names);
+            labels.add("research oracle");
+            var labelWidth = labels.stream().mapToInt(String::length).max().orElse(15);
+
+            System.out.printf(
+                    "%n--- corpus gzip (payload bytes only, concatenated then gzipped once) ---%n");
+            System.out.printf(
+                    "%-" + labelWidth + "s %14s %14s %8s%n", "encoding", "raw", "gzip", "ratio");
+            for (var name : names) {
+                var raw = streams.containsKey(name) ? streams.get(name).size() : 0;
+                printRow(name, labelWidth, raw, gzip(streams.get(name)));
+            }
+            printRow("research oracle", labelWidth, oracle.size(), gzip(oracle));
+        }
+
+        private static void printRow(String label, int labelWidth, int raw, int gzipped) {
+            System.out.printf(
+                    "%-" + labelWidth + "s %,14d %,14d %8.3f%n",
+                    label, raw, gzipped, raw == 0 ? 0.0 : (double) gzipped / raw);
+        }
+
+        private static int gzip(ByteArrayOutputStream buffer) {
+            if (buffer == null || buffer.size() == 0) {
+                return 0;
+            }
+            var out = new ByteArrayOutputStream();
+            try (var gzipOut = new GZIPOutputStream(out)) {
+                buffer.writeTo(gzipOut);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            return out.size();
         }
     }
 
@@ -223,13 +453,15 @@ public final class BenchmarkCli {
 
         var manifest = ExtractionReader.readManifest(inDir);
 
-        var encodings = Baselines.all();
+        var encodings = selectEncodings(opts);
         var names = encodings.stream().map(Encoding::name).toList();
 
         var overall = new Totals();
         var byLayer = new TreeMap<String, Totals>();
         var byGeometry = new TreeMap<String, Totals>();
         var selection = new Selection();
+        var gzipTotals = new GzipTotals();
+        var residuals = new Residuals();
         long rawTotal = 0;
 
         Writer csv = null;
@@ -264,6 +496,9 @@ public final class BenchmarkCli {
                 geometryTotals.buffers++;
 
                 var sizes = new ArrayList<Integer>(encodings.size());
+                byte[] bestPayload = null;
+                var bestTotal = Integer.MAX_VALUE;
+                var seenTransforms = new HashSet<String>();
                 for (var encoding : encodings) {
                     var encoded = encoding.encode(ctx);
                     verifyRoundTrip(entry, ctx, encoding, encoded);
@@ -273,9 +508,22 @@ public final class BenchmarkCli {
                     overall.add(encoding.name(), total);
                     layerTotals.add(encoding.name(), total);
                     geometryTotals.add(encoding.name(), total);
+
+                    gzipTotals.add(encoding.name(), encoded.payload());
+                    if (total < bestTotal) {
+                        bestTotal = total;
+                        bestPayload = encoded.payload();
+                    }
+
+                    var residualSource = residualSourceOf(encoding);
+                    if (residualSource != null && seenTransforms.add(residualSource.rowKey())) {
+                        residuals.add(
+                                residualSource.rowKey(), residualSource.transform().apply(encoding.emitted(ctx)));
+                    }
                 }
 
                 selection.add(names, sizes);
+                gzipTotals.addOracle(bestPayload);
 
                 if (csv != null) {
                     csv.write(
@@ -305,10 +553,99 @@ public final class BenchmarkCli {
             return;
         }
 
-        report(names, overall, byLayer, byGeometry, selection, rawTotal, opts.verbose);
+        report(
+                names, overall, byLayer, byGeometry, selection, residuals, gzipTotals, rawTotal,
+                opts.verbose, describeSet(opts));
         if (opts.csvFile != null) {
             System.out.printf("%nWrote %s%n", opts.csvFile);
         }
+    }
+
+    /**
+     * The encodings this run measures: always the baselines and {@link Baselines#core()}, plus the
+     * add-ons the flags asked for.
+     *
+     * <p>The add-ons are deliberately additive rather than alternative. {@code --reorder} appends a
+     * reordered copy of every row already selected instead of replacing it, so a reordered row and
+     * its unreordered original always appear in the same table — which is what makes the add-on's
+     * contribution readable separately from the encoding's, per {@code docs/evaluation-protocol.md}.
+     * The baselines are reordered too, since "reordering alone, on the baseline transform" is itself
+     * one of the numbers being compared; the percentage reference stays the unreordered baseline,
+     * because {@link #bestBaseline} keys on {@link Baselines#baseline()}'s own names.
+     */
+    private static List<Encoding> selectEncodings(Options opts) {
+        var selected = new ArrayList<Encoding>(Baselines.baseline());
+        selected.addAll(Baselines.core());
+        if (opts.segmented) {
+            selected.addAll(Baselines.segmented());
+        }
+        selected.removeIf(BenchmarkCli::isRans);
+        if (opts.reorder != null) {
+            var reordered = new ArrayList<Encoding>(selected.size());
+            for (var encoding : selected) {
+                reordered.add(new ReorderedEncoding(encoding, opts.reorder));
+            }
+            selected.addAll(reordered);
+        }
+        return selected;
+    }
+
+    /**
+     * rANS is retired as a research direction (not spec-compatible, does not combine with gzip) and
+     * is no longer reported by default. {@link Baselines} keeps every rANS row registered so {@link
+     * org.maplibre.mlt.research.encoding.VertexBufferCodecTest} still round-trips them; this filter
+     * only removes them from what the benchmark measures and prints. Matched on codec identity, not
+     * name, so a future rANS variant is not missed by a stale substring check.
+     */
+    private static boolean isRans(Encoding encoding) {
+        if (encoding instanceof VertexBufferCodec codec) {
+            return codec.codec() instanceof RansCodec;
+        }
+        return encoding instanceof SegmentedEncoding;
+    }
+
+    /**
+     * A transform reachable for residual-bits reporting, plus the row key it should accumulate under.
+     *
+     * <p>The row key is the transform's own name for a plain row, so {@code QUAD_CORNER_VARINT},
+     * {@code QUAD_CORNER_RANS} and {@code QUAD_CORNER_FASTPFOR} collapse onto one {@code QUAD_CORNER}
+     * row (same transform, byte-identical residuals). A {@link ReorderedEncoding} gets its own key
+     * instead — {@code GeometryReorder#apply} genuinely changes the vertex order and therefore the
+     * residual stream, so it is measured as a distinct row, named like every reordered byte column
+     * (transform name plus the reorder suffix) rather than collapsed into the unreordered transform's.
+     */
+    private record ResidualSource(String rowKey, VertexTransform transform) {
+    }
+
+    private static ResidualSource residualSourceOf(Encoding encoding) {
+        if (encoding instanceof ReorderedEncoding reordered) {
+            var inner = residualSourceOf(reordered.inner());
+            return inner == null
+                    ? null
+                    : new ResidualSource(
+                            inner.transform().name() + reordered.reorder().nameSuffix(), inner.transform());
+        }
+        if (encoding instanceof VertexBufferCodec codec) {
+            return new ResidualSource(codec.transform().name(), codec.transform());
+        }
+        if (encoding instanceof SegmentedEncoding segmented) {
+            return new ResidualSource(segmented.transform().name(), segmented.transform());
+        }
+        return null;
+    }
+
+    /**
+     * Names which add-ons are in play, so a pasted table cannot be mistaken for a default run.
+     */
+    private static String describeSet(Options opts) {
+        var set = new StringBuilder("core -rans");
+        if (opts.segmented) {
+            set.append(" +segmented");
+        }
+        if (opts.reorder != null) {
+            set.append(" +reorder ").append(opts.reorderName);
+        }
+        return set.toString();
     }
 
     // --- reporting ----------------------------------------------------------
@@ -330,16 +667,22 @@ public final class BenchmarkCli {
             Map<String, Totals> byLayer,
             Map<String, Totals> byGeometry,
             Selection selection,
+            Residuals residuals,
+            GzipTotals gzipTotals,
             long rawTotal,
-            boolean verbose) {
+            boolean verbose,
+            String set) {
 
         System.out.printf(
-                "%d buffers, %s raw bytes%n%n", overall.buffers, String.format("%,d", rawTotal));
+                "%d buffers, %s raw bytes, set: %s%n%n",
+                overall.buffers, String.format("%,d", rawTotal), set);
 
         segment("layer", names, byLayer, TOP_LAYERS, verbose);
         segment("geometry", names, byGeometry, Integer.MAX_VALUE, verbose);
+        residuals.report();
         selection.winCounts(names);
         selection.report(names, overall);
+        gzipTotals.report(names);
     }
 
     /**
@@ -407,7 +750,18 @@ public final class BenchmarkCli {
 
         var width =
                 Math.max(label.length(), shown.stream().mapToInt(g -> g.getKey().length()).max().orElse(8));
-        var nameWidth = Math.max(6, names.stream().mapToInt(String::length).max().orElse(20));
+        /* Sized to the winners this table actually prints, not to the widest name in the registry:
+         * with every add-on enabled the longest registered name is ~40 chars, which would pad this
+         * column with ~25 blanks on every row and push the two numeric columns off to the right. */
+        var nameWidth =
+                Math.max(
+                        "winner".length(),
+                        shown.stream()
+                                .filter(g -> !g.getKey().startsWith("(other"))
+                                .map(g -> winner(names, g.getValue()))
+                                .mapToInt(String::length)
+                                .max()
+                                .orElse("winner".length()));
         var corpus = shown.stream().mapToLong(g -> bestBaseline(g.getValue())).sum();
 
         System.out.printf(
@@ -455,18 +809,27 @@ public final class BenchmarkCli {
 
         var width =
                 Math.max(label.length(), shown.stream().mapToInt(g -> g.getKey().length()).max().orElse(8));
-        var nameWidth = names.stream().mapToInt(String::length).max().orElse(20);
+        // Sized to the winners actually printed, for the same reason as in compactTable.
+        var nameWidth =
+                Math.max(
+                        "best".length(),
+                        shown.stream()
+                                .map(g -> winner(names, g.getValue()))
+                                .mapToInt(String::length)
+                                .max()
+                                .orElse("best".length()));
         var corpus = shown.stream().mapToLong(g -> bestBaseline(g.getValue())).sum();
         var header =
                 new StringBuilder(String.format("%-" + width + "s %8s %7s", label, "buffers", "share"));
         var column = columnWidth(chunk);
         for (var name : chunk) {
-            header.append(String.format(" %" + column + "s", name));
+            // The trailing blank matches the star slot each data cell reserves below.
+            header.append(String.format(" %" + column + "s ", name));
         }
         if (withBest) {
-            header.append(String.format("   %-" + nameWidth + "s", "best"));
+            header.append(String.format("  %-" + nameWidth + "s", "best"));
         }
-        System.out.println(header);
+        System.out.println(header.toString().stripTrailing());
 
         for (var group : shown) {
             var totals = group.getValue();
@@ -482,20 +845,21 @@ public final class BenchmarkCli {
             for (var name : chunk) {
                 var bytes = totals.get(name);
                 /* The winning cell is starred; the percentages are all against the baseline reference,
-                 * which is a different question and can land on a different column. */
+                 * which is a different question and can land on a different column.
+                 *
+                 * The star sits OUTSIDE the right-aligned field: inside it, a starred cell would be one
+                 * character wider than its neighbours and shift every later column left by one. Every
+                 * cell therefore reserves the same trailing character, blank when it did not win. */
                 row.append(
                         String.format(
-                                " %" + column + "s",
-                                String.format(
-                                        "%s %s%s",
-                                        String.format("%,d", bytes),
-                                        delta(bytes, reference),
-                                        name.equals(winner) ? "*" : "")));
+                                " %" + column + "s%s",
+                                String.format("%s %s", String.format("%,d", bytes), delta(bytes, reference)),
+                                name.equals(winner) ? "*" : " "));
             }
             if (withBest) {
-                row.append(String.format("   %-" + nameWidth + "s", winner));
+                row.append(String.format("  %-" + nameWidth + "s", winner));
             }
-            System.out.println(row);
+            System.out.println(row.toString().stripTrailing());
         }
     }
 
@@ -643,7 +1007,14 @@ public final class BenchmarkCli {
         return best < names.length ? names[best] : "UNKNOWN";
     }
 
-    private record Options(String inDir, String csvFile, String layer, boolean verbose) {
+    private record Options(
+            String inDir,
+            String csvFile,
+            String layer,
+            boolean verbose,
+            boolean segmented,
+            GeometryReorder reorder,
+            String reorderName) {
 
         /**
          * The extraction directory used when none is given on the command line — the project's
@@ -652,18 +1023,32 @@ public final class BenchmarkCli {
         private static final String DEFAULT_IN_DIR = "../data/extractedBaseline";
 
         private static final String USAGE =
-                "Usage: [extractionDir] [--csv <file>] [--layer <name>] [--verbose]";
+                "Usage: [extractionDir] [--csv <file>] [--layer <name>] [--verbose] [--segmented]"
+                        + " [--reorder <feature|feature-rev>]";
 
         static Options parse(String[] args) {
             String in = null;
             String csv = null;
             String layer = null;
             var verbose = false;
+            var segmented = false;
+            GeometryReorder reorder = null;
+            String reorderName = null;
             for (var i = 0; i < args.length; i++) {
                 switch (args[i]) {
                     case "--csv" -> csv = args[++i];
                     case "--layer" -> layer = args[++i];
                     case "--verbose" -> verbose = true;
+                    case "--segmented" -> segmented = true;
+                    case "--reorder" -> {
+                        reorderName = args[++i];
+                        reorder = switch (reorderName) {
+                            case "feature" -> GeometryReorder.FEATURE;
+                            case "feature-rev" -> GeometryReorder.FEATURE_REV;
+                            default -> throw new IllegalArgumentException(
+                                    "Unknown reorder mode: " + reorderName + "\n" + USAGE);
+                        };
+                    }
                     case "--help", "-h" -> throw new IllegalArgumentException(USAGE);
                     default -> {
                         if (args[i].startsWith("-")) {
@@ -680,7 +1065,7 @@ public final class BenchmarkCli {
             if (in == null) {
                 in = DEFAULT_IN_DIR;
             }
-            return new Options(in, csv, layer, verbose);
+            return new Options(in, csv, layer, verbose, segmented, reorder, reorderName);
         }
     }
 }

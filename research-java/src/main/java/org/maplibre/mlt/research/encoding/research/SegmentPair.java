@@ -31,7 +31,7 @@ public final class SegmentPair implements ClassifiedPredictor {
 
     @Override
     public String name() {
-        return "SEGMENT_PAIR";
+        return "PART_START";
     }
 
     @Override
@@ -62,11 +62,15 @@ public final class SegmentPair implements ClassifiedPredictor {
 
     @Override
     public int predictX(int vertexClass, int i, List<Vertex> vertices) {
-        throw new UnsupportedOperationException("SEGMENT_PAIR has no class with a real predictor");
+        throw noPredictor();
     }
 
     @Override
     public int predictY(int vertexClass, int i, List<Vertex> vertices) {
-        throw new UnsupportedOperationException("SEGMENT_PAIR has no class with a real predictor");
+        throw noPredictor();
+    }
+
+    private static UnsupportedOperationException noPredictor() {
+        return new UnsupportedOperationException("PART_START has no class with a real predictor");
     }
 }

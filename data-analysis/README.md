@@ -36,6 +36,19 @@ Plot: `python plot/plot_vertex_dist.py <tileset>` reads
 — one log-scale box plot per layer, p99 marked separately since Tukey
 whiskers alone hide the tail.
 
+## Transportation road-class stats — `transportation_stats.py`
+
+```
+python transportation_stats.py <tileset> [--zoom Z] [--force]
+```
+
+Per road `class` (MVT tag), per zoom, in the `transportation` layer: features,
+vertices, geometry bytes, and mean zigzag residual bit width for plain delta vs.
+edge continuation (`pred = p[i-1] + (p[i-1]-p[i-2])`) on run-interior vertices. Reuses
+`mvt_stats.py`'s protobuf primitives; adds `layer.keys`/`layer.values`/`feature.tags`
+decoding to resolve `class`. Caches to `out/<tileset>.transportation.json`; `--force`
+rescans. See `research-java/docs/results/line-continuation.md` for what this measured.
+
 ## Tilesets
 
 `munich-de-rs`, `munich-maptiler`, `munich-overture`, `NY-maptiler`,

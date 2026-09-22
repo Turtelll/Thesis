@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoding.research;
+package org.maplibre.mlt.research.encoding.research.failed;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -11,10 +11,11 @@ import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.Layout;
 import org.maplibre.mlt.research.encoding.PredictedTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
 
 /**
  * Pins that {@code SEGMENT_QUAD_CORNER_ROT90} composes {@link SegmentQuadCorner}'s parallelogram
- * corner (on exactly-four-vertex rings) with {@link Rot90Fixed}'s fixed-ccw turn predictor (on
+ * corner (on exactly-four-vertex rings) with {@code Rot90Fixed}'s fixed-ccw turn predictor (on
  * even-length rings longer than four vertices), routing each into its own region, and reconstructs
  * from the topology streams alone.
  */

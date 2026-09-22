@@ -20,9 +20,10 @@ import java.util.List;
  * tile, and no context has to be plumbed through {@link IntCodec}, which is context-free by design.
  *
  * <p><b>Why the table is per-buffer.</b> The alternative — one table trained over the corpus — is
- * cheaper per tile but only valid for tiles resembling the training set. A 33-symbol table costs
- * ~66 bytes here, small enough that per-buffer adaptivity is worth more than the bytes it costs, and
- * it keeps the measurement honest: every byte the decoder needs is inside the payload being counted.
+ * cheaper per tile but only valid for tiles resembling the training set. A sparse 33-symbol table
+ * costs at most ~100 bytes and typically far less (see below), small enough that per-buffer
+ * adaptivity is worth more than the bytes it costs, and it keeps the measurement honest: every byte
+ * the decoder needs is inside the payload being counted.
  *
  * <p><b>Stream layout.</b> rANS decodes in the reverse order of encoding, so the encoder walks
  * values back-to-front and the decoder front-to-back. The raw bits are <em>not</em> interleaved into
@@ -246,10 +247,25 @@ public final class RansCodec implements IntCodec {
     }
 
     /**
-     * Table format: one 16-bit frequency per symbol. Fixed-width keeps the reader trivial.
+     * Table format: {@code [1 B present count][present x (1 B symbol, 2 B frequency)]}, instead of
+     * all 33 symbols unconditionally (a fixed 66 bytes, most of them zero — the alphabet stays sparse
+     * even on the largest buffers, mean ~11 of 33 symbols present; see
+     * {@code docs/results/shared-tables.md}). Sparse wins whenever a table has ≤21 present symbols,
+     * which is effectively always; the worst case (all 33 present) costs 100 bytes instead of 66.
      */
     private static void writeTable(ByteList out, int[] freq) {
+        var present = 0;
         for (var s = 0; s < MAX_SYMBOL; s++) {
+            if (freq[s] != 0) {
+                present++;
+            }
+        }
+        out.add((byte) present);
+        for (var s = 0; s < MAX_SYMBOL; s++) {
+            if (freq[s] == 0) {
+                continue;
+            }
+            out.add((byte) s);
             out.add((byte) (freq[s] & 0xFF));
             out.add((byte) ((freq[s] >>> 8) & 0xFF));
         }
@@ -257,10 +273,12 @@ public final class RansCodec implements IntCodec {
 
     private static int[] readTable(ByteReader in) {
         final var freq = new int[MAX_SYMBOL];
-        for (var s = 0; s < MAX_SYMBOL; s++) {
+        final var present = in.readByte() & 0xFF;
+        for (var i = 0; i < present; i++) {
+            final var symbol = in.readByte() & 0xFF;
             final var lo = in.readByte() & 0xFF;
             final var hi = in.readByte() & 0xFF;
-            freq[s] = lo | (hi << 8);
+            freq[symbol] = lo | (hi << 8);
         }
         return freq;
     }

@@ -32,56 +32,49 @@ public final class Baselines {
     }
 
     /**
-     * Encodings under test — add one line per new idea. Each is a {@code (transform, codec,
-     * reorder)} triple and names itself from those parts.
+     * The encoding ideas themselves — add one line per new idea.
+     *
+     * <p>Every row here is a {@code (transform, codec)} pair under {@link Layout#INTERLEAVED} and in
+     * the buffer's original order, because this is the set the default benchmark run reports and it
+     * must answer one question only: <em>is the idea itself better?</em> Segmentation and reordering
+     * are separately-measured add-ons ({@link #segmented()}, {@code --reorder}) — never register a
+     * row that has either baked in, or its uplift becomes unattributable to the idea under test.
      */
-    public static List<Encoding> research() {
+    public static List<Encoding> core() {
         return List.of(
-                // --- FASTPFOR ---
-                new VertexBufferCodec(segmented(new SegmentPair()), IntCodec.FASTPFOR),
-                new VertexBufferCodec(segmented(new SegmentPair()), IntCodec.FASTPFOR, GeometryReorder.FEATURE),
-                new VertexBufferCodec(segmented(new SegmentPair()), IntCodec.FASTPFOR, GeometryReorder.FEATURE_REV),
-                new VertexBufferCodec(segmented(new SegmentQuadCorner()), IntCodec.FASTPFOR),
-                new VertexBufferCodec(segmented(new SegmentQuadCorner()), IntCodec.FASTPFOR, GeometryReorder.FEATURE),
-                new VertexBufferCodec(segmented(new SegmentQuadCorner()), IntCodec.FASTPFOR, GeometryReorder.FEATURE_REV),
-                new VertexBufferCodec(segmented(new Rot90Fixed()), IntCodec.FASTPFOR),
-                new VertexBufferCodec(segmented(new SegmentQuadCornerRot90()), IntCodec.FASTPFOR, GeometryReorder.FEATURE_REV),
-
-                // --- VARINT ---
-                new VertexBufferCodec(segmented(new SegmentQuadCorner()), IntCodec.VARINT),
-                new VertexBufferCodec(segmented(new SegmentPair()), IntCodec.VARINT, GeometryReorder.FEATURE_REV),
-                new VertexBufferCodec(segmented(new SegmentQuadCorner()), IntCodec.VARINT, GeometryReorder.FEATURE_REV),
-                new VertexBufferCodec(segmented(new Rot90Fixed()), IntCodec.VARINT),
-                new VertexBufferCodec(segmented(new SegmentQuadCornerRot90()), IntCodec.VARINT),
-
-                // --- RANS ---
-                // WP7 follow-up: the rANS coder the cost model estimated but did not build. Paired with the
-                // plain baseline transform and with the corpus's best one, so the entropy coder's own
-                // contribution is separable from the transform's.
-                new VertexBufferCodec(new VertexTransform.ZigZagDelta(), RANS),
-                new VertexBufferCodec(segmented(new SegmentQuadCorner()), RANS),
-                new VertexBufferCodec(segmented(new SegmentQuadCorner()), RANS, GeometryReorder.FEATURE_REV),
-
-                // --- Segmented (per-region frequency tables) ---
-                // Does the region split the transform already performs buy anything once an entropy
-                // coder, rather than a bit packer, prices the regions?
-                new SegmentedEncoding(GeometryReorder.NONE),
-                new SegmentedEncoding(GeometryReorder.FEATURE_REV),
-
-                // --- Interleaved controls (evaluation protocol Stage 1) ---
-                // The same predictors as above with no region separation: isolates whether a predictor's
-                // win depends on SEGMENTED layout at all, or survives interleaved. See
-                // docs/results/segment-quad-corner.md for the documented case where this matters.
+                new VertexBufferCodec(interleaved(new SegmentQuadCorner()), IntCodec.VARINT),
                 new VertexBufferCodec(interleaved(new SegmentQuadCorner()), IntCodec.FASTPFOR),
-                new VertexBufferCodec(interleaved(new SegmentQuadCorner()), RANS));
+                new VertexBufferCodec(interleaved(new LineContinuation()), IntCodec.VARINT),
+                new VertexBufferCodec(interleaved(new LineContinuation()), IntCodec.FASTPFOR));
+                //new VertexBufferCodec(interleaved(new Rot90Fixed()), IntCodec.VARINT),
     }
 
     /**
-     * Everything the benchmark measures: {@link #baseline()} followed by {@link #research()}.
+     * The segmentation add-on: the same predictors under {@link Layout#SEGMENTED}, which groups
+     * residuals into contiguous per-class regions so a block-packing codec sizes each independently.
+     *
+     * <p>Measured only under {@code --segmented}, because the win is specific to a codec that prices
+     * a block's maximum (FastPFOR) and does not carry over to a byte-aligned or general-purpose one —
+     * so folding it into a headline number would credit the idea for the packaging. Only a {@link
+     * ClassifiedPredictor} can have a row here, and it should have a {@link #core()} row beside it.
+     */
+    public static List<Encoding> segmented() {
+        return List.of(
+                new VertexBufferCodec(segmented(new SegmentPair()), IntCodec.FASTPFOR),
+                new VertexBufferCodec(segmented(new SegmentQuadCorner()), IntCodec.FASTPFOR),
+                new VertexBufferCodec(segmented(new LineContinuation()), IntCodec.FASTPFOR),
+                new SegmentedEncoding());
+    }
+
+    /**
+     * Everything the benchmark can measure without an add-on flag: {@link #baseline()} then {@link
+     * #core()} then {@link #segmented()}. This is the round-trip surface the tests parameterize over,
+     * not the default benchmark set — {@code BenchmarkCli} selects per run.
      */
     public static List<Encoding> all() {
         var all = new ArrayList<Encoding>(baseline());
-        all.addAll(research());
+        all.addAll(core());
+        all.addAll(segmented());
         return all;
     }
 }

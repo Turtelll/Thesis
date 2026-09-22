@@ -31,9 +31,10 @@ public final class PredictedTransform implements VertexTransform {
 
     @Override
     public String name() {
-        // SEGMENTED matches every predictor's own historical name (no suffix); INTERLEAVED is a new
-        // variant and must not collide with it in the benchmark's column names.
-        return layout == Layout.SEGMENTED ? predictor.name() : predictor.name() + "_INTERLEAVED";
+        // The predictor's bare name is the core idea, measured INTERLEAVED; SEGMENTED is the add-on
+        // and carries the suffix, so a table column says which of the two it is. See
+        // docs/results/README.md for the old -> new name mapping.
+        return layout == Layout.SEGMENTED ? predictor.name() + "_SEG" : predictor.name();
     }
 
     @Override

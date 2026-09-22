@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoding.research;
+package org.maplibre.mlt.research.encoding.research.failed;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.ClassifiedPredictor;
@@ -8,13 +8,15 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import java.util.List;
 
 /**
- * Extends {@link SegmentQuadCorner} by giving <b>even-length</b> rings longer than four vertices —
- * the population its parallelogram predictor cannot reach — {@link Rot90Fixed}'s fixed-ccw 90°-turn
+ * Extends {@link org.maplibre.mlt.research.encoding.research.SegmentQuadCorner} by giving
+ * <b>even-length</b> rings longer than four vertices — the population its parallelogram predictor
+ * cannot reach — {@link org.maplibre.mlt.research.encoding.research.Rot90Fixed}'s fixed-ccw 90°-turn
  * predictor, while exactly-four-vertex rings keep the parallelogram corner ({@code p0+p2-p1}) that
  * wins {@code building} outright.
  *
  * <p>This composition targets disjoint populations, the same pattern {@code SEGMENT_QUAD_CORNER}
- * itself uses to compose {@link SegmentPair} and the corner predictor. Measured:
+ * itself uses to compose {@link org.maplibre.mlt.research.encoding.research.SegmentPair} and the
+ * corner predictor. Measured:
  * {@code docs/results/rot90-fixed.md} ("It does not compose with SEGMENT_QUAD_CORNER") — the
  * composition does not improve on plain quad-corner.
  *
@@ -46,7 +48,7 @@ public final class SegmentQuadCornerRot90 implements ClassifiedPredictor {
 
     @Override
     public String name() {
-        return "SEGMENT_QUAD_CORNER_ROT90";
+        return "QUAD_CORNER_ROT90";
     }
 
     @Override

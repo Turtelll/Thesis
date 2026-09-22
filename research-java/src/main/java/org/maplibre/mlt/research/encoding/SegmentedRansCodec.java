@@ -3,7 +3,7 @@ package org.maplibre.mlt.research.encoding;
 /**
  * {@link RansCodec} with one frequency table per residual region instead of one shared table.
  *
- * <p>A transform like {@code SEGMENT_QUAD_CORNER} already packs its residuals into contiguous
+ * <p>A transform like {@code QUAD_CORNER_SEG} already packs its residuals into contiguous
  * regions (starts | interior | corners) whose distributions differ sharply. Coding them with a
  * single table prices every region at the mixture of all three, which is strictly worse than
  * pricing each at its own distribution — measured in {@code docs/results/rans-entropy-coder.md}

@@ -1,6 +1,7 @@
 package org.maplibre.mlt.research.encoding;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Random;
 import org.junit.jupiter.api.Test;
@@ -62,5 +63,21 @@ class RansCodecTest {
       values[i] = i < 32 ? (1 << i) - 1 : (1 << (i - 32));
     }
     assertRoundTrip(values);
+
+    // Worst case for the sparse table: all 33 symbols present, so it costs 100 bytes vs the old
+    // format's fixed 66 — accepted deliberately since this case is rare (docs/results/shared-tables.md).
+    final var codec = new RansCodec();
+    final var encoded = codec.encode(values);
+    assertEquals(33, encoded[0] & 0xFF);
+  }
+
+  @Test
+  void writesSparseTableHeader() {
+    // Only buckets 0, 1, 2 occur (values 0..3), so the leading count byte should read 3, not the old
+    // format's fixed 33 — pins the sparse header without depending on total payload size.
+    final var values = new int[] {0, 1, 2, 3, 1, 2, 0, 3};
+    final var codec = new RansCodec();
+    final var encoded = codec.encode(values);
+    assertEquals(3, encoded[0] & 0xFF);
   }
 }

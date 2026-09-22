@@ -76,6 +76,22 @@ tasks.register('condEntropy', JavaExec) {
     mainClass = 'org.maplibre.mlt.research.CondEntropyCli'
 }
 
+/* ./gradlew decodeTime --args="../data/extractedBaseline --layer building" */
+tasks.register('decodeTime', JavaExec) {
+    group = 'application'
+    description = 'Decode-time probe: rANS vs FastPFOR, interleaved vs segmented.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.maplibre.mlt.research.DecodeTimeCli'
+}
+
+/* ./gradlew shareTable --args="../data/extractedBaseline" */
+tasks.register('shareTable', JavaExec) {
+    group = 'application'
+    description = 'Probe: rANS frequency tables shared across buffers vs per-buffer.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.maplibre.mlt.research.ShareTableCli'
+}
+
 /* ./gradlew featureBoundary --args="../data/extracted" */
 tasks.register('featureBoundary', JavaExec) {
     group = 'application'
@@ -90,6 +106,14 @@ tasks.register('quadCornerResidual', JavaExec) {
     description = 'Stage 0 probe: second-order corner predictors on non-parallelogram 4-vertex rings.'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'org.maplibre.mlt.research.QuadCornerResidualCli'
+}
+
+/* Stage 0 protocol probe (encodes nothing): ./gradlew turnRadius --args="../data/extractedBaseline --layer transportation" */
+tasks.register('turnRadius', JavaExec) {
+    group = 'application'
+    description = 'Stage 0 probe: per-zoom turn radius, curvature and line-predictor residuals.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.maplibre.mlt.research.TurnRadiusCli'
 }
 
 tasks.withType(Test).configureEach {

@@ -1,7 +1,6 @@
 package org.maplibre.mlt.research.encoding;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.research.GeometryReorder;
 
 import java.util.List;
 
@@ -10,11 +9,9 @@ import java.util.List;
  * {@link Encoding}: the transform and codec supply encode/decode, and this class adds the
  * stream-metadata accounting the benchmark compares on.
  *
- * <p>A {@link GeometryReorder} is an optional third component, defaulting to {@link
- * GeometryReorder#NONE} — every encoding is a uniform {@code (transform, codec, reorder)} triple.
- * Reordering is applied <em>before</em> the transform and is never part of a baseline: the
- * baseline is the fixed yardstick every percentage is computed against (see
- * {@code docs/results/reordering.md}).
+ * <p>Reordering is not a component: it is a benchmark-wide add-on applied through {@link
+ * org.maplibre.mlt.research.encoding.research.ReorderedEncoding}, so every row here is measured
+ * with and without it (see {@code docs/results/reordering.md}).
  */
 public final class VertexBufferCodec implements Encoding {
 
@@ -57,28 +54,19 @@ public final class VertexBufferCodec implements Encoding {
 
     private final VertexTransform transform;
     private final IntCodec codec;
-    private final GeometryReorder reorder;
 
-    /**
-     * An encoding that leaves the geometry order untouched.
-     */
     public VertexBufferCodec(VertexTransform transform, IntCodec codec) {
-        this(transform, codec, GeometryReorder.NONE);
-    }
-
-    public VertexBufferCodec(VertexTransform transform, IntCodec codec, GeometryReorder reorder) {
         this.transform = transform;
         this.codec = codec;
-        this.reorder = reorder;
     }
 
     /**
      * Composed from the components, so a name can neither drift from what it describes nor collide
-     * with another combination's — e.g. {@code SEGMENT_PAIR_FASTPFOR_REORDER_REV}.
+     * with another combination's — e.g. {@code PART_START_SEG_FASTPFOR}.
      */
     @Override
     public String name() {
-        return transform.name() + "_" + codec.name() + reorder.nameSuffix();
+        return transform.name() + "_" + codec.name();
     }
 
     @Override
@@ -87,38 +75,31 @@ public final class VertexBufferCodec implements Encoding {
     }
 
     @Override
-    public boolean reordersGeometries() {
-        return reorder.reorders();
-    }
-
-    /**
-     * The buffer this encoding actually emits — what a decoder reconstructs, and what it must equal.
-     */
-    @Override
-    public BufferContext emitted(BufferContext ctx) {
-        return reorder.apply(ctx);
-    }
-
-    @Override
     public EncodedBuffer encode(BufferContext ctx) {
-        final var emitted = reorder.apply(ctx);
-        final var payload = codec.encode(transform.apply(emitted));
+        final var payload = codec.encode(transform.apply(ctx));
         return new EncodedBuffer(
-                payload, StreamMetadata.bytes(emitted.vertices().size() * 2, payload.length));
+                payload, StreamMetadata.bytes(ctx.vertices().size() * 2, payload.length));
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * <p>Under a reorder, {@code ctx} carries the topology streams of the <em>original</em> buffer
-     * while the payload describes the reordered one, and the transform derives its part boundaries
-     * from whatever context it is given — so it is handed the reordered topology, exactly as a real
-     * decoder would read it from the tile. {@link GeometryReorder#topology} recomputes it without
-     * touching the vertices, which this method is forbidden to read.
-     */
     @Override
     public List<Vertex> decode(EncodedBuffer encoded, BufferContext ctx, int vertexCount) {
-        return transform.invert(
-                codec.decode(encoded.payload(), vertexCount * 2), reorder.topology(ctx, vertexCount));
+        return transform.invert(codec.decode(encoded.payload(), vertexCount * 2), ctx);
+    }
+
+    /**
+     * The transform alone, for measurements that need the residual stream independent of the codec
+     * (e.g. residual-magnitude reporting) — {@link VertexTransform#apply} is pure, so it is safe to
+     * call outside the encode/decode pairing {@link #encode} otherwise requires.
+     */
+    public VertexTransform transform() {
+        return transform;
+    }
+
+    /**
+     * The codec alone, so a measurement can tell which physical codec a row uses without matching on
+     * its name.
+     */
+    public IntCodec codec() {
+        return codec;
     }
 }

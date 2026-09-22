@@ -19,7 +19,8 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 public interface ClassifiedPredictor {
 
     /**
-     * This predictor's contribution to an encoding's name, e.g. {@code SEGMENT_QUAD_CORNER}.
+     * This predictor's contribution to an encoding's name, e.g. {@code QUAD_CORNER}. {@link
+     * PredictedTransform} appends {@code _SEG} under {@link Layout#SEGMENTED}.
      */
     String name();
 

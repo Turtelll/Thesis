@@ -83,11 +83,9 @@ public final class GeometryReorder {
     private static final int MULTIPOLYGON = 5;
 
     private final Mode mode;
-    private final boolean allowReversal;
 
     private GeometryReorder(Mode mode) {
         this.mode = mode;
-        this.allowReversal = mode.allowReversal;
     }
 
     public String nameSuffix() {
@@ -259,6 +257,7 @@ public final class GeometryReorder {
 
         // Each feature contributes its entry endpoint, and its exit endpoint too when reversal may
         // pick it up; both map back to the same feature index.
+        final var allowReversal = mode.allowReversal;
         final var grid = new EndpointGrid(groups.size() * (allowReversal ? 2 : 1));
         for (var g = 0; g < groups.size(); g++) {
             final var group = groups.get(g);
@@ -284,10 +283,6 @@ public final class GeometryReorder {
             cursorY = exit.y();
         }
         return order;
-    }
-
-    private static long distance(Vertex vertex, int x, int y) {
-        return Math.abs((long) vertex.x() - x) + Math.abs((long) vertex.y() - y);
     }
 
     // --- rebuilding the context ---------------------------------------------
@@ -337,14 +332,9 @@ public final class GeometryReorder {
                 final var part = placed.reversed() ? group[group.length - 1 - i] : group[i];
                 final var from = starts[part];
                 final var length = lengths[part];
-                if (placed.reversed()) {
-                    for (var v = length - 1; v >= 0; v--) {
-                        reordered.add(vertices.get(from + v));
-                    }
-                } else {
-                    for (var v = 0; v < length; v++) {
-                        reordered.add(vertices.get(from + v));
-                    }
+                for (var v = 0; v < length; v++) {
+                    final var offset = placed.reversed() ? length - 1 - v : v;
+                    reordered.add(vertices.get(from + offset));
                 }
                 if (polygonColumn) {
                     numRings.add(length);
@@ -535,11 +525,14 @@ public final class GeometryReorder {
                             // feature — what a first-wins linear scan yields. Without this the grid's cell
                             // order would decide, so the same corpus could chain differently between runs and
                             // the measured byte totals would not be reproducible.
-                            final var better =
-                                    d < bestDistance
-                                            || (d == bestDistance
-                                            && (feature[i] < bestFeature
-                                            || (feature[i] == bestFeature && bestReversed && !reversed[i])));
+                            final boolean better;
+                            if (d != bestDistance) {
+                                better = d < bestDistance;
+                            } else if (feature[i] != bestFeature) {
+                                better = feature[i] < bestFeature;
+                            } else {
+                                better = bestReversed && !reversed[i];
+                            }
                             if (better) {
                                 bestDistance = d;
                                 bestFeature = feature[i];

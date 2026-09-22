@@ -18,11 +18,10 @@ interface LayerConfig {
 
 const SOURCE_ID = "mbtiles";
 
-const DATASETS = [{id: "munich-maptiler", label: "Munich"}, {id: "ny-maptiler", label: "New York"}, {
-    id: "germany-rs", label: "Germany"
-}, {id: "munich-overture", label: "Munich Overture"}, {
-    id: "munich-buildings-unmerged", label: "Munich Buildings Unmerged"
-},];
+const DATASETS = [{id: "munich-plantiler", label: "Munich Plantiler"},
+    {id: "germany-rs", label: "Germany"},
+    {id: "munich-overture", label: "Munich Overture"},
+    {id: "bayern", label: "Bayern Plantiler"},];
 
 function currentDataset(): string {
     const id = new URLSearchParams(window.location.search).get("dataset");

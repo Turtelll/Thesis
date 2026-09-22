@@ -106,11 +106,38 @@ directory explicitly to run on a different extraction: `./gradlew benchmark
 | `--csv <file>` | no | Also dump per-buffer sizes (one column per encoding) |
 | `--layer <name>` | no | Restrict the run to one layer |
 | `--verbose` | no | Full per-encoding tables instead of the compact winner-only table |
+| `--segmented` | no | Also measure the segmentation add-on (`Baselines.segmented()`) |
+| `--reorder <feature\|feature-rev>` | no | Also measure every selected row with geometry reordering applied |
 
-There is no `--reorder` flag: reordering is the third component of an encoding's
-`(transform, codec, reorder)` triple (see "Adding an encoding" below), so it is selected
-by which registered encoding's row you read, not by a benchmark-wide switch — the
-baselines are never reordered, and neither is any encoding unless its own row says so.
+rANS-based encodings are registered in `Baselines` (so `./gradlew test` still round-trips
+them) but are filtered out of every benchmark run — rANS is retired as a research
+direction (not spec-compatible, does not combine with gzip). The header names the
+omission (`set: core -rans`).
+
+Every run also prints a corpus-wide gzip table unconditionally: each selected encoding's
+payload bytes, concatenated across the corpus and gzipped once, raw vs gzipped vs ratio.
+Gzip is the browser-native compressor applied on top of whatever this harness ships, so
+it is a standing column rather than an opt-in check.
+
+### Add-ons are separate runs
+
+A default run measures the baselines and `Baselines.core()` — the encoding ideas themselves,
+interleaved and in the buffer's original order. **Segmentation and reordering are add-ons, and
+they are opt-in for a reason:** both lift almost any encoding, so a number that has either baked
+in does not say whether the encoding idea is good.
+
+- **Segmentation** (`--segmented`) groups residuals into per-class regions. It only pays under a
+  codec that prices a block's maximum (FastPFOR); under Varint it is byte-identical to the
+  unsegmented row, and under rANS it is worth about one byte per buffer.
+- **Reordering** (`--reorder`) is a pre-pass on the buffer, not an encoding. It is not always
+  available: some cases need the original feature order preserved, and property encoding may want
+  to sort the feature table by something else.
+
+Each flag *adds* rows rather than replacing them, so the add-on's row and its plain original sit
+in the same table and the difference between them is the add-on's contribution. The header line
+names the set (`set: core +segmented +reorder feature-rev`) so a pasted table cannot be mistaken
+for a default run. Never cite an add-on row as evidence that the core encoding is better — compare
+core against core first, then report the add-on separately.
 
 Prints corpus totals, then a breakdown by layer and by dominant geometry type. Each
 encoding is shown as a percentage against the **best baseline for that group**, so a
@@ -131,7 +158,17 @@ housenumber              244       735.180     base       849.969   +15,6%
 
 Negative means smaller, which is the goal.
 
-After the layer and geometry breakdowns, an `--- encoding potential (FeatureTable wins)
+After the layer and geometry breakdowns, a `--- residual bits ---` table reports mean
+zigzag residual bit width per **transform** (codec-independent — `QUAD_CORNER_VARINT`,
+`QUAD_CORNER_RANS` and `QUAD_CORNER_FASTPFOR` share one transform and collapse onto one
+`QUAD_CORNER` row), against the plain `DELTA_ZIGZAG` transform. This is the current
+research target: lower average residuals. Read it as a headroom signal, not a result — a
+transform can narrow the mean while widening the tail, which a block-max codec
+(FastPFOR) prices as no win at all until segmentation exposes it (see
+`docs/evaluation-protocol.md`). Whether a residual win reaches the tile is answered by
+the byte tables, not this one.
+
+After that, an `--- encoding potential (FeatureTable wins)
 ---` table lists every registered encoding with how many buffers (FeatureTable instances)
 it is the smallest encoding on, corpus-wide, and the bytes saved against each won buffer's
 best baseline. Every encoding gets a row, including `0`-win ones — that is the signal to
@@ -142,6 +179,7 @@ by a byte each).
 With `--reorder`, every buffer is additionally checked for geometry preservation before it is
 encoded: reordering may change the order and nothing else, so the multiset of parts must be
 unchanged (parts compared up to reversal). The run fails naming the tile and layer otherwise.
+This is `GeometryEquivalence`, and it applies to any encoding declaring `reordersGeometries()`.
 
 Every run **round-trips every encoding on every buffer** — encode, decode, compare
 against the extraction — and fails naming the encoding, tile and layer if any does not
@@ -170,15 +208,18 @@ would make even a codec that discards the buffer round-trip successfully.
    `geometryTypes`) alongside the vertices, for encodings with structural reset points
    (the predictors in `ideen.md`) to condition on.
 
-2. **Register it** — one line in `Baselines.research()`.
+2. **Register it** — one line in `Baselines.core()`, interleaved and unreordered. If it is a
+   `ClassifiedPredictor` whose win may depend on region packing, add a second line in
+   `Baselines.segmented()` for its `_SEG` variant. Never register a reordered row: `--reorder`
+   produces those from whatever is already selected.
 
 3. **Run the benchmark.** Your encoding appears as a new column in every table, and is
    round-tripped over the whole corpus automatically. `VertexBufferCodecTest`
    parameterizes over `Baselines.all()`, so `./gradlew test` covers it too without a
    new test method.
 
-With `research()` empty the run reports the two baselines only — the null result that
-shows the harness works before any new encoding is judged by it. See
+With `core()` and `segmented()` empty the run reports the two baselines only — the null result
+that shows the harness works before any new encoding is judged by it. See
 [`docs/results/`](docs/results/README.md) for what the currently registered encodings do
 and for the ones that were measured and rejected.
 
@@ -187,8 +228,8 @@ and for the ones that were measured and rejected.
 **Zero FeatureTable wins, or wins with negligible bytes saved, means demote now** — do not
 leave a dead encoding registered. There is no tooling for this; it is four manual steps:
 
-1. Delete its line(s) from `Baselines.research()`. This alone drops it from the benchmark
-   and from `VertexBufferCodecTest`, which parameterizes over `Baselines.all()`.
+1. Delete its line(s) from `Baselines.core()` and `Baselines.segmented()`. This alone drops it
+   from the benchmark and from `VertexBufferCodecTest`, which parameterizes over `Baselines.all()`.
 2. Move the class to `encoding/research/failed/` and fix its `package` line. `Baselines`
    imports `...encoding.research.*`, so the wildcard no longer reaches it there.
 3. Move its `*MechanismTest.java` to the matching `test/.../research/failed/` package. The

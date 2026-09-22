@@ -16,11 +16,10 @@ const MVT_DIR = path.resolve(__dirname, "..", "..", "..", "data", "MVT");
 const PUBLIC_DIR = path.resolve(__dirname, "..", "public");
 
 const DATASETS: Record<string, string> = {
-    "munich-maptiler": path.join(MVT_DIR, "munich-maptiler.mbtiles"),
+    "bayern": path.join(MVT_DIR, "bayern.mbtiles"),
+    "munich-plantiler": path.join(MVT_DIR, "munich-plantiler.mbtiles"),
     "germany-rs": path.join(MVT_DIR, "germany-rs.mbtiles"),
-    "ny-maptiler": path.join(MVT_DIR, "NY-maptiler.mbtiles"),
     "munich-overture": path.join(MVT_DIR, "munich-overture.mbtiles"),
-    "munich-buildings-unmerged": path.join(MVT_DIR, "munich-buildings-unmerged.mbtiles"),
 };
 const DEFAULT_DATASET = "munich-maptiler";
 

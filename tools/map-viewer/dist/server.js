@@ -18,11 +18,10 @@ const PORT = Number(process.env.PORT) || 5173;
 const MVT_DIR = node_path_1.default.resolve(__dirname, "..", "..", "..", "data", "MVT");
 const PUBLIC_DIR = node_path_1.default.resolve(__dirname, "..", "public");
 const DATASETS = {
-    "munich-maptiler": node_path_1.default.join(MVT_DIR, "munich-maptiler.mbtiles"),
+    "bayern": node_path_1.default.join(MVT_DIR, "bayern.mbtiles"),
+    "munich-plantiler": node_path_1.default.join(MVT_DIR, "munich-plantiler.mbtiles"),
     "germany-rs": node_path_1.default.join(MVT_DIR, "germany-rs.mbtiles"),
-    "ny-maptiler": node_path_1.default.join(MVT_DIR, "NY-maptiler.mbtiles"),
     "munich-overture": node_path_1.default.join(MVT_DIR, "munich-overture.mbtiles"),
-    "munich-buildings-unmerged": node_path_1.default.join(MVT_DIR, "munich-buildings-unmerged.mbtiles"),
 };
 const DEFAULT_DATASET = "munich-maptiler";
 const dbs = Object.fromEntries(Object.entries(DATASETS).map(([id, file]) => [id, new better_sqlite3_1.default(file, {
