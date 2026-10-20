@@ -15,36 +15,24 @@ import org.locationtech.jts.geom.LinearRing;
 import org.locationtech.jts.geom.Polygon;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
-import org.maplibre.mlt.research.encoding.research.GeometryReorder;
-import org.maplibre.mlt.research.encoding.research.ReorderedEncoding;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
+import org.maplibre.mlt.research.workshop.Workshop;
 
 /**
  * Round-trips real extracted vertex buffers through every registered encoding and compares against
  * the original MVT extraction, per the thesis testing convention (encode, decode, compare).
  *
- * <p>Parameterized over {@link Baselines#all()}, so an encoding added to {@code Baselines.core()}
- * or {@code Baselines.segmented()} is covered here without writing a new test.
+ * <p>Parameterized over {@link Baselines#all()} and {@link Workshop#encodings()}, so an idea added
+ * to either is covered here without writing a new test.
  */
 class VertexBufferCodecTest {
 
   private static final GeometryFactory GF = new GeometryFactory();
 
-  /**
-   * Every registered encoding, each also wrapped in both reorder modes.
-   *
-   * <p>Reordering is applied benchmark-wide rather than registered, so without the wrapping here
-   * nothing would round-trip {@link ReorderedEncoding} at all — and it is the component whose
-   * decode path differs most from its encode path (the decoder never sees the original order, only
-   * the rebuilt topology streams).
-   */
   private static List<Encoding> everyEncoding() {
-    var encodings = new ArrayList<Encoding>(Baselines.all());
-    for (var encoding : Baselines.all()) {
-      encodings.add(new ReorderedEncoding(encoding, GeometryReorder.FEATURE));
-      encodings.add(new ReorderedEncoding(encoding, GeometryReorder.FEATURE_REV));
-    }
-    return encodings;
+    var all = new ArrayList<Encoding>(Baselines.all());
+    all.addAll(Workshop.encodings());
+    return all;
   }
 
   /** A context carrying the real topology streams, as {@code BenchmarkCli} builds from a sidecar. */

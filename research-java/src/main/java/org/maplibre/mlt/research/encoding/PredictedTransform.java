@@ -38,6 +38,11 @@ public final class PredictedTransform implements VertexTransform {
     }
 
     @Override
+    public boolean vertexAligned() {
+        return layout == Layout.INTERLEAVED;
+    }
+
+    @Override
     public int[] apply(BufferContext ctx) {
         final var vertices = ctx.vertices();
         final var classes = predictor.classify(ctx, vertices.size());

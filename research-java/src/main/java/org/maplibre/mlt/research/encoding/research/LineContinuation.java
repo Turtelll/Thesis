@@ -37,14 +37,15 @@ import java.util.List;
 public final class LineContinuation implements ClassifiedPredictor {
 
     // INTERIOR is 0 so the default-zeroed class array already means "interior".
-    private static final int INTERIOR = 0;
-    private static final int START = 1;
-    private static final int LINE_INTERIOR = 2;
+    static final int INTERIOR = 0;
+    static final int START = 1;
+    static final int LINE_INTERIOR = 2;
 
     // Below this run length, continuation measured a regression (2 verts: no interior vertex
-    // exists; 3 verts: +1,13% mean bits) — see docs/results/line-continuation.md. Runs shorter
-    // than this fall back to plain delta on every vertex, exactly like a non-line run.
-    private static final int MIN_LINE_RUN_LENGTH = 4;
+    // exists; 3 verts: +1,13% mean bits; 4-5 verts: -0,2% Munich but +9,7% Chicago) — see
+    // docs/results/line-continuation.md. Runs shorter than this fall back to plain delta on every
+    // vertex, exactly like a non-line run.
+    private static final int MIN_LINE_RUN_LENGTH = 6;
 
     @Override
     public String name() {

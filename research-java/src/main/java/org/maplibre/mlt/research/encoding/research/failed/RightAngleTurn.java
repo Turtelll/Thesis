@@ -112,6 +112,23 @@ public final class RightAngleTurn implements Encoding {
         return new Transformed(values, turns);
     }
 
+    /** The interleaved residual stream {@link #encode} hands the codec; the direction bits are not in it. */
+    public int[] residuals(BufferContext ctx) {
+        final var vertices = ctx.vertices();
+        return transform(vertices, classify(PartBoundaries.of(ctx, vertices.size()), vertices.size())).values();
+    }
+
+    /** Number of turn-direction bits {@link #encode} signals besides the residuals. */
+    public int turnBits(BufferContext ctx) {
+        var bits = 0;
+        for (final var turn : classify(PartBoundaries.of(ctx, ctx.vertices().size()), ctx.vertices().size())) {
+            if (turn) {
+                bits++;
+            }
+        }
+        return bits;
+    }
+
     @Override
     public List<Vertex> decode(EncodedBuffer encoded, BufferContext ctx, int vertexCount) {
         final var isTurn = classify(PartBoundaries.of(ctx, vertexCount), vertexCount);

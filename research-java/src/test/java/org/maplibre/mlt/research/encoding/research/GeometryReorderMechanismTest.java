@@ -231,4 +231,68 @@ class GeometryReorderMechanismTest {
     assertEquals(List.of(2), reordered.numGeometries(), "the multi count travels with its feature");
     assertEquals(ctx.geometryTypes().size(), reordered.geometryTypes().size());
   }
+
+  // --- canonical ring start -----------------------------------------------
+
+  /**
+   * Two translated copies of one L-shaped ring, the second starting two corners later. Canonical
+   * start must make both rings' internal deltas identical, which is the whole point for an LZ77
+   * stage — and must stay a rotation, never a reversal, so winding is kept.
+   */
+  @Test
+  void canonicalStartMakesTranslatedCopiesEmitTheSameDeltas() {
+    final var ctx =
+        new BufferContext(
+            List.of(
+                new Vertex(10, 0), new Vertex(10, 5), new Vertex(5, 5),
+                new Vertex(5, 10), new Vertex(0, 10), new Vertex(0, 0),
+                // the same ring shifted by (100, 100), starting at its third vertex
+                new Vertex(105, 105), new Vertex(105, 110), new Vertex(100, 110),
+                new Vertex(100, 100), new Vertex(110, 100), new Vertex(110, 105)),
+            List.of(2, 2),
+            List.of(),
+            List.of(1, 1),
+            List.of(6, 6));
+
+    final var canonical = GeometryReorder.RING_CANONICAL.apply(ctx);
+    assertTrue(GeometryEquivalence.holds(ctx, canonical));
+    final var vertices = canonical.vertices();
+    assertEquals(new Vertex(0, 0), vertices.get(0));
+    assertEquals(new Vertex(100, 100), vertices.get(6));
+    for (var i = 1; i < 6; i++) {
+      assertEquals(vertices.get(i).x() - vertices.get(i - 1).x(), vertices.get(6 + i).x() - vertices.get(5 + i).x());
+      assertEquals(vertices.get(i).y() - vertices.get(i - 1).y(), vertices.get(6 + i).y() - vertices.get(5 + i).y());
+    }
+    // A rotation keeps the successor of the start vertex: (0,0) was followed by (10,0) before.
+    assertEquals(new Vertex(10, 0), vertices.get(1));
+  }
+
+  /**
+   * Rotation runs first, so the chain sees the emitted ring starts: the far ring (starting at its
+   * smallest vertex (100,100)) is placed after the near one, whose canonical start is (0,0), and
+   * every ring in the result starts at its smallest vertex.
+   */
+  @Test
+  void canonicalThenFeatureChainsOverTheRotatedStarts() {
+    final var ctx =
+        new BufferContext(
+            List.of(
+                // far ring first, starting at its third vertex
+                new Vertex(105, 105), new Vertex(105, 110), new Vertex(100, 110),
+                new Vertex(100, 100), new Vertex(110, 100), new Vertex(110, 105),
+                // near ring
+                new Vertex(10, 0), new Vertex(10, 5), new Vertex(5, 5),
+                new Vertex(5, 10), new Vertex(0, 10), new Vertex(0, 0)),
+            List.of(2, 2),
+            List.of(),
+            List.of(1, 1),
+            List.of(6, 6));
+
+    final var combined = GeometryReorder.RING_CANONICAL_THEN_FEATURE.apply(ctx);
+    assertTrue(GeometryEquivalence.holds(ctx, combined));
+    final var vertices = combined.vertices();
+    assertEquals(new Vertex(0, 0), vertices.get(0), "nearest start to the origin goes first");
+    assertEquals(new Vertex(100, 100), vertices.get(6));
+    assertEquals("_RING_CANONICAL_REORDER", GeometryReorder.RING_CANONICAL_THEN_FEATURE.nameSuffix());
+  }
 }

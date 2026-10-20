@@ -76,14 +76,16 @@ public final class VertexBufferCodec implements Encoding {
 
     @Override
     public EncodedBuffer encode(BufferContext ctx) {
-        final var payload = codec.encode(transform.apply(ctx));
+        final var values = transform.apply(ctx);
+        final var payload = codec.encode(values);
         return new EncodedBuffer(
-                payload, StreamMetadata.bytes(ctx.vertices().size() * 2, payload.length));
+                payload, StreamMetadata.bytes(values.length, payload.length));
     }
 
     @Override
     public List<Vertex> decode(EncodedBuffer encoded, BufferContext ctx, int vertexCount) {
-        return transform.invert(codec.decode(encoded.payload(), vertexCount * 2), ctx);
+        return transform.invert(
+                codec.decode(encoded.payload(), transform.valueCount(ctx, vertexCount)), ctx);
     }
 
     /**

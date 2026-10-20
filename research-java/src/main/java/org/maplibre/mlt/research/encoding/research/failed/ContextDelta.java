@@ -329,9 +329,10 @@ public final class ContextDelta implements Encoding {
      * and a cursor into the run starts. All arithmetic is integer with fixed semantics — {@code
      * cross}/{@code dot} in {@code long} to survive full-extent coordinates, and the edge mean by
      * truncating division applied identically on both sides. {@code ideen.md} names this the
-     * conformance point where implementations diverge, which is why there is exactly one copy of it.
+     * conformance point where implementations diverge, which is why there is exactly one copy of it
+     * — the workshop's interleaved {@code CONTEXT_DELTA} drives this same class.
      */
-    private static final class State {
+    public static final class State {
 
         private final int[] starts;
         private final int turnShift;
@@ -348,7 +349,7 @@ public final class ContextDelta implements Encoding {
         private int lastY;
         private boolean hasLast;
 
-        State(int[] starts, int turnShift, int maxContext, int missThreshold) {
+        public State(int[] starts, int turnShift, int maxContext, int missThreshold) {
             this.starts = starts;
             this.turnShift = turnShift;
             this.maxContext = maxContext;
@@ -360,15 +361,15 @@ public final class ContextDelta implements Encoding {
         /**
          * The context of the vertex about to be coded — valid before it is decoded.
          */
-        int context() {
+        public int context() {
             return Math.min(run, maxContext);
         }
 
-        int meanEdgeX(int c) {
+        public int meanEdgeX(int c) {
             return mean(edgeX, c);
         }
 
-        int meanEdgeY(int c) {
+        public int meanEdgeY(int c) {
             return mean(edgeY, c);
         }
 
@@ -412,7 +413,7 @@ public final class ContextDelta implements Encoding {
          * decoder state — and it is the only mechanism here that reacts to a turn at the vertex where
          * the turn actually costs something.
          */
-        void advance(int i, int x, int y) {
+        public void advance(int i, int x, int y) {
             // Run starts arrive in ascending order, so a single cursor suffices.
             while (startCursor < starts.length && starts[startCursor] < i) {
                 startCursor++;
@@ -459,7 +460,7 @@ public final class ContextDelta implements Encoding {
          * <p>Both halves call this with the same residual: the encoder has it directly, the decoder has
          * it from the value it just read. So the feedback is symmetric and nothing is signalled.
          */
-        void penalise(int codedContext, int residualX, int residualY) {
+        public void penalise(int codedContext, int residualX, int residualY) {
             /* Only a prediction that actually used history can have mispredicted. A context-0 residual is
              * a plain delta -- an ordinary edge length, routinely far wider than this threshold -- so
              * judging it here would collapse the run at every run start and degenerate the whole encoding

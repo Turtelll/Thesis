@@ -74,7 +74,7 @@ public final class MidpointReflect implements VertexTransform {
 
     @Override
     public String name() {
-        return "MIDPOINT_REFLECT";
+        return "MIDPOINT_REFLECT_" + pairing.name();
     }
 
     @Override

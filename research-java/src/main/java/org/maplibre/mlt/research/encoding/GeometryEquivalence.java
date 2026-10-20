@@ -47,12 +47,14 @@ public final class GeometryEquivalence {
             return false;
         }
 
+        final var ringsBefore = ringRuns(original, before.size());
+        final var ringsAfter = ringRuns(reordered, after.size());
         final var counts = new HashMap<List<Vertex>, Integer>();
-        for (final var part : before) {
-            counts.merge(canonical(part), 1, Integer::sum);
+        for (var i = 0; i < before.size(); i++) {
+            counts.merge(canonical(before.get(i), ringsBefore[i]), 1, Integer::sum);
         }
-        for (final var part : after) {
-            final var key = canonical(part);
+        for (var i = 0; i < after.size(); i++) {
+            final var key = canonical(after.get(i), ringsAfter[i]);
             final var remaining = counts.get(key);
             if (remaining == null) {
                 return false;
@@ -104,13 +106,68 @@ public final class GeometryEquivalence {
     }
 
     /**
-     * A part and its reversal share one key, so reversal compares equal while any other permutation
-     * of the same vertices does not.
+     * Per part, whether it is a polygon ring; all {@code false} (strict) if not derivable.
      */
-    private static List<Vertex> canonical(List<Vertex> part) {
+    private static boolean[] ringRuns(BufferContext ctx, int runCount) {
+        final var isLine = PartBoundaries.lineRuns(ctx, runCount);
+        final var isRing = new boolean[runCount];
+        if (isLine != null) {
+            for (var i = 0; i < runCount; i++) {
+                isRing[i] = !isLine[i];
+            }
+        }
+        return isRing;
+    }
+
+    /**
+     * A part and its reversal share one key, so reversal compares equal while any other permutation
+     * of the same vertices does not. A polygon ring additionally shares its key with every cyclic
+     * rotation — a ring has no distinguished start vertex, so rotating it is not a deformation.
+     */
+    private static List<Vertex> canonical(List<Vertex> part, boolean ring) {
         final var reversed = new ArrayList<>(part);
         java.util.Collections.reverse(reversed);
-        return compare(part, reversed) <= 0 ? part : List.copyOf(reversed);
+        if (!ring) {
+            return compare(part, reversed) <= 0 ? part : List.copyOf(reversed);
+        }
+        final var best = minRotation(part);
+        final var bestReversed = minRotation(reversed);
+        return compare(best, bestReversed) <= 0 ? best : bestReversed;
+    }
+
+    /**
+     * The lexicographically smallest cyclic rotation; only rotations starting at the minimal vertex
+     * are candidates, so this stays near-linear.
+     */
+    private static List<Vertex> minRotation(List<Vertex> part) {
+        final var min = part.get(indexOfMin(part));
+        List<Vertex> best = null;
+        for (var s = 0; s < part.size(); s++) {
+            if (compareVertex(part.get(s), min) != 0) {
+                continue;
+            }
+            final var candidate = new ArrayList<Vertex>(part.size());
+            candidate.addAll(part.subList(s, part.size()));
+            candidate.addAll(part.subList(0, s));
+            if (best == null || compare(candidate, best) < 0) {
+                best = candidate;
+            }
+        }
+        return best == null ? part : List.copyOf(best);
+    }
+
+    private static int indexOfMin(List<Vertex> part) {
+        var min = 0;
+        for (var i = 1; i < part.size(); i++) {
+            if (compareVertex(part.get(i), part.get(min)) < 0) {
+                min = i;
+            }
+        }
+        return min;
+    }
+
+    private static int compareVertex(Vertex left, Vertex right) {
+        return left.x() != right.x() ? Integer.compare(left.x(), right.x()) : Integer.compare(left.y(), right.y());
     }
 
     private static int compare(List<Vertex> a, List<Vertex> b) {

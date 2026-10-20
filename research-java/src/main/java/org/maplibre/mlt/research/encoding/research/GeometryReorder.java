@@ -1,5 +1,6 @@
 package org.maplibre.mlt.research.encoding.research;
 
+import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
@@ -58,10 +59,39 @@ public final class GeometryReorder {
      */
     public static final GeometryReorder FEATURE_REV = new GeometryReorder(Mode.FEATURE_REV);
 
+    /**
+     * Keeps feature order, but starts every four-vertex polygon ring at the vertex that minimises
+     * the zigzag bits of its start delta, two interior deltas and parallelogram-corner residual.
+     * Rotation keeps winding, so ring orientation is unchanged; chosen greedily in buffer order.
+     * Probe: {@code QuadRotationCli}.
+     */
+    public static final GeometryReorder RING_ROTATE = new GeometryReorder(Mode.RING_ROTATE);
+
+    /**
+     * Keeps feature order, but starts every polygon ring at its smallest vertex (lowest x, then
+     * lowest y), so two translated copies of one shape start at the same corner and emit
+     * byte-identical residual strings — repeats a general-purpose compressor's LZ77 stage can match,
+     * where two different start corners give rotations of one string. Winding is kept, and needs no
+     * canonicalizing: the MVT spec already fixes it per ring role.
+     */
+    public static final GeometryReorder RING_CANONICAL = new GeometryReorder(Mode.RING_CANONICAL);
+
+    /**
+     * {@link #RING_CANONICAL} first, then feature chaining over the rotated rings, so the chain
+     * follows the endpoints that are actually emitted. Chaining first and rotating afterwards was
+     * measured too and is slightly larger on the whole tileset (see {@code
+     * docs/results/revisit-varint-split.md}).
+     */
+    public static final GeometryReorder RING_CANONICAL_THEN_FEATURE =
+            new GeometryReorder(Mode.RING_CANONICAL_THEN_FEATURE);
+
     private enum Mode {
         NONE("", false),
         FEATURE("_REORDER", false),
-        FEATURE_REV("_REORDER_REV", true);
+        FEATURE_REV("_REORDER_REV", true),
+        RING_ROTATE("_RING_ROTATE", false),
+        RING_CANONICAL("_RING_CANONICAL", false),
+        RING_CANONICAL_THEN_FEATURE("_RING_CANONICAL_REORDER", false);
 
         private final String suffix;
         private final boolean allowReversal;
@@ -129,12 +159,21 @@ public final class GeometryReorder {
         if (mode == Mode.NONE) {
             return ctx;
         }
+        if (mode == Mode.RING_CANONICAL_THEN_FEATURE) {
+            return FEATURE.apply(RING_CANONICAL.apply(ctx));
+        }
         final var vertices = ctx.vertices();
         final var starts = PartBoundaries.of(ctx, vertices.size());
         // A single whole-buffer run is PartBoundaries' documented "I cannot locate the boundaries"
         // answer, not a one-part buffer worth reordering.
         if (starts.length < 2) {
             return ctx;
+        }
+        if (mode == Mode.RING_ROTATE) {
+            return rotateQuads(ctx, vertices, starts);
+        }
+        if (mode == Mode.RING_CANONICAL) {
+            return canonicalRings(ctx, vertices, starts);
         }
 
         final var groups = featureGroups(ctx, starts.length);
@@ -145,6 +184,93 @@ public final class GeometryReorder {
         final var lengths = runLengths(starts, vertices.size());
         final var order = greedyChain(vertices, starts, lengths, groups);
         return rebuild(ctx, vertices, starts, lengths, groups, order);
+    }
+
+    // --- ring rotation ------------------------------------------------------
+
+    /**
+     * Rotates each four-vertex polygon ring in place; line runs and topology streams are untouched.
+     */
+    private static BufferContext rotateQuads(BufferContext ctx, List<Vertex> vertices, int[] starts) {
+        final var isLine = PartBoundaries.lineRuns(ctx, starts.length);
+        if (isLine == null) {
+            return ctx;
+        }
+        final var rotated = new ArrayList<>(vertices);
+        var prev = new Vertex(0, 0);
+        for (var i = 0; i < starts.length; i++) {
+            final var start = starts[i];
+            final var end = i + 1 < starts.length ? starts[i + 1] : vertices.size();
+            if (!isLine[i] && end - start == 4) {
+                var best = 0;
+                var bestCost = Integer.MAX_VALUE;
+                for (var k = 0; k < 4; k++) {
+                    final var cost = quadCost(vertices, start, k, prev);
+                    if (cost < bestCost) {
+                        bestCost = cost;
+                        best = k;
+                    }
+                }
+                for (var v = 0; v < 4; v++) {
+                    rotated.set(start + v, vertices.get(start + (best + v) % 4));
+                }
+            }
+            prev = rotated.get(end - 1);
+        }
+        return new BufferContext(
+                rotated, ctx.geometryTypes(), ctx.numGeometries(), ctx.numParts(), ctx.numRings());
+    }
+
+    /**
+     * Rotates every polygon ring in place to start at its smallest vertex; line runs and topology
+     * streams are untouched. Ties (a repeated smallest position) keep the first occurrence.
+     */
+    private static BufferContext canonicalRings(BufferContext ctx, List<Vertex> vertices, int[] starts) {
+        final var isLine = PartBoundaries.lineRuns(ctx, starts.length);
+        if (isLine == null) {
+            return ctx;
+        }
+        final var rotated = new ArrayList<>(vertices);
+        for (var i = 0; i < starts.length; i++) {
+            final var start = starts[i];
+            final var end = i + 1 < starts.length ? starts[i + 1] : vertices.size();
+            final var n = end - start;
+            if (isLine[i] || n < 3) {
+                continue;
+            }
+            var min = 0;
+            for (var k = 1; k < n; k++) {
+                final var candidate = vertices.get(start + k);
+                final var best = vertices.get(start + min);
+                if (candidate.x() < best.x() || (candidate.x() == best.x() && candidate.y() < best.y())) {
+                    min = k;
+                }
+            }
+            for (var v = 0; v < n; v++) {
+                rotated.set(start + v, vertices.get(start + (min + v) % n));
+            }
+        }
+        return new BufferContext(
+                rotated, ctx.geometryTypes(), ctx.numGeometries(), ctx.numParts(), ctx.numRings());
+    }
+
+    /**
+     * Zigzag bits of the quad decoded from rotation {@code k}: start delta, two interior deltas,
+     * parallelogram-corner residual.
+     */
+    private static int quadCost(List<Vertex> vertices, int start, int k, Vertex prev) {
+        final var a = vertices.get(start + k);
+        final var b = vertices.get(start + (k + 1) % 4);
+        final var c = vertices.get(start + (k + 2) % 4);
+        final var d = vertices.get(start + (k + 3) % 4);
+        return bits(a.x() - prev.x()) + bits(a.y() - prev.y())
+                + bits(b.x() - a.x()) + bits(b.y() - a.y())
+                + bits(c.x() - b.x()) + bits(c.y() - b.y())
+                + bits(d.x() - (a.x() + c.x() - b.x())) + bits(d.y() - (a.y() + c.y() - b.y()));
+    }
+
+    private static int bits(int value) {
+        return 32 - Integer.numberOfLeadingZeros(EncodingUtils.encodeZigZag(value));
     }
 
     // --- feature grouping ---------------------------------------------------

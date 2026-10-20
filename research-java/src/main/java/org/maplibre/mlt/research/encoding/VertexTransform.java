@@ -1,5 +1,6 @@
 package org.maplibre.mlt.research.encoding;
 
+import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.converter.encodings.GeometryEncoder;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.decoder.DecodingUtils;
@@ -24,6 +25,23 @@ public interface VertexTransform {
      * so the two derive identical run boundaries.
      */
     int[] apply(BufferContext ctx);
+
+    /**
+     * Length of the stream {@link #apply} produces, derivable from topology alone so a decoder
+     * knows how many values to unpack. Two per vertex unless a transform stores extra values.
+     */
+    default int valueCount(BufferContext ctx, int vertexCount) {
+        return vertexCount * 2;
+    }
+
+    /**
+     * Whether values {@code 2i} and {@code 2i + 1} of {@link #apply} belong to vertex {@code i}, so
+     * a residual can be paired with another transform's residual for the same vertex. False for a
+     * layout that permutes the slots, e.g. {@link Layout#SEGMENTED}.
+     */
+    default boolean vertexAligned() {
+        return true;
+    }
 
     /**
      * The inverse of {@link #apply}. {@code ctx} carries the topology streams for transforms that
@@ -59,6 +77,54 @@ public interface VertexTransform {
                 vertices.add(new Vertex(x, y));
                 prevX = x;
                 prevY = y;
+            }
+            return vertices;
+        }
+    }
+
+    /**
+     * Componentwise delta of the deltas + zigzag, continuous across the whole buffer with both
+     * predecessors starting at zero — a port of upstream Rust {@code encode_componentwise_delta2_vec2s}
+     * (maplibre-tile-spec 7f56208b, v2 {@code Vertex} logical encoding {@code ComponentwiseDelta2}).
+     * Unlike {@code LINE_CONTINUATION} it is not gated by geometry type or run length and does not
+     * reset at part boundaries.
+     */
+    final class ZigZagDelta2 implements VertexTransform {
+
+        @Override
+        public String name() {
+            return "DELTA2_ZIGZAG";
+        }
+
+        @Override
+        public int[] apply(BufferContext ctx) {
+            var vertices = ctx.vertices();
+            var values = new int[vertices.size() * 2];
+            int prevX = 0, prevY = 0, prevDx = 0, prevDy = 0;
+            for (int i = 0; i < vertices.size(); i++) {
+                var v = vertices.get(i);
+                int dx = v.x() - prevX;
+                int dy = v.y() - prevY;
+                values[2 * i] = EncodingUtils.encodeZigZag(dx - prevDx);
+                values[2 * i + 1] = EncodingUtils.encodeZigZag(dy - prevDy);
+                prevX = v.x();
+                prevY = v.y();
+                prevDx = dx;
+                prevDy = dy;
+            }
+            return values;
+        }
+
+        @Override
+        public List<Vertex> invert(int[] values, BufferContext ctx) {
+            var vertices = new ArrayList<Vertex>(values.length / 2);
+            int x = 0, y = 0, dx = 0, dy = 0;
+            for (int i = 0; i < values.length; i += 2) {
+                dx += DecodingUtils.decodeZigZag(values[i]);
+                dy += DecodingUtils.decodeZigZag(values[i + 1]);
+                x += dx;
+                y += dy;
+                vertices.add(new Vertex(x, y));
             }
             return vertices;
         }

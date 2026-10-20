@@ -31,9 +31,9 @@ import java.util.List;
 public final class SegmentQuadCorner implements ClassifiedPredictor {
 
     // INTERIOR is 0 so the default-zeroed class array already means "interior".
-    private static final int INTERIOR = 0;
-    private static final int START = 1;
-    private static final int CORNER = 2;
+    static final int INTERIOR = 0;
+    static final int START = 1;
+    static final int CORNER = 2;
 
     @Override
     public String name() {
