@@ -1,5 +1,7 @@
 # Upstream `ComponentwiseDelta2` (Rust, maplibre-tile-spec #1806) — `DELTA2_ZIGZAG`
 
+> **Consolidation note.** The Gradle task(s) benchmark named below were removed from the build (the code is at git tag `pre-consolidation`); `research measure` and the other `research` commands replace the rest. The numbers below are unchanged history.
+
 > **Revisited under split varints:** `DELTA2_ZIGZAG_VARINT_SPLIT` is +8,93% whole tileset
 > (smallest of gzip/Brotli/zstd), worse than the baseline on every layer. See
 > [revisit-varint-split.md](../revisit-varint-split.md).

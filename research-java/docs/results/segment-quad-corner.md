@@ -1,5 +1,7 @@
 # Composing SegmentPair and QuadCorner — `SEGMENT_QUAD_CORNER_FASTPFOR`
 
+> **Consolidation note.** The Gradle task(s) quadCornerResidual named below were removed from the build (the code is at git tag `pre-consolidation`); `research measure` and the other `research` commands replace the rest. The numbers below are unchanged history.
+
 **Status:** registered — the single best encoding on the whole corpus (before rANS, see
 [rans-entropy-coder.md](rans-entropy-coder.md))
 **Effect:** -6,1% corpus / -12,2% building

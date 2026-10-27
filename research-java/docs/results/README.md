@@ -1,5 +1,7 @@
 # Results index
 
+> **Consolidation note.** The Gradle task(s) benchmark named below were removed from the build (the code is at git tag `pre-consolidation`); `research measure` and the other `research` commands replace the rest. The numbers below are unchanged history.
+
 > All figures in these files were measured on a **retired corpus** unless a file says
 > otherwise — either `munich.mbtiles` (OpenMapTiles v3.11, planet time 2020-02-10, 8.366
 > buffers, ~1.355 low-zoom **world mask** tiles taking 63% of its vertex mass) or the
@@ -71,18 +73,25 @@ features over the rotated starts (`QUAD_CORNER_SHARED_RING_CANONICAL_REORDER`) i
 tileset row: -9,50% against -9,39% for `QUAD_CORNER_SHARED_REORDER`, -13,79% on `building`:
 [revisit-varint-split.md](revisit-varint-split.md).
 
-The best row since then is the frame prior composed with that reorder,
-`QUAD_CORNER_SHARED_FRAME_RING_CANONICAL_REORDER`: -8,19% gzip / -15,21% Brotli / -9,92% zstd per
-tile against `DELTA_ZIGZAG_VARINT`, -13,35% gzip on `building`:
-[orientation-prior.md](orientation-prior.md). The frame is also a predictor of the separate pipeline
+The best single row is now the pipeline's, the frame prior with shared references,
+`PIPE_HILBERT_CENTROID_ROT_MP_QUAD_CORNER_SHARED_FRAME_CLASS_ZIGZAG_ESCAPE_PLANES`: **-9,95% gzip /
+-15,97% Brotli / -11,68% zstd** per tile (every column against the smaller baseline's gzip, 11.237.124 B,
+the benchmark's convention; geometry buffers, 4.368 buffers of `munich-plantiler`). It replaced the old
+`QUAD_CORNER_SHARED_FRAME_RING_CANONICAL_REORDER` row (-8,19% gzip / -15,21% Brotli / -9,92% zstd,
+-13,35% gzip on `building`: [orientation-prior.md](orientation-prior.md)), which no longer exists as code
+(it is at git tag `pre-consolidation`); the pipeline row is 198.207 B smaller on gzip. The frame is also a predictor of the pipeline
 (`Prediction.QUAD_CORNER_FRAME`, `--step frame`): on `building` with `HILBERT_CENTROID_ROT_MP`, class
 streams and escape width it takes the layer's composition from -9,20% to -12,69% gzip, -13,61% to
 -19,80% Brotli, -10,41% to -15,36% zstd, and it is now `forLayer("building")`, and since
 `--step framelayers` also of `landcover`, `landuse` and `aeroway` (a win under all three backends; `water`,
-`boundary`, `park` stay plain): the per-layer default over the whole corpus is -7,45% gzip / -13,66% Brotli /
--9,29% zstd (geometry buffers, per tile, vs `DELTA_ZIGZAG_VARINT`; -7,36% / -13,55% / -9,16% with
-`building` alone), at 5,86x FastPFOR decode on `building`
-([openzl-pipeline.md](openzl-pipeline.md#per-layer-default)).
+`boundary`, `park` stay plain; the later `QUAD_CORNER_SHARED_FRAME` on `building`, `landcover`, `landuse`, `water` and
+`LINE_CONTINUATION_SHARED_FRAME_HEADING` on `transportation`, `transportation_name` are in `forLayer` today): the
+per-layer default over the whole corpus is **-11,36% gzip / -17,18% Brotli / -13,03% zstd** (9.960.430 B gzip,
+9.306.400 B Brotli, 9.773.069 B zstd; geometry buffers, per tile, every column against `DELTA_ZIGZAG_VARINT`
+gzip; current `research measure --step layer`), at 5,86x FastPFOR decode on `building`
+([openzl-pipeline.md](openzl-pipeline.md#per-layer-default)). Earlier figures of the same row, kept as
+history: -7,45% / -13,66% / -9,29% (10.399.717 B gzip, `building` alone -7,36% / -13,55% / -9,16%), measured before
+`forLayer` took the shared-reference predictors.
 
 ## rANS is retired from reporting
 
@@ -94,7 +103,7 @@ stay registered in `Baselines.retired()` (still round-tripped by `VertexBufferCo
 `QUAD_CORNER_SEG_FASTPFOR` at -6,1%'s superseding row, `RANSSEG`, sparse tables, and
 `decode-time.md`'s rANS-vs-FastPFOR comparison) are real measurements and are kept as
 history, but a current run does not reproduce them. The target is compressed bytes per tile
-(`./gradlew benchmark`); residual bits are a probe (`./gradlew residualBits`).
+(`./gradlew benchmark`); residual bits are a probe (`./gradlew research --args="residual-bits"`).
 
 ## Wins (registered)
 

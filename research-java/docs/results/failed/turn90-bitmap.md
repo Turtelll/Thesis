@@ -1,5 +1,7 @@
 # 90° edge rotation with a signalled turn direction — `TURN90_BITMAP` + reflex-signal probe
 
+> **Consolidation note.** The Gradle task(s) benchmark named below were removed from the build (the code is at git tag `pre-consolidation`); `research measure` and the other `research` commands replace the rest. The numbers below are unchanged history.
+
 > **Revisited under split varints:** `TURN90_BITMAP_VARINT_SPLIT` is +0,26% whole tileset
 > (smallest of gzip/Brotli/zstd) and -0,76% on `building`; stays retired. See
 > [../revisit-varint-split.md](../revisit-varint-split.md).

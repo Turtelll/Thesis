@@ -5,7 +5,7 @@ import org.maplibre.mlt.research.encoding.Encoding;
 import org.maplibre.mlt.research.encoding.StreamMetadata;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
-import org.maplibre.mlt.research.encoding.research.SharedVertexRef;
+import org.maplibre.mlt.research.pipeline.mechanism.SharedVertexRef;
 
 import java.io.ByteArrayOutputStream;
 import java.util.List;

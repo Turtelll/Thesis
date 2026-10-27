@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoding.research;
+package org.maplibre.mlt.research.pipeline.mechanism;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.ClassifiedPredictor;

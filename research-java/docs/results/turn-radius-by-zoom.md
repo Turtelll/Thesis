@@ -3,7 +3,7 @@
 **Status:** measured, no encoder built — corpus-dependent, inconclusive
 **Effect:** flat on the current baseline corpus; a real trend on the Overture corpus
 **Corpus:** current baseline (`munich-plantiler.mbtiles`, `data/extractedBaseline`) and
-`data/extracted-overture`, `--layer transportation`, `./gradlew turnRadius`
+`data/extracted-overture`, `--layer transportation`, `./gradlew research --args="turn-radius"`
 
 ## The question
 

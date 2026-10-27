@@ -3,7 +3,7 @@
 **Status:** measured, no encoder built — outside `VertexBuffer` scope (not lossless vs MVT)
 **Effect:** -24,46% total MLT tile bytes when Point features outside the tile extent are
 dropped; almost all of it properties, not geometry
-**Corpus:** current baseline (`munich-plantiler.mbtiles`, 358 tiles), `./gradlew bufferPoint`
+**Corpus:** current baseline (`munich-plantiler.mbtiles`, 358 tiles), `./gradlew research --args="buffer-point"`
 
 ## The question
 

@@ -36,8 +36,8 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * The golden master of the consolidation: for every row of {@link Baselines#baseline()}, {@link
- * Baselines#research()} and {@link PipelineRegistry#all()}, plus the
+ * The golden master of the consolidation: for every row of {@link Baselines#baseline()}, and {@link
+ * PipelineRegistry#all()}, plus the
  * per-layer default ({@value #PER_LAYER}), and every (tile, layer) buffer of an extraction, the
  * SHA-256 of the encoded bytes, their length and the sizes under gzip, Brotli 11 and zstd 19, per
  * buffer (compressed alone) and per tile (the row's buffers concatenated, as the benchmark sizes
@@ -90,7 +90,6 @@ public final class GoldenDumpCli {
             }
         };
         Baselines.baseline().forEach(add);
-        Baselines.research().forEach(add);
         PipelineRegistry.all().forEach(add);
         if (rows.putIfAbsent(PER_LAYER, new Row(PER_LAYER, null)) != null) {
             throw new IllegalStateException("two rows are named " + PER_LAYER);

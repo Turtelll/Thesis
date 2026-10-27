@@ -1,5 +1,7 @@
 # `LINE_CONTINUATION` per zoom level — how road style drives the gain
 
+> **Consolidation note.** The Gradle task(s) benchmark named below were removed from the build (the code is at git tag `pre-consolidation`); `research measure` and the other `research` commands replace the rest. The numbers below are unchanged history.
+
 **Status:** measured, no new encoder — characterizes the registered `LINE_CONTINUATION`
 **Effect:** -1,4% to -4,9% mean residual bits on every zoom; bytes (FastPFOR, interleaved)
 -0,3% to -2,3% on z4–z11, -0,0% to -0,1% on z12–z14 (Munich); **net regression on

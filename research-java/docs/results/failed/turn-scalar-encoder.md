@@ -66,7 +66,7 @@ signalling.
 corner and turn rule, with the `along` scalar as a side-value stream of its own after the residual
 streams (under every segmentation; the header's predictor field grew to 3 bits). Its residual
 pairs equal the old transform's, value for value (`PredictionMechanismTest`). Measured with
-`./gradlew pipeline --args="--step turn --layer building --by-zoom --with-old"` on
+`./gradlew research --args="measure --step turn --layer building --by-zoom --with-old"` on
 `data/extractedBaseline` (310 `building` buffers, per tile, change vs `DELTA_ZIGZAG_VARINT` gzip):
 
 ```

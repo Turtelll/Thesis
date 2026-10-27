@@ -12,7 +12,7 @@ buffers, `--set: core -rans +segmented`), plus `data/extracted-chicago` and
 
 ## How much is shared — probe
 
-`./gradlew sharedVertex --args="../data/extractedBaseline --layer transportation"`
+`./gradlew research --args="shared-vertex ../data/extractedBaseline --layer transportation"`
 (`SharedVertexCli`, no encoder). A vertex is **shared** if its exact position occurs at two or
 more indices of the buffer; **cross-part** if two of those occurrences lie in different parts
 (junctions); **within-part** if all lie in one part (loops); **redundant** counts occurrences
@@ -182,7 +182,7 @@ junctions to the start, and the candidate set is the whole buffer instead of a w
 
 ## Decode time
 
-`./gradlew decodeTime --args="../data/extractedBaseline --encoding LINE_CONTINUATION_FASTPFOR,
+`./gradlew research --args="decode-time ../data/extractedBaseline --encoding LINE_CONTINUATION_FASTPFOR,
 LINE_CONTINUATION_SEG_FASTPFOR,LINE_CONTINUATION_SHARED_DICT_FASTPFOR,
 LINE_CONTINUATION_SHARED_DICT_SEG_FASTPFOR,LINE_CONTINUATION_SHARED_DICT_VARINT --layer
 transportation --reps 5 --warmup 2"`, end-to-end `Encoding.decode`, x same-codec baseline, two
@@ -256,7 +256,7 @@ overhead. `_DICT` stays the bytes winner; `_MARKED` is the choice if decode time
 
 `Prediction.LINE_CONTINUATION_SHARED` and `LINE_CONTINUATION_SHARED_FRAME_HEADING` (`_DICT` table) run
 `LineSharedVertexRef`'s references inside `PipelineEncoding`; a buffer the references do not shrink is
-written under the plain predictor id. Rows: `./gradlew pipeline --args="--step linesshared --layer
+written under the plain predictor id. Rows: `./gradlew research --args="measure --step linesshared --layer
 transportation --by-zoom"`; mechanism test `pipeline/LineSharedMechanismTest`.
 
 Munich `transportation`, geometry buffers alone, per-tile gzip vs `DELTA_ZIGZAG_VARINT` (class streams,
@@ -270,7 +270,7 @@ escape width, byte planes):
 
 The chain beats Hilbert on lines, and by less once the references take the junction starts it would
 have shortened. The reorder also permutes the property columns, so the geometry figure alone is not
-the choice. `./gradlew pipelineTileSize --args="../data/MVT/munich-plantiler.mbtiles --joint
+the choice. `./gradlew research --args="tile-size ../data/MVT/munich-plantiler.mbtiles --joint
 transportation [--ids sequential]"` compresses the layer's pipeline geometry payload and its
 property-only tile together, once per tile (a stand-in for the tile: the MLT writer cannot take the
 pipeline's geometry bytes; the single pass is 0,1% to 1% larger than the two compressed alone).

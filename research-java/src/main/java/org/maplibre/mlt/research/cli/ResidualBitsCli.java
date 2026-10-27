@@ -1,20 +1,13 @@
 package org.maplibre.mlt.research.cli;
 
 import org.maplibre.mlt.research.encoding.Baselines;
-import org.maplibre.mlt.research.encoding.ClassifiedPredictor;
 import org.maplibre.mlt.research.encoding.Encoding;
-import org.maplibre.mlt.research.encoding.Layout;
-import org.maplibre.mlt.research.encoding.PredictedTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexTransform;
-import org.maplibre.mlt.research.encoding.research.LineContinuation;
-import org.maplibre.mlt.research.encoding.research.LineContinuationEncoding;
-import org.maplibre.mlt.research.encoding.research.LineSharedVertexRef;
-import org.maplibre.mlt.research.encoding.research.QuadCornerEncoding;
-import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
-import org.maplibre.mlt.research.encoding.research.SharedVertexRef;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
+import org.maplibre.mlt.research.pipeline.Prediction;
+import org.maplibre.mlt.research.pipeline.PredictionTransform;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -156,8 +149,8 @@ public final class ResidualBitsCli {
      * vertices got smaller, with the gains and the losses summed separately so they cannot cancel.
      *
      * <p>Only transforms whose slot {@code 2i} is vertex {@code i} can be paired ({@link
-     * VertexTransform#vertexAligned()}): {@link SharedVertexRef} rotates rings and gives a referenced
-     * vertex no residual at all.
+     * VertexTransform#vertexAligned()}): the ring-frame predictors rotate the residual but keep one pair per
+     * vertex, so they pair too.
      */
     static final class VertexShrink {
         private static final int VERTICES = 0;
@@ -317,30 +310,19 @@ public final class ResidualBitsCli {
                     "",
                     DELTA_ZIGZAG::apply);
         }
-        // All-in, not residuals alone: a referenced vertex has no residual but pays flag and index
-        // bits, so a residual-only mean would miss both. See SharedVertexRef#allInBits.
-        if (encoding instanceof SharedVertexRef shared) {
-            return new ResidualSource(shared.name(), shared::allInBits);
-        }
-        if (encoding instanceof LineSharedVertexRef shared) {
-            return new ResidualSource(shared.name(), shared::allInBits);
-        }
-        // A predictor row owns its byte layout; its residuals are measured before that, per vertex.
-        if (encoding instanceof QuadCornerEncoding) {
-            return predicted(encoding.name(), new SegmentQuadCorner());
-        }
-        if (encoding instanceof LineContinuationEncoding) {
-            return predicted(encoding.name(), new LineContinuation());
-        }
         return null;
     }
 
-    private static ResidualSource predicted(String rowKey, ClassifiedPredictor predictor) {
-        var transform = new PredictedTransform(predictor, Layout.INTERLEAVED);
+    /** A pipeline predictor through its {@code FLAT} split: one residual pair per vertex, in order. */
+    private static ResidualSource predicted(Prediction prediction) {
+        var transform = new PredictionTransform(prediction);
         return new ResidualSource(
-                rowKey, ctx -> Residuals.measure(transform.apply(ctx)), transform::apply, "", DELTA_ZIGZAG::apply);
+                transform.name(),
+                ctx -> Residuals.measure(transform.apply(ctx)),
+                transform::apply,
+                "",
+                DELTA_ZIGZAG::apply);
     }
-
     public static void main(String[] args) throws IOException {
         var inDir = "../data/extractedBaseline";
         String layer = null;
@@ -360,8 +342,14 @@ public final class ResidualBitsCli {
             }
         }
 
-        var encodings = new ArrayList<Encoding>(Baselines.baseline());
-        encodings.addAll(Baselines.research());
+        var sources = new ArrayList<ResidualSource>();
+        for (var encoding : Baselines.baseline()) {
+            sources.add(residualSourceOf(encoding));
+        }
+        for (var prediction : List.of(Prediction.QUAD_CORNER, Prediction.LINE_CONTINUATION,
+                Prediction.QUAD_CORNER_LINE, Prediction.QUAD_CORNER_FRAME, Prediction.QUAD_CORNER_LINE_FRAME)) {
+            sources.add(predicted(prediction));
+        }
 
         var residuals = new Residuals();
         var shrink = new VertexShrink();
@@ -389,8 +377,7 @@ public final class ResidualBitsCli {
 
             var seenTransforms = new HashSet<String>();
             var referenceStreams = new HashMap<String, int[]>();
-            for (var encoding : encodings) {
-                var residualSource = residualSourceOf(encoding);
+            for (var residualSource : sources) {
                 if (residualSource == null || !seenTransforms.add(residualSource.rowKey())) {
                     continue;
                 }

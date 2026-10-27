@@ -1,5 +1,7 @@
 # Retired encodings revisited under segmented VARINT_SPLIT
 
+> **Consolidation note.** The Gradle task(s) benchmark named below were removed from the build (the code is at git tag `pre-consolidation`); `research measure` and the other `research` commands replace the rest. The numbers below are unchanged history.
+
 **Status:** measured — one row kept and flagged, the other fourteen retired again; the flagged
 idea, combined with feature chaining, is the smallest tileset row (-9,50%, see the follow-up)
 **Effect:** only `QUAD_CORNER_SHARED_RING_CANONICAL` is the smallest row on any layer

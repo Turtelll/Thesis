@@ -30,7 +30,7 @@ smaller **and** faster to decode than the FastPFOR baseline it replaces.
 
 ## Method
 
-New probe, `DecodeTimeCli` (`./gradlew decodeTime --args="[extractionDir] [--encoding
+New probe, `DecodeTimeCli` (`./gradlew research --args="decode-time [extractionDir] [--encoding
 <NAME>[,<NAME>...]] [--layer <name>] [--reps <n>] [--warmup <n>] [--max-ratio <x>] [--csv
 <file>]"`), following the existing measurement-only CLI pattern (`RingPriorCli`, `EntropyCli`).
 

@@ -1,5 +1,7 @@
 # Predictors under gzip, Brotli and zstd
 
+> **Consolidation note.** The Gradle task(s) benchmark named below were removed from the build (the code is at git tag `pre-consolidation`); `research measure` and the other `research` commands replace the rest. The numbers below are unchanged history.
+
 **Status:** measured — direction, not one new encoding
 **Corpus:** current baseline (`munich-plantiler.mbtiles`, `data/extractedBaseline`, 358
 tiles, 4.368 buffers). Every compressed figure below is **per tile**: a tile's buffers

@@ -1,5 +1,7 @@
 # Chaining the parts of a MultiLineString — `_PART_CHAIN`
 
+> **Consolidation note.** The Gradle task(s) benchmark named below were removed from the build (the code is at git tag `pre-consolidation`); `research measure` and the other `research` commands replace the rest. The numbers below are unchanged history.
+
 **Status:** workshop rows only (`Workshop.partChainRows()`), not in `Baselines.research()`
 **Effect:** `transportation`, per-tile gzip vs `DELTA_ZIGZAG_VARINT`:
 `LINE_CONTINUATION_PART_CHAIN_REV` -4,85% (`LINE_CONTINUATION` alone -1,37%),
@@ -45,7 +47,7 @@ feature, polygons in a mixed column untouched) and `WorkshopTest.chainContinuati
 
 ## Measured
 
-`./gradlew workshop --args="--layer transportation --by-zoom"`, per-tile gzip vs the smaller
+`./gradlew research --args="workshop --layer transportation --by-zoom"`, per-tile gzip vs the smaller
 baseline (`DELTA_ZIGZAG_VARINT`):
 
 | row | all tiles | z4–z11 range | z12 | z13 | z14 |

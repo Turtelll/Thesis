@@ -7,9 +7,8 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
  * The logical content of a structural predictor, with no opinion on how its residuals are laid
  * out in the output array: for each vertex, which of a fixed set of classes it falls in (derived
  * from the topology streams, identically on encode and decode) and what that class predicts.
- * {@link PredictedTransform} pairs one of these with a {@link Layout} to produce a
- * {@code VertexTransform}, so measuring a predictor both interleaved and segmented (see
- * {@code docs/evaluation-protocol.md}) is a constructor argument, not a second implementation.
+ * The pipeline's {@code Segmentation} lays the residuals out (flat, or one stream per class), so a
+ * predictor is measured both ways without a second implementation.
  *
  * <p>{@code predictX}/{@code predictY} are given the vertex index and the vertices reconstructed
  * so far (on decode, exactly as far as a real decoder has gotten) plus the vertex classes, and
@@ -19,8 +18,7 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 public interface ClassifiedPredictor {
 
     /**
-     * This predictor's contribution to an encoding's name, e.g. {@code QUAD_CORNER}. {@link
-     * PredictedTransform} appends {@code _SEG} under {@link Layout#SEGMENTED}.
+     * This predictor's contribution to an encoding's name, e.g. {@code QUAD_CORNER}. The pipeline's own configuration name adds the segmentation.
      */
     String name();
 
@@ -36,7 +34,7 @@ public interface ClassifiedPredictor {
     int classCount();
 
     /**
-     * Region order for {@link Layout#SEGMENTED}: a permutation of {@code [0, classCount())}. Every
+     * Region order when segmented by class: a permutation of {@code [0, classCount())}. Every
      * existing predictor here orders its regions "start, interior, then everything else ascending"
      * (e.g. {@code {1, 0, 2}}, not {@code {0, 1, 2}}) — this is pinned explicitly per predictor
      * rather than derived, so the refactor cannot silently reorder a region and change output bytes.
@@ -44,8 +42,8 @@ public interface ClassifiedPredictor {
     int[] regionOrder();
 
     /**
-     * Whether {@code vertexClass} has a predictor of its own. When {@code false}, {@link
-     * PredictedTransform} predicts (prevX, prevY) — the continuous first-order delta every class
+     * Whether {@code vertexClass} has a predictor of its own. When {@code false}, the
+     * segmentation predicts (prevX, prevY) — the continuous first-order delta every class
      * without a better model falls back to here — and never calls {@link #predictX}/{@link
      * #predictY} for it. Every predictor's {@code INTERIOR} (0) and {@code START} (1) class is
      * plain delta; only classes describing an actual geometric prediction (a parallelogram corner,

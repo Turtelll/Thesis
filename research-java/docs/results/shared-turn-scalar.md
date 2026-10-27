@@ -38,7 +38,7 @@ the smaller of the two payloads after raw Deflate, encoder-only. `FORCED` (no fa
 
 ## Measured
 
-`building`, gzip per tile (`./gradlew workshop --args="--layer building --by-zoom"`), change vs
+`building`, gzip per tile (`./gradlew research --args="workshop --layer building --by-zoom"`), change vs
 `DELTA_ZIGZAG_VARINT`:
 
 | row | all tiles | z13 | z14 |

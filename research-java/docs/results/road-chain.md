@@ -1,5 +1,7 @@
 # Road chaining — `LINE_CONTINUATION_ROAD_CHAIN` and the lossy `_ROAD_MERGE`
 
+> **Consolidation note.** The Gradle task(s) benchmark, roadChain named below were removed from the build (the code is at git tag `pre-consolidation`); `research measure` and the other `research` commands replace the rest. The numbers below are unchanged history.
+
 **Status:** registered — win on `transportation`: the smallest row on Chicago, second to
 `LINE_CONTINUATION_SHARED_DICT` on Munich overall (and the smallest on z12/z13 there). The lossy merge is a
 reported row, never in the oracle.

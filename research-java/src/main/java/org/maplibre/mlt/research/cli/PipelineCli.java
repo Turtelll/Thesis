@@ -47,7 +47,7 @@ import java.util.stream.IntStream;
  * chosen on the compressed tile, beside the fixed per-layer default.
  *
  * <p>Usage: {@code [extractionDir] [--step s0|s1|...|tile|ladder|oracle|all] [--oracle] [--rows a,b]
- * [--layer <name>] [--by-zoom] [--by-geometry] [--stats] [--with-old] [--csv <file>] [--brotli-quality <0-11>]
+ * [--layer <name>] [--by-zoom] [--by-geometry] [--stats] [--csv <file>] [--brotli-quality <0-11>]
  * [--limit-tiles <n>]}.
  */
 public final class PipelineCli {
@@ -59,10 +59,6 @@ public final class PipelineCli {
 
     private static final int TOP_LAYERS = 8;
 
-    /** Old-pipeline rows shown beside the new ones under {@code --with-old}; read-only references. */
-    private static final List<String> OLD_ROWS = List.of(
-            "QUAD_CORNER", "QUAD_CORNER_SHARED_RING_CANONICAL_REORDER", "LINE_CONTINUATION_SHARED_DICT");
-
     public static void main(String[] args) throws IOException {
         final var opts = Options.parse(args);
         final var inDir = Path.of(opts.inDir);
@@ -73,11 +69,6 @@ public final class PipelineCli {
         final var rows = new ArrayList<Encoding>(rowsFor(opts));
         if (opts.step.equals("selector") && opts.rows == null) {
             rows.addAll(selectors(opts.brotliQuality));
-        }
-        if (opts.withOld) {
-            for (final var name : OLD_ROWS) {
-                Baselines.all().stream().filter(e -> e.name().equals(name)).findFirst().ifPresent(rows::add);
-            }
         }
         final var encodings = new ArrayList<Encoding>(baselines);
         encodings.addAll(rows);
@@ -623,7 +614,6 @@ public final class PipelineCli {
             boolean byZoom,
             boolean byGeometry,
             boolean stats,
-            boolean withOld,
             String csvFile,
             int brotliQuality,
             int limitTiles,
@@ -634,7 +624,7 @@ public final class PipelineCli {
             String featuresCsv) {
 
         private static final String USAGE = "Usage: [extractionDir] [--step s0|s1|...|selector|tile|ladder|oracle|all]"
-                + " [--rows a,b] [--layer <name>] [--by-zoom] [--by-geometry] [--stats] [--with-old] [--csv <file>]"
+                + " [--rows a,b] [--layer <name>] [--by-zoom] [--by-geometry] [--stats] [--csv <file>]"
                 + " [--brotli-quality <0-11>] [--limit-tiles <n>] [--isolated] [--no-verify] [--oracle]"
                 + " [--trials gzip,brotli,zstd,order0,order1] [--features <file>]";
 
@@ -659,7 +649,6 @@ public final class PipelineCli {
             var byZoom = false;
             var byGeometry = false;
             var stats = false;
-            var withOld = false;
             String csv = null;
             var brotliQuality = 11;
             var limitTiles = 0;
@@ -680,7 +669,6 @@ public final class PipelineCli {
                     case "--by-zoom" -> byZoom = true;
                     case "--by-geometry" -> byGeometry = true;
                     case "--stats" -> stats = true;
-                    case "--with-old" -> withOld = true;
                     case "--csv" -> csv = args[++i];
                     case "--brotli-quality" -> brotliQuality = Integer.parseInt(args[++i]);
                     case "--limit-tiles" -> limitTiles = Integer.parseInt(args[++i]);
@@ -694,7 +682,7 @@ public final class PipelineCli {
                     }
                 }
             }
-            return new Options(in == null ? DEFAULT_IN_DIR : in, step, rows, layer, byZoom, byGeometry, stats, withOld, csv,
+            return new Options(in == null ? DEFAULT_IN_DIR : in, step, rows, layer, byZoom, byGeometry, stats, csv,
                     brotliQuality, limitTiles, isolated, skipVerification, oracle, trials, features);
         }
     }

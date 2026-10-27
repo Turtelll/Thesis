@@ -4,13 +4,13 @@ import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.ClassifiedPredictor;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
-import org.maplibre.mlt.research.encoding.research.LineContinuation;
-import org.maplibre.mlt.research.encoding.research.LineSharedVertexRef;
-import org.maplibre.mlt.research.encoding.research.QuadCornerLine;
-import org.maplibre.mlt.research.encoding.research.RingFramePrior;
-import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
-import org.maplibre.mlt.research.encoding.research.SharedVertexRef;
-import org.maplibre.mlt.research.encoding.research.failed.TurnScalar;
+import org.maplibre.mlt.research.pipeline.mechanism.LineContinuation;
+import org.maplibre.mlt.research.pipeline.mechanism.LineSharedVertexRef;
+import org.maplibre.mlt.research.pipeline.mechanism.QuadCornerLine;
+import org.maplibre.mlt.research.pipeline.mechanism.RingFramePrior;
+import org.maplibre.mlt.research.pipeline.mechanism.SegmentQuadCorner;
+import org.maplibre.mlt.research.pipeline.mechanism.SharedVertexRef;
+import org.maplibre.mlt.research.pipeline.mechanism.TurnScalar;
 
 import java.util.List;
 
@@ -89,7 +89,7 @@ public enum Prediction {
 
     /**
      * {@link #LINE_CONTINUATION} plus references to the positions earlier line parts hold ({@link
-     * LineSharedVertexRef}, {@code Table.ALL_PARTS}, old {@code LINE_CONTINUATION_SHARED_DICT}): an
+     * LineSharedVertexRef}, old {@code LINE_CONTINUATION_SHARED_DICT}): an
      * entry and an exit flag at the ends of every line part, and a bit-packed index into the
      * dictionary of earlier positions in place of the residual on a hit. A part whose end is in the
      * dictionary and whose start is not is reversed, which changes line direction. Polygon rings and
@@ -131,7 +131,7 @@ public enum Prediction {
         return switch (this) {
             case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME -> SharedVertexRef.scan(ctx);
             case LINE_CONTINUATION_SHARED, LINE_CONTINUATION_SHARED_FRAME_HEADING ->
-                    LineSharedVertexRef.scan(ctx, LineSharedVertexRef.Table.ALL_PARTS);
+                    LineSharedVertexRef.scan(ctx);
             default -> throw new UnsupportedOperationException(this + " has no references");
         };
     }
@@ -143,7 +143,7 @@ public enum Prediction {
                     SharedVertexRef.Walk.forDecoding(topo, vertexCount, flags, indices);
             case LINE_CONTINUATION_SHARED, LINE_CONTINUATION_SHARED_FRAME_HEADING ->
                     LineSharedVertexRef.walkForDecoding(
-                            topo, vertexCount, LineSharedVertexRef.Table.ALL_PARTS, flags, indices);
+                            topo, vertexCount, flags, indices);
             default -> throw new UnsupportedOperationException(this + " has no references");
         };
     }

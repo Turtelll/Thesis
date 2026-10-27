@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoding.research;
+package org.maplibre.mlt.research.pipeline.mechanism;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -7,8 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.Layout;
-import org.maplibre.mlt.research.encoding.PredictedTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 
 /**
@@ -50,13 +48,11 @@ class SegmentQuadCornerMechanismTest {
         List.of(4));
   }
 
-  private static PredictedTransform segmented() {
-    return new PredictedTransform(new SegmentQuadCorner(), Layout.SEGMENTED);
-  }
+  private static final SegmentQuadCorner PREDICTOR = new SegmentQuadCorner();
 
   @Test
   void appliesTheParallelogramPredictor() {
-    final var values = segmented().apply(parallelogramColumn());
+    final var values = ClassSegmented.apply(PREDICTOR, parallelogramColumn());
     // p0 is the only start (region head); the corner p3 is the tail two slots and must be (0,0).
     assertEquals(0, values[values.length - 2], "p3 x residual against p0+p2-p1 must be zero");
     assertEquals(0, values[values.length - 1], "p3 y residual against p0+p2-p1 must be zero");
@@ -65,18 +61,20 @@ class SegmentQuadCornerMechanismTest {
   @Test
   void reconstructsBothColumnsFromTopologyAlone() {
     for (final var ctx : List.of(lineColumn(), parallelogramColumn())) {
-      final var transform = segmented();
-      assertEquals(ctx.vertices(), transform.invert(transform.apply(ctx), topologyOnly(ctx)));
+      assertEquals(
+          ctx.vertices(),
+          ClassSegmented.invert(
+              PREDICTOR, ClassSegmented.apply(PREDICTOR, ctx), topologyOnly(ctx), ctx.vertices().size()));
     }
   }
 
   @Test
   void corruptedStreamDoesNotReconstruct() {
     final var ctx = parallelogramColumn();
-    final var transform = segmented();
-    final var values = transform.apply(ctx);
+    final var values = ClassSegmented.apply(PREDICTOR, ctx);
     values[0] += 2;
-    assertNotEquals(ctx.vertices(), transform.invert(values, topologyOnly(ctx)));
+    assertNotEquals(
+        ctx.vertices(), ClassSegmented.invert(PREDICTOR, values, topologyOnly(ctx), ctx.vertices().size()));
   }
 
   private static BufferContext topologyOnly(BufferContext ctx) {

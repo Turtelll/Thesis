@@ -231,7 +231,7 @@ size the next MLT version adopts). Bytes vs the old `QUAD_CORNER_SHARED_SEG_FAST
 
 ## Decode time
 
-`./gradlew decodeTime --args="../data/extractedBaseline --encoding QUAD_CORNER_SEG_FASTPFOR,
+`./gradlew research --args="decode-time ../data/extractedBaseline --encoding QUAD_CORNER_SEG_FASTPFOR,
 QUAD_CORNER_SHARED_SEG_FASTPFOR,QUAD_CORNER_SHARED_FASTPFOR,QUAD_CORNER_SHARED_VARINT --reps 5
 --warmup 2"`, full corpus, end-to-end `Encoding.decode`, x same-codec baseline (method:
 [decode-time.md](decode-time.md)):

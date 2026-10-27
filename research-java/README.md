@@ -1,9 +1,11 @@
 # research-java
 
-A lightweight harness for testing VertexBuffer encoding ideas against the baseline.
+A lightweight harness for testing VertexBuffer encoding ideas against the baseline. Everything runs
+through one entry point, `./gradlew research --args="<command> ..."` (`./gradlew research` lists the
+commands); the encoder is the modular `pipeline/`, the only encoder stack.
 It extracts geometries from `data/MVT/munich-de.mbtiles` into MLT-compatible
 `VertexBuffer`s (exactly as `maplibre-tile-spec`'s `GeometryEncoder` would, one buffer
-per MVT layer per tile), then measures every registered encoding against the baseline
+per MVT layer per tile), then measures the pipeline's rows against the baseline
 encodings from the repo root `README.md` — overall, and **per layer**.
 
 The per-layer breakdown is the point. An encoding that is much better on
@@ -35,7 +37,7 @@ no `publishToMavenLocal`, and the submodule is never modified.
 ### 1. Extract (once)
 
 ```
-./gradlew run --args="--mbtiles ../data/MVT/munich-de.mbtiles --out ../data/extracted"
+./gradlew research --args="extract --mbtiles ../data/MVT/munich-de.mbtiles --out ../data/extracted"
 ```
 
 `munich-de.mbtiles` is the Munich area cut out of the full-Germany tileset
@@ -73,7 +75,7 @@ S3 parquet with DuckDB (`pip install duckdb`); `--release` pins the Overture rel
 Then extract as usual:
 
 ```
-./gradlew run --args="--mbtiles ../data/MVT/munich-overture.mbtiles --out ../data/extracted-overture"
+./gradlew research --args="extract --mbtiles ../data/MVT/munich-overture.mbtiles --out ../data/extracted-overture"
 ```
 
 | Flag | Required | Description |
@@ -90,114 +92,65 @@ unencoded, the neutral starting point for any experiment) plus a `.json` sidecar
 the topology streams (`tileExtent`, `geometryTypes`, `numGeometries`, `numParts`,
 `numRings`, `vertexCount`). A `manifest.json` indexes them all.
 
-### 2. Benchmark
+### 2. Measure
 
 ```
-./gradlew benchmark
+./gradlew research --args="measure"
 ```
 
-Defaults to `../data/extractedBaseline`, the project's current baseline corpus. Pass a
-directory explicitly to run on a different extraction: `./gradlew benchmark
---args="../data/extracted"`.
-
-| Flag | Required | Description |
-|---|---|---|
-| `[extractionDir]` | no | Must contain `manifest.json`; defaults to `../data/extractedBaseline` |
-| `--csv <file>` | no | Also dump per-buffer gzip sizes (one column per row) |
-| `--layer <name>` | no | Restrict the run to one layer |
-| `--verbose` | no | Full per-encoding breakdown tables instead of the compact winner-only table |
-| `--by-zoom` | no | Add a breakdown by tile zoom (whole tiles, gzip) |
-| `--brotli-quality <0-11>` | no | Brotli quality (default 11, what static assets are precompressed at; roughly ten times slower than 9) |
-
-The benchmark measures **research encoding → general-purpose compressor (gzip, Brotli, zstd
-19)**; an encoding owns its region layout, any geometry reordering and its byte serialization. Sizes are
-what a client is served: every buffer of one tile concatenated (one tile is one HTTP response),
-compressed on its own, summed over tiles. Background:
+`measure` is the one measurement harness. It encodes the two baselines and the pipeline's rows
+over an extraction, **round-trips every row on every buffer** (encode, decode from the topology
+streams alone, compare against the extraction; the run fails naming the row, tile and layer if one
+does not reconstruct the buffer — no flag turns this off, except `--no-verify` for the grids that
+`./gradlew test` already covers), and sizes them the way a client is served: every buffer of one
+tile concatenated (one tile is one HTTP response), compressed on its own under gzip, Brotli 11 and
+zstd 19, summed over tiles. Background:
 [docs/results/general-purpose-compression.md](docs/results/general-purpose-compression.md).
 
-A run prints, in order:
+Defaults to `../data/extractedBaseline`, the project's current baseline corpus. Pass a directory
+explicitly to run on a different extraction (`research measure ../data/extracted`).
 
-1. **Per encoding, per tile.** One row per candidate: raw, `order-0` (byte-entropy bound per tile before any LZ77 match), gzip, Brotli,
-   zstd, against `ref` (see 4).
-2. **Oracle composition**: which rows the research oracle picks, on how many buffers.
-3. **Breakdowns, gzip.** By layer and by dominant geometry type each (tile, layer) buffer is
-   gzipped on its own — the tile restricted to that layer — so these rows do not sum to the
-   per-tile tables. `--by-zoom` sums whole gzipped tiles per zoom.
-4. **Baselines vs oracle, per tile.** `DELTA_ZIGZAG_FASTPFOR` and `DELTA_ZIGZAG_VARINT` under
-   gzip; the *research oracle* (per buffer, the smallest of the Varint baseline and every
-   `Baselines.research()` row) under gzip, Brotli and zstd. `ref` is the smaller
-   baseline under gzip, and **every percentage in every column is against it**. The oracle selects
-   on uncompressed bytes and charges nothing for signalling the choice.
+`ref` is the smaller baseline under gzip (`DELTA_ZIGZAG_VARINT`), and **every percentage in every
+column is against it**. Rows that reorder geometries are additionally checked for geometry
+preservation (`GeometryEquivalence`): reordering may change the order and nothing else.
 
-Lossy rows (`Baselines.lossy()`, e.g. `LINE_CONTINUATION_ROAD_MERGE`, which fuses line features
-that meet end to start and drops their boundaries for later linear referencing) are encoded and
-verified on every buffer too, but declare `mergesFeatures()`, are checked by `MergeEquivalence` (every
-original line part must be a vertex-aligned slice of a merged part) and are printed in their own
-section after the oracle composition. They are never part of the research oracle or a winner
-column. The probe that motivated them: `./gradlew roadChain --args="--layer transportation"`
-([docs/results/road-chain.md](docs/results/road-chain.md)).
-
-Reordering is not a benchmark flag: an encoding that wants it calls `GeometryReorder` itself
-and declares `reordersGeometries()`. It is not always available (some cases need the original
-feature order), so say so when a row depends on it.
-
-Retired from the benchmark, still registered in `Baselines.retired()` so `./gradlew test`
-round-trips them: rANS, the serializers `RAW` / `VARINT_XY` / `VARINT_SPLIT` / `BYTESPLIT` /
-`UINT16*` and everything under `encoding/research/failed/`.
-
-The residual-bit tables (mean zigzag bits per transform, `zero pairs`, per-vertex change vs
-`DELTA_ZIGZAG`) moved to their own probe:
-
-```
-./gradlew residualBits --args="--layer building"      # also: --by-zoom
-```
-
-An encoding declaring `reordersGeometries()` is additionally checked for geometry preservation
-on every buffer: reordering may change the order and nothing else, so the multiset of parts must
-be unchanged (parts compared up to reversal). The run fails naming the tile and layer otherwise.
-This is `GeometryEquivalence`.
-
-Every run **round-trips every encoding on every buffer** — encode, decode, compare
-against the extraction — and fails naming the encoding, tile and layer if any does not
-reconstruct the buffer exactly. This is not optional and has no flag: an encoding that
-discards data reports a small size and would look like the best result in the table
-*because* it is broken, so a size from an unverified encoding is not a result.
-
-### 2b. Pipeline benchmark (`pipeline/`)
-
-```
-./gradlew pipeline --args="--step s8 --by-zoom --with-old"
-```
-
-The OpenZL-style pipeline ([results](docs/results/openzl-pipeline.md)) has its own benchmark with the same
-sizing as the one above (tile buffers concatenated, compressed per tile, every change against the smaller
-baseline under gzip). Steps S1 to S8 build on the previous step's winner; one step per run.
+The pipeline is composed of stages, one step per run, each building on the previous step's winner
+(S1 reorder, S2 predict, S3 segment, S4 zigzag, S6 byte width, S7 transpose, S8 the general-purpose
+backend; S5 was measured and removed). Results: [docs/results/openzl-pipeline.md](docs/results/openzl-pipeline.md);
+the bytes a row writes: [docs/bitstream.md](docs/bitstream.md).
 
 | Flag | Required | Description |
 |---|---|---|
 | `[extractionDir]` | no | Must contain `manifest.json`; defaults to `../data/extractedBaseline` |
-| `--step <name>` | no | `s0` (default), `s1` to `s4`, `s6` to `s8` (`s5`, the GCD, was removed), `selector`, `ladder` (the pipeline built up decision by decision), `oracle` (the grid the oracle chooses among), `layer` (the per-layer default `PipelineRegistry.forLayer` beside the single `DEFAULT` row), or `all` |
+| `--step <name>` | no | `s0` (default), `s1` to `s4`, `s6` to `s8`, `selector`, `ladder` (the pipeline built up decision by decision), `oracle` (the grid the oracle chooses among), `layer` (the per-layer default `PipelineRegistry.forLayer` beside the single `DEFAULT` row), `tile` (one composition per tile and layer), or `all` |
 | `--rows a,b` | no | Run only these row names (from any step) |
 | `--oracle` | no | Replace the per-row tables by the per-buffer best of the step's rows: what was chosen and how often, then the result against `ref`. Implied by `--step oracle` (48 compositions); the oracle chooses per backend, charges nothing for the choice and so is an upper bound |
 | `--layer <name>` | no | Restrict the run to one layer |
 | `--by-zoom` | no | Add a breakdown by tile zoom (whole tiles, gzip) |
+| `--by-geometry` | no | Add a breakdown by the dominant geometry type of each (tile, layer) buffer |
 | `--stats` | no | The step's own probes (for example predictor shares, width histograms) |
-| `--with-old` | no | Add the old pipeline's best rows (`QUAD_CORNER`, `QUAD_CORNER_SHARED_RING_CANONICAL_REORDER`, `LINE_CONTINUATION_SHARED_DICT`) as read-only references |
 | `--isolated` | no | Also size every buffer compressed on its own, beside the per-tile figure |
 | `--csv <file>` | no | Dump per-buffer gzip sizes (one column per row) |
 | `--brotli-quality <0-11>` | no | Brotli quality (default 11; 9 is much faster for development runs) |
 | `--limit-tiles <n>` | no | Only the first `n` tiles, for quick runs |
-| `--no-verify` | no | Skip the round-trip check; always skipped for `ladder`, `layer` and the oracle (see below) |
+| `--no-verify` | no | Skip the round-trip check; always skipped for `ladder`, `layer` and the oracle (`PipelineEncodingTest` round-trips `PipelineRegistry.all()`, including the ladder stages and the oracle grid) |
+| `--trials`, `--features <file>` | no | The opt-in selector report: compression-free selectors (entropy estimates) and how well cheap buffer features predict each stage's choice |
 
-Unlike `benchmark`, the round trip of the pipeline's rows is checked in **`./gradlew test`**
-(`PipelineEncodingTest` over `PipelineRegistry.all()`, which includes the ladder stages and the oracle
-grid), so the `ladder` and oracle runs only size. Every run says on its first line whether it
-round-tripped.
+The old `benchmark` rows (the per-idea encodings of `Baselines.research()`, FastPFOR/rANS rows and
+the `--with-old` references) no longer exist; their results are history in `docs/results/`, their
+code is at git tag `pre-consolidation`.
+
+The residual-bit tables (mean zigzag bits per transform, `zero pairs`, per-vertex change vs
+`DELTA_ZIGZAG`) are their own probe:
+
+```
+./gradlew research --args="residual-bits --layer building"      # also: --by-zoom
+```
 
 Whole-tile effect of the reorder on the property columns and ids (the other side of S1):
 
 ```
-./gradlew pipelineTileSize --args="../data/MVT/munich-plantiler.mbtiles --by-layer"
+./gradlew research --args="tile-size ../data/MVT/munich-plantiler.mbtiles --by-layer"
 ```
 
 | Flag | Description |
@@ -210,36 +163,25 @@ Whole-tile effect of the reorder on the property columns and ids (the other side
 | `--brotli-quality <0-11>` | Brotli quality (default 9) |
 | `--limit-tiles <n>` | Only the first `n` tiles |
 
-`./gradlew pipeline --args="--help"` shows the usage line of the first table (as the error message of the run).
+`./gradlew research` lists every command; `./gradlew research --args="measure --help"` shows the usage line.
 
-### 3. Chart the results
+### 3. Prove nothing moved (the golden dump)
 
 ```
-./gradlew benchmark --args="--csv ../data/out/run.csv"
-./gradlew chart --args="../data/out/run.csv"
+./gradlew research --args="dump --out ../data/golden/<name>"
+./gradlew research --args="dump --diff ../data/golden/<old> ../data/golden/<new>"
 ```
 
-`chart` reads the benchmark's `--csv` file and writes three SVG charts to
-`<csv name>-charts/` beside it (no extra dependencies; open them in a browser):
-
-| File | Shows |
-|---|---|
-| `totals.svg` | Summed gzip bytes per encoding, as % change against the smaller baseline |
-| `by-layer.svg` | Encoding x layer heatmap (all + the 8 largest layers), each column against that layer's smaller baseline |
-| `by-zoom.svg` | Change per tile zoom for the best encodings and the other baseline |
-
-| Flag | Description |
-|---|---|
-| `--out <dir>` | Output directory (default `<csv name>-charts` beside the CSV) |
-| `--layer <name>` | Chart only one layer (`by-layer.svg` is then skipped) |
-| `--top <n>` | Non-baseline encodings drawn in `by-zoom.svg` (default 5) |
-
-The CSV holds gzip bytes **per (tile, layer) buffer**, so the numbers match the benchmark's
-"by layer" / "by zoom" breakdowns, not its whole-tile tables.
+`dump` writes, for every row of the baselines and `PipelineRegistry.all()` and every buffer, the SHA-256 and
+size of the encoded bytes, plus per-tile compressed sizes (`buffers.tsv.gz`, `tiles.tsv.gz`,
+`manifest.tsv`). `--diff` compares two dumps and names every row and buffer that changed, so a
+refactor can be shown byte-identical. Options: `--limit-tiles <n>`, `--layer <name>`, `--serial`.
+`research-java/golden/pre-consolidation.manifest.tsv` is the committed manifest of the dump taken at
+tag `pre-consolidation` (Munich only).
 
 ## Trying a predictor fast
 
-`./gradlew workshop` measures prediction ideas only: every row interleaved (no segmentation,
+`./gradlew research --args="workshop"` measures prediction ideas only: every row interleaved (no segmentation,
 reordering or shared references) over plain Varint, against `DELTA_ZIGZAG_VARINT` and
 `DELTA_ZIGZAG_FASTPFOR`. Per row it prints the mean and median absolute residual of the x and y
 components (in tile units), the share of `(0, 0)` pairs, Varint bytes, and gzip bytes
@@ -257,12 +199,15 @@ with every tile compressed on its own. Every row is round-tripped on every buffe
    ```
 
    Reading `xs[i]` or later does not round-trip, so a look-ahead fails loudly instead of winning.
-2. **Run it**: `./gradlew workshop --args="--only LINE_CONT_ALL,DELTA,LINE_CONTINUATION"`.
+2. **Run it**: `./gradlew research --args="workshop --only LINE_CONT_ALL,DELTA,LINE_CONTINUATION"`.
 
-`Workshop.known()` holds the predictors measured so far, in the same form: `DELTA` (the baseline
-as a rule; its Varint bytes equal `DELTA_ZIGZAG_VARINT`'s), `QUAD_CORNER`, `LINE_CONTINUATION`,
-`QUAD_CORNER_LINE`, `ROT90_FIXED`, `QUAD_CORNER_ROT90`, `DELTA2_ZIGZAG` and both
-`MIDPOINT_REFLECT` pairings.
+`Workshop.known()` holds the predictors measured so far: `DELTA` (the baseline as a rule; its Varint
+bytes equal `DELTA_ZIGZAG_VARINT`'s) and the pipeline's own predictors (`QUAD_CORNER`,
+`LINE_CONTINUATION`, `QUAD_CORNER_LINE`, `QUAD_CORNER_FRAME`, `QUAD_CORNER_LINE_FRAME`) through
+its `FLAT` split (`PredictionTransform`), so a row here writes the same residual pairs as the
+`FLAT` row of `measure`. The whole-encoding rows that used to sit here (`TURN_SCALAR`,
+`QUAD_CORNER_SHARED`) and the retired predictors (`ROT90_FIXED`, `QUAD_CORNER_ROT90`, `DELTA2_ZIGZAG`,
+`MIDPOINT_REFLECT`) are history.
 
 | Flag | Description |
 |---|---|
@@ -286,60 +231,34 @@ MultiLineString (`GeometryReorder.PART_CHAIN`; `_PART_CHAIN_REV` may also revers
 the previous one ended) over the chained buffer, e.g. `CHAIN_CONTINUATION_PART_CHAIN_REV`. They always
 run and are not combined with `--reorder`. Results: [docs/results/line-part-chain.md](docs/results/line-part-chain.md).
 
-A workshop win is a lead, not a result: promote the idea to an `Encoding` (below) and measure it
-with `./gradlew benchmark`, where segmentation and the split-varint layout apply.
+A workshop win is a lead, not a result: promote the idea to a pipeline predictor (below) and measure it
+with `./gradlew research --args="measure"`, where segmentation, the byte width and the shared references apply.
 
-## Adding an encoding
+## Adding an idea to the pipeline
 
-Everything the harness measures is one kind of thing:
-`org.maplibre.mlt.research.encoding.Encoding` — `name()`, `encode(BufferContext)`,
-`decode(EncodedBuffer, BufferContext, vertexCount)`. `decode` is mandatory, for the
-reason above. Both halves get the `BufferContext`, so a transform that resets on
-part/ring boundaries derives the same runs when encoding and decoding. `decode` must
-not read `ctx.vertices()` — that is the buffer it is reconstructing, and reading it
-would make even a codec that discards the buffer round-trip successfully.
+Everything `measure` sizes is one kind of thing: `org.maplibre.mlt.research.encoding.Encoding` —
+`name()`, `encode(BufferContext)`, `decode(EncodedBuffer, BufferContext, vertexCount)`; the pipeline's
+row is `PipelineEncoding(PipelineConfig)`. `decode` is mandatory and must not read `ctx.vertices()` —
+that is the buffer it is reconstructing, and reading it would make even a codec that discards the
+buffer round-trip successfully.
 
-1. **Write it.** One class per idea in `encoding/research/`, implementing `Encoding`
-   directly and owning its whole byte layout — which streams it writes, in which order, with
-   which serialization, and whether it reorders geometries first (`GeometryReorder`). No
-   `Layout`/`IntCodec` constructor arguments: the layout is tuned inside the class. Building
-   blocks: a `ClassifiedPredictor` plus `ClassRegions` (its residuals as one stream per vertex
-   class), the `IntCodec` instances (`IntCodec.VARINT_SPLIT.encode(int[])`, ...), and
-   `SharedVertexRef.BitWriter`/`BitReader`. `QuadCornerEncoding` is the smallest example.
+1. **Write the mechanism.** A predictor is a `ClassifiedPredictor` (per-vertex class derived from the
+   topology streams, and what each class predicts), put in `pipeline/mechanism/` beside `SegmentQuadCorner`
+   and `LineContinuation`. A reordering is a `Reorder` entry. `BufferContext` carries the topology
+   streams (`numParts`, `numRings`, `geometryTypes`) alongside the vertices, so both sides derive
+   the same runs.
+2. **Register it** — one `Prediction` constant, appended at the end (the ordinals are the header's
+   predictor id, see [docs/bitstream.md](docs/bitstream.md); the header has room for 16 predictors and
+   3 free bits). `PipelineRegistry` lists which compositions are rows.
+3. **Round-trip it.** `./gradlew test` round-trips every row of `PipelineRegistry.all()` and every
+   `Prediction` from the topology alone; a mechanism test pins how the idea works on a small fixture.
+4. **Measure it.** `./gradlew research --args="measure --rows <row> --by-zoom"`, then
+   `research dump --diff` against a dump taken before, to show no other row moved.
 
-   `BufferContext` carries the topology streams (`numParts`, `numRings`,
-   `geometryTypes`) alongside the vertices, for encodings with structural reset points
-   (the predictors in `ideen.md`) to condition on.
-
-2. **Register it** — one line in `Baselines.research()`, next to the baseline list. That
-   yields one benchmark row, named by the encoding's `name()`.
-
-3. **Run the benchmark.** Your encoding appears as a new row in the per-tile tables, and is
-   round-tripped over the whole corpus automatically. `VertexBufferCodecTest`
-   parameterizes over `Baselines.all()`, so `./gradlew test` covers it too without a
-   new test method.
-
-With the research list empty the run reports the two baselines only — the null result that shows the
-harness works before any new encoding is judged by it. See
-[`docs/results/`](docs/results/README.md) for what the currently registered encodings do
-and for the ones that were measured and rejected.
-
-## Excluding an encoding
-
-**No compressed win per tile and a negligible share of the oracle composition means demote
-now** — do not leave a dead encoding registered. There is no tooling for this; it is four manual steps:
-
-1. Delete its line from `Baselines.research()`. This alone drops it from the benchmark and from
-   `VertexBufferCodecTest`, which parameterizes over `Baselines.all()`; add it to
-   `Baselines.retired()` if it should stay round-tripped.
-2. Move the class to `encoding/research/failed/` and fix its `package` line. `Baselines`
-   imports `...encoding.research.*`, so the wildcard no longer reaches it there.
-3. Move its `*MechanismTest.java` to the matching `test/.../research/failed/` package. The
-   mechanism test survives the demotion — it pins how the idea works, independent of
-   whether it won, so the mechanism need not be re-derived if the idea resurfaces.
-4. Add a `docs/results/failed/<name>.md` with `Status:` / `Effect:` / `Corpus:`, following
-   the existing files under `docs/results/failed/`.
-
+A predictor that earns nothing is demoted rather than left registered: remove its `PipelineRegistry`
+rows, write `docs/results/failed/<name>.md` with `Status:` / `Effect:` / `Corpus:` (following the
+existing files there), and keep its mechanism test, which pins how the idea works independent of
+whether it won.
 ## Docs
 
 - [`docs/architecture.md`](docs/architecture.md) — pipeline, package layout, the

@@ -4,7 +4,7 @@ import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.ClassifiedPredictor;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
-import org.maplibre.mlt.research.encoding.research.SharedVertexRef;
+import org.maplibre.mlt.research.pipeline.mechanism.SharedVertexRef;
 
 import java.util.ArrayList;
 import java.util.Arrays;

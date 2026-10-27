@@ -1,5 +1,7 @@
 # Shared rANS frequency tables across buffers — the sparse table wins, sharing barely adds to it
 
+> **Consolidation note.** The Gradle task(s) benchmark named below were removed from the build (the code is at git tag `pre-consolidation`); `research measure` and the other `research` commands replace the rest. The numbers below are unchanged history.
+
 **Status:** sparse table built and measured (`RansCodec.writeTable`/`readTable`);
 cross-buffer sharing remains a probe only, `ShareTableCli`
 (`./gradlew shareTable --args="../data/extractedBaseline"`), corpus-wide (`munich-buildings-unmerged.mbtiles`,

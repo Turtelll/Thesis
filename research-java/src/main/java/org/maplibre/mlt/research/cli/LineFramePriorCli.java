@@ -3,7 +3,7 @@ package org.maplibre.mlt.research.cli;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
-import org.maplibre.mlt.research.encoding.research.LineContinuation;
+import org.maplibre.mlt.research.pipeline.mechanism.LineContinuation;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.pipeline.Reorder;
 

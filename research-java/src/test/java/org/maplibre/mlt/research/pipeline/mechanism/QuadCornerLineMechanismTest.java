@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoding.research;
+package org.maplibre.mlt.research.pipeline.mechanism;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -108,17 +108,4 @@ class QuadCornerLineMechanismTest {
     assertEquals(155, predictor.predictY(classes[16], 16, ctx.vertices()));
   }
 
-  @Test
-  void sharedRoundTripsTheMixedColumn() {
-    final var ctx = mixedColumn();
-    final var encoding = new SharedVertexRef("QUAD_CORNER_LINE", new QuadCornerLine());
-    final var decoded =
-        encoding.decode(encoding.encode(ctx), topologyOnly(ctx), ctx.vertices().size());
-    assertEquals(encoding.emitted(ctx).vertices(), decoded);
-  }
-
-  private static BufferContext topologyOnly(BufferContext ctx) {
-    return new BufferContext(
-        List.of(), ctx.geometryTypes(), ctx.numGeometries(), ctx.numParts(), ctx.numRings());
-  }
 }

@@ -1,5 +1,7 @@
 # Standardized-length deltas over a fixed Uint16 layout — `STD_DELTA_*`
 
+> **Consolidation note.** The Gradle task(s) benchmark named below were removed from the build (the code is at git tag `pre-consolidation`); `research measure` and the other `research` commands replace the rest. The numbers below are unchanged history.
+
 **Status:** measured, regression. Registered compression-only (`--compress --std-delta`),
 class in `encoding/research/failed/StandardDelta.java`
 **Effect:** no row beats `DELTA_ZIGZAG_VARINT_SPLIT` under any compressor. The best,

@@ -1,26 +1,16 @@
 package org.maplibre.mlt.research.workshop;
 
-import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.decoder.DecodingUtils;
-import org.maplibre.mlt.research.encoding.ClassifiedPredictor;
 import org.maplibre.mlt.research.encoding.Encoding;
 import org.maplibre.mlt.research.encoding.IntCodec;
-import org.maplibre.mlt.research.encoding.Layout;
-import org.maplibre.mlt.research.encoding.PredictedTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
 import org.maplibre.mlt.research.encoding.VertexTransform;
-import org.maplibre.mlt.research.encoding.research.GeometryReorder;
-import org.maplibre.mlt.research.encoding.research.LineContinuation;
-import org.maplibre.mlt.research.encoding.research.QuadCornerLine;
-import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
-import org.maplibre.mlt.research.encoding.research.SharedVertexRef;
-import org.maplibre.mlt.research.encoding.research.failed.TurnScalar;
 import org.maplibre.mlt.research.pipeline.Prediction;
+import org.maplibre.mlt.research.pipeline.PredictionTransform;
 import org.maplibre.mlt.research.pipeline.Reorder;
-import org.maplibre.mlt.research.pipeline.Segmentation;
+import org.maplibre.mlt.research.pipeline.mechanism.GeometryReorder;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,7 +20,7 @@ import java.util.function.UnaryOperator;
 
 /**
  * The prediction workshop's rows, measured interleaved over plain {@link IntCodec#VARINT} by {@code
- * ./gradlew research --args="workshop"} — mean x/y residual size, Varint bytes and per-tile gzip against the {@code
+ * research workshop} — mean x/y residual size, Varint bytes and per-tile gzip against the {@code
  * DELTA_ZIGZAG} baselines. To try an idea, add one {@link Predictor} line to {@link #experiments()};
  * the CLI and {@code VertexBufferCodecTest} round-trip it.
  *
@@ -39,21 +29,14 @@ import java.util.function.UnaryOperator;
  * #withReorder} puts one in front of the predictor rows ({@code --reorder}). {@link #partChainRows()}
  * chain the parts inside each MultiLineString instead ({@link GeometryReorder#PART_CHAIN}).
  *
- * <p>Two known rows write side values besides the residual pairs, and pay for them in their
- * bytes: {@code TURN_SCALAR} an {@code along} scalar per turn vertex, and
- * {@code QUAD_CORNER_SHARED} ({@link SharedVertexRef}) its reference flags, one per vertex that
- * can reference an earlier ring. It is the full encoding, segmented by predictor class and with its
- * own rotation and plain fallback, not an interleaved rule; a referenced vertex has no residual
- * pair, so its mean and median are over the unreferenced vertices only and its {@code side}
- * counts flags only (the entry indices are not counted).
- *
  * <p>{@code QUAD_CORNER_FRAME} and {@code QUAD_CORNER_LINE_FRAME} are the pipeline's ring-frame
  * predictors ({@link Prediction}) through its own {@code FLAT} split: a frame rotates the residual, so
  * it is not a {@link Predictor} rule, but its residual pairs are one per vertex like the others'.
  * They compose with {@code --reorder} like any known row; a new rule cannot be framed from here.
  *
- * <p>Retired predictors (right-angle turn, context delta, midpoint reflect, fixed rotation, the road chain)
- * and their rows are history: their numbers are in {@code docs/results/failed/}, and the code is at the
+ * <p>Retired predictors (right-angle turn, context delta, midpoint reflect, fixed rotation, the road
+ * chain) and the whole-encoding rows (turn scalar, shared references: the pipeline measures them)
+ * are history: their numbers are in {@code docs/results/failed/}, and the code is at the
  * {@code pre-consolidation} tag.
  */
 public final class Workshop {
@@ -77,73 +60,25 @@ public final class Workshop {
 
     /**
      * The predictors measured so far, without segmentation. {@code DELTA} is the baseline transform
-     * written as a rule, so its Varint bytes equal {@code DELTA_ZIGZAG_VARINT}'s.
+     * written as a rule, so its Varint bytes equal {@code DELTA_ZIGZAG_VARINT}'s. The others are the
+     * pipeline's own predictors ({@link Prediction}) through its {@code FLAT} split ({@link
+     * PredictionTransform}), so a row here and the {@code FLAT} row of {@code research measure} write
+     * the same residual pairs; the ring-frame ones rotate the residual and so are not a {@link
+     * Predictor} rule.
      */
     public static List<Row> known() {
-        var turnScalar = new TurnScalar(Layout.INTERLEAVED);
-        var sharedVertexRef = new SharedVertexRef();
         return List.of(
                 deltaRow(),
-                row(interleaved(new SegmentQuadCorner())),
-                row(interleaved(new LineContinuation())),
-                row(interleaved(new QuadCornerLine())),
-                new Row(
-                        turnScalar.name(),
-                        new VertexBufferCodec(turnScalar, IntCodec.VARINT),
-                        ctx -> new Residuals(turnScalar.residualPairs(ctx), turnScalar.alongCount(ctx))),
-                new Row(
-                        sharedVertexRef.name(),
-                        sharedVertexRef,
-                        ctx -> {
-                            var shared = sharedVertexRef.residuals(ctx);
-                            return new Residuals(shared.pairs(), shared.flags());
-                        }),
-                row(new FramedTransform(Prediction.QUAD_CORNER_FRAME)),
-                row(new FramedTransform(Prediction.QUAD_CORNER_LINE_FRAME)));
+                predictionRow(Prediction.QUAD_CORNER),
+                predictionRow(Prediction.LINE_CONTINUATION),
+                predictionRow(Prediction.QUAD_CORNER_LINE),
+                predictionRow(Prediction.QUAD_CORNER_FRAME),
+                predictionRow(Prediction.QUAD_CORNER_LINE_FRAME));
     }
 
-    /**
-     * A pipeline predictor with the ring frame ({@link Prediction#QUAD_CORNER_FRAME}, {@link
-     * Prediction#QUAD_CORNER_LINE_FRAME}) as an interleaved transform: the pipeline's own {@link
-     * Segmentation#FLAT} split and join, so its residual pairs are the ones the pipeline's {@code FLAT}
-     * rows write, and the ring frame is {@code RingFramePrior}'s. The frame rotates the residual of a
-     * ring's plain-delta vertices into the frame of the nearest decoded ring (nothing signalled), which
-     * a {@link Predictor} rule, which only predicts a position, cannot express; so this is a known row
-     * and not an experiment.
-     */
-    private record FramedTransform(Prediction prediction) implements VertexTransform {
-
-        @Override
-        public String name() {
-            return prediction.name();
-        }
-
-        @Override
-        public int[] apply(BufferContext ctx) {
-            final var predictor = prediction.predictor();
-            final var n = ctx.vertices().size();
-            final var layout = Segmentation.FLAT.layout(ctx, predictor, n);
-            final var residuals = Segmentation.split(layout, predictor, ctx.vertices())[0];
-            final var values = new int[residuals.length];
-            for (var i = 0; i < values.length; i++) {
-                values[i] = EncodingUtils.encodeZigZag(residuals[i]);
-            }
-            return values;
-        }
-
-        @Override
-        public List<Vertex> invert(int[] values, BufferContext ctx) {
-            final var predictor = prediction.predictor();
-            final var n = values.length / 2;
-            final var layout = Segmentation.FLAT.layout(ctx, predictor, n);
-            final var residuals = new int[values.length];
-            for (var i = 0; i < values.length; i++) {
-                residuals[i] = DecodingUtils.decodeZigZag(values[i]);
-            }
-            return Segmentation.join(layout, predictor, new int[][] {residuals}, n);
-        }
+    private static Row predictionRow(Prediction prediction) {
+        return row(new PredictionTransform(prediction));
     }
-
     /**
      * New ideas. A rule predicts vertex {@code i} from vertices {@code < i} and the {@link Topology},
      * e.g. continuation on every line vertex past the second:
@@ -235,7 +170,7 @@ public final class Workshop {
      * context without vertices, which a second reorder could not chain.
      */
     public static List<Row> partChainRows() {
-        var inner = List.of(deltaRow(), row(interleaved(new LineContinuation())), row(chainContinuation().transform()));
+        var inner = List.of(deltaRow(), predictionRow(Prediction.LINE_CONTINUATION), row(chainContinuation().transform()));
         var rows = new ArrayList<Row>();
         for (var chain : List.of(GeometryReorder.PART_CHAIN, GeometryReorder.PART_CHAIN_REV)) {
             for (var row : inner) {
@@ -328,7 +263,7 @@ public final class Workshop {
 
         @Override
         public BufferContext emitted(BufferContext ctx) {
-            // An inner encoding may reorder further (SharedVertexRef rotates rings): what the decoder
+            // An inner encoding may reorder further (the shared-reference predictors rotate rings): what the decoder
             // emits is the inner one's emitted buffer over the reordered one.
             return inner.emitted(reorder.apply(ctx));
         }
@@ -347,7 +282,4 @@ public final class Workshop {
                 ctx -> new Residuals(transform.apply(ctx), 0));
     }
 
-    private static VertexTransform interleaved(ClassifiedPredictor predictor) {
-        return new PredictedTransform(predictor, Layout.INTERLEAVED);
-    }
 }

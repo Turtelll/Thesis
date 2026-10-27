@@ -3,7 +3,7 @@ package org.maplibre.mlt.research.pipeline;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
-import org.maplibre.mlt.research.encoding.research.GeometryReorder;
+import org.maplibre.mlt.research.pipeline.mechanism.GeometryReorder;
 
 import java.util.ArrayList;
 import java.util.Arrays;

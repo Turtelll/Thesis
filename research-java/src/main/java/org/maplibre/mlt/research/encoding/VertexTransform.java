@@ -37,7 +37,7 @@ public interface VertexTransform {
     /**
      * Whether values {@code 2i} and {@code 2i + 1} of {@link #apply} belong to vertex {@code i}, so
      * a residual can be paired with another transform's residual for the same vertex. False for a
-     * layout that permutes the slots, e.g. {@link Layout#SEGMENTED}.
+     * layout that permutes the slots, e.g. a segmentation by vertex class.
      */
     default boolean vertexAligned() {
         return true;

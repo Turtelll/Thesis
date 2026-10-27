@@ -1,5 +1,7 @@
 # Predictors for >4-vertex rings
 
+> **Consolidation note.** The Gradle task(s) ringPrior, buildingShape named below were removed from the build (the code is at git tag `pre-consolidation`); `research measure` and the other `research` commands replace the rest. The numbers below are unchanged history.
+
 **Status:** measured, no encoder written (baseline delta already near-optimal on the
 pooled population); parity resolution opened WP2/WP3 — see [rot90-fixed.md](../rot90-fixed.md)
 **Corpus:** previous Munich corpus (`munich.mbtiles`) — see [../reordering.md](../reordering.md)

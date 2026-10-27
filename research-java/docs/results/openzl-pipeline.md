@@ -14,7 +14,7 @@ S5 (a per-stream GCD) was measured below and then removed from the encoder. Late
 
 Each step varies only its own stage over the winners of the steps before it and is kept or
 discarded on the measured bytes. The rows of a step are `PipelineRegistry.step("sN")`, so
-`./gradlew pipeline --args="--step sN --by-zoom"` reproduces its table whatever was decided
+`./gradlew research --args="measure --step sN --by-zoom"` reproduces its table whatever was decided
 later. The rule of the per-step gate: a mechanism test (`src/test/.../pipeline/*MechanismTest`),
 a lossless round trip of the whole corpus (the CLI aborts on the first mismatch), and a verdict here.
 
@@ -415,7 +415,7 @@ next experiment, on the no-reorder base first.
 
 ## The whole pipeline, stage by stage
 
-`./gradlew pipeline --args="--step ladder --by-zoom"` (log `research-java/build/pipeline-ladder.txt`)
+`./gradlew research --args="measure --step ladder --by-zoom"` (log `research-java/build/pipeline-ladder.txt`)
 encodes every buffer with the pipeline built up one decision at a time and prints the sizes. It does
 **not** round-trip the buffers: every stage is a row of some step, which `PipelineEncodingTest` verifies
 over `PipelineRegistry.all()`, and `LadderTest` checks that each stage is such a row and that no two
@@ -441,7 +441,7 @@ saves in the geometry buffers.
 
 ## Oracle: which combination compresses best
 
-`./gradlew pipeline --args="--step oracle --by-zoom"` (log `research-java/build/pipeline-oracle.txt`, 4.368
+`./gradlew research --args="measure --step oracle --by-zoom"` (log `research-java/build/pipeline-oracle.txt`, 4.368
 buffers, 358 tiles, Brotli 11, 14 minutes, not round-tripped here: the 48 rows are in
 `PipelineRegistry.all()` and so in the round-trip tests). The candidates are the full grid of the decisions
 a buffer's content can change: reorder (none or `HILBERT_CENTROID_ROT_MP`) x predictor (`QUAD_CORNER_LINE`,

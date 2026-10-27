@@ -1,10 +1,12 @@
 # Ring frame prior — `QUAD_CORNER_SHARED_FRAME`
 
+> **Consolidation note.** The Gradle task(s) benchmark named below were removed from the build (the code is at git tag `pre-consolidation`); `research measure` and the other `research` commands replace the rest. The numbers below are unchanged history.
+
 > **Partially rebuilt.** The original file was lost (it was never committed). This version holds the
 > sections whose numbers are still known: the idea, the headline results from the results
 > [README](README.md), the pipeline, workshop and other-layer measurements, decode time and open items.
 > Sections marked **TODO** need the Stage 0 probe and the encoder benchmark re-run
-> (`./gradlew orientationPrior --args="../data/extractedBaseline --layer building"` and
+> (`./gradlew research --args="orientation-prior ../data/extractedBaseline --layer building"` and
 > `./gradlew benchmark`) to be written back with their original numbers.
 
 ## The idea
@@ -34,7 +36,7 @@ framed stream is smaller than plain delta off the axes and not worse on them.
 
 ## Probe first (Stage 0): `OrientationPriorCli`
 
-**TODO** — numbers lost. `./gradlew orientationPrior --args="../data/extractedBaseline --layer building"`
+**TODO** — numbers lost. `./gradlew research --args="orientation-prior ../data/extractedBaseline --layer building"`
 measures the frame from decoded neighbours against a pre-pass of per-buffer frames, with plain delta as
 the reference. The conclusion that was drawn: free decoded-neighbour context beats a pre-pass of buffer
 frames, because the index cost of the pre-pass exceeds its accuracy gain.
@@ -57,7 +59,7 @@ The frame is also a predictor of the separate `pipeline/` package: `Prediction.Q
 streams, as `SharedVertexRef` does, and frames the plain-delta vertices of polygon rings except a ring's
 start. Same `RingFramePrior`, same integer rotation, no extra stream. The pipeline has no shared-vertex
 references, so the frame has to earn its gain on the plain QUAD_CORNER residual alone.
-Run: `./gradlew pipeline --args="--step frame --layer building --by-zoom --with-old"`; 310 `building` buffers,
+Run: `./gradlew research --args="measure --step frame --layer building --by-zoom --with-old"`; 310 `building` buffers,
 every row round-tripped, per tile, change vs `DELTA_ZIGZAG_VARINT`:
 
 | Row (`HILBERT_CENTROID_ROT_MP`, `CLASS`, `ESCAPE`) | gzip | Brotli 11 | zstd 19 |
@@ -85,7 +87,7 @@ at z13 -3,15% → -6,46% and at z14 -10,68% → -14,21% (gzip, whole tiles). The
   the shared-vertex references the pipeline lacks are worth about that much on top of the frame
   (those two numbers come from different runs and are not re-measured side by side here).
 
-**In the workshop** (`./gradlew workshop --args="--layer building"`): `QUAD_CORNER_FRAME` and
+**In the workshop** (`./gradlew research --args="workshop --layer building"`): `QUAD_CORNER_FRAME` and
 `QUAD_CORNER_LINE_FRAME` are known rows (the pipeline predictors through its own `FLAT` split, so the
 residual pairs are the pipeline's `FLAT` ones; a workshop `Predictor` rule only predicts a position and
 cannot rotate a residual, so a new rule cannot be framed from there). Interleaved over Varint, per-tile gzip
@@ -103,7 +105,7 @@ frame: the 1,5x budget does not apply to this target
 ([general-purpose-compression.md](general-purpose-compression.md)), and the whole-corpus per-layer default
 goes to -7,36% gzip / -13,55% Brotli / -9,16% zstd ([openzl-pipeline.md](openzl-pipeline.md#per-layer-default)).
 
-Other layers (`./gradlew pipeline --args="--step framelayers --layer <name>"`, each layer's own terminal,
+Other layers (`./gradlew research --args="measure --step framelayers --layer <name>"`, each layer's own terminal,
 plain → framed, gzip / Brotli / zstd): `landcover` -4,70% → -5,15% / -7,38% → -7,92% / -5,64% → -6,21%,
 `landuse` -4,70% → -5,72% / -8,41% → -9,63% / -6,16% → -7,29%, `aeroway` -2,14% → -2,21% / -16,47% →
 -17,84% / -10,96% → -11,13% (58 buffers): these three now use the frame. `water` -2,41% → -2,24% gzip
@@ -117,7 +119,7 @@ per-layer default: -7,45% gzip / -13,66% Brotli / -9,29% zstd. Decode on those l
 
 ## Decode time (old encoding set)
 
-`./gradlew decodeTime --args="../data/extractedBaseline --encoding QUAD_CORNER_SHARED_FRAME --layer building"`
+`./gradlew research --args="decode-time ../data/extractedBaseline --encoding QUAD_CORNER_SHARED_FRAME --layer building"`
 (end to end, 310 `building` buffers): 5,1x `DELTA_ZIGZAG_FASTPFOR` (487 ms against 95 ms; 7,0x in the 5000+
 vertex bucket, 115 ns/value), against 1,37x for `QUAD_CORNER_SHARED`. The 1,5x decode budget does not
 apply to the general-purpose-compression target ([general-purpose-compression.md](general-purpose-compression.md)):

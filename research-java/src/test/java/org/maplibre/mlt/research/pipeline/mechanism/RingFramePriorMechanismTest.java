@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoding.research;
+package org.maplibre.mlt.research.pipeline.mechanism;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -8,6 +8,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.pipeline.Prediction;
+import org.maplibre.mlt.research.pipeline.PredictionTransform;
 
 /**
  * Pins {@code QUAD_CORNER_SHARED_FRAME}: ring edges are coded in the frame of the nearest decoded
@@ -55,42 +57,28 @@ class RingFramePriorMechanismTest {
     return new BufferContext(vertices, types, List.of(), parts, numRings);
   }
 
-  private static BufferContext topologyOnly(BufferContext ctx) {
-    return new BufferContext(
-        List.of(), ctx.geometryTypes(), ctx.numGeometries(), ctx.numParts(), ctx.numRings());
-  }
-
-  private static SharedVertexRef framed() {
-    return new SharedVertexRef("QUAD_CORNER", new SegmentQuadCorner(), GeometryReorder.NONE, true);
+  private static long residualBits(Prediction prediction, BufferContext ctx) {
+    var sum = 0L;
+    for (final var value : new PredictionTransform(prediction).apply(ctx)) {
+      sum += 32 - Integer.numberOfLeadingZeros(value);
+    }
+    return sum;
   }
 
   @Test
-  void streetOffTheTileAxesCostsLessThanPlainDelta() {
+  void streetOffTheTileAxesCostsFewerResidualBitsThanPlainCorners() {
     final var ctx = street(40, 33);
-    final var plain = new SharedVertexRef().encode(ctx).payload();
-    final var framed = framed().encode(ctx).payload();
-    assertTrue(
-        framed.length < plain.length,
-        "framed " + framed.length + " bytes vs plain " + plain.length + " bytes");
+    final var plain = residualBits(Prediction.QUAD_CORNER, ctx);
+    final var framed = residualBits(Prediction.QUAD_CORNER_FRAME, ctx);
+    assertTrue(framed < plain, "framed " + framed + " bits vs plain " + plain + " bits");
   }
 
   @Test
   void streetAlongTheTileAxesIsNotMadeWorse() {
     final var ctx = street(40, 0);
-    final var plain = new SharedVertexRef().encode(ctx).payload();
-    final var framed = framed().encode(ctx).payload();
-    assertTrue(framed.length <= plain.length + 8);
-  }
-
-  @Test
-  void reconstructsFromTopologyAlone() {
-    for (final var degrees : new double[] {0, 7, 33, 44.9, 45, 61, -20, 90, 123.4}) {
-      final var ctx = street(30, degrees);
-      final var encoding = framed();
-      final var decoded =
-          encoding.decode(encoding.encode(ctx), topologyOnly(ctx), ctx.vertices().size());
-      assertEquals(encoding.emitted(ctx).vertices(), decoded, "street at " + degrees + " degrees");
-    }
+    assertTrue(
+        residualBits(Prediction.QUAD_CORNER_FRAME, ctx)
+            <= residualBits(Prediction.QUAD_CORNER, ctx) + 8);
   }
 
   @Test

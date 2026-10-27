@@ -13,12 +13,7 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
-import org.maplibre.mlt.research.encoding.IntCodec;
-import org.maplibre.mlt.research.encoding.Layout;
-import org.maplibre.mlt.research.encoding.research.failed.TurnScalar;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
-import org.maplibre.mlt.research.encoding.research.LineContinuationEncoding;
-import org.maplibre.mlt.research.encoding.research.QuadCornerEncoding;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 
 /**
@@ -107,26 +102,24 @@ class PredictionMechanismTest {
   }
 
   @Test
-  void quadCornerResidualsAreTheOldQuadCornerValues() {
+  void quadCornerPredictsARectanglesFourthCornerExactly() {
     var ctx = buildings();
-    var old = new QuadCornerEncoding().encode(ctx).payload();
-    var expected = IntCodec.VARINT_SPLIT.decode(old, ctx.vertices().size() * 2);
+    var values = regionValues(Prediction.QUAD_CORNER, ctx);
 
-    assertArrayEquals(expected, regionValues(Prediction.QUAD_CORNER, ctx));
+    assertEquals(ctx.vertices().size() * 2, values.length);
     assertTrue(
-        java.util.Arrays.stream(regionValues(Prediction.QUAD_CORNER, ctx)).anyMatch(v -> v == 0),
+        java.util.Arrays.stream(values).anyMatch(v -> v == 0),
         "a rectangle's fourth corner is predicted exactly");
   }
 
   @Test
-  void lineContinuationResidualsAreTheOldLineContinuationValues() {
+  void lineContinuationWritesOneResidualPairPerVertex() {
     var ctx = roads();
-    var old = new LineContinuationEncoding().encode(ctx).payload();
-    var expected = IntCodec.VARINT_SPLIT.decode(old, ctx.vertices().size() * 2);
+    var values = regionValues(Prediction.LINE_CONTINUATION, ctx);
 
-    assertArrayEquals(expected, regionValues(Prediction.LINE_CONTINUATION, ctx));
+    assertEquals(ctx.vertices().size() * 2, values.length);
+    assertTrue(java.util.Arrays.stream(values).allMatch(v -> v >= 0), "zigzag values are never negative");
   }
-
   /** Every predictor reconstructs every kind of buffer from the topology alone (no vertices). */
   @ParameterizedTest
   @EnumSource(Prediction.class)
@@ -144,24 +137,17 @@ class PredictionMechanismTest {
     }
   }
 
-  /** The pipeline's TURN_SCALAR writes the old transform's values: its residual pairs, and its scalars as a stream. */
+  /** TURN_SCALAR writes one residual pair per vertex and its {@code along} scalars as a side stream. */
   @Test
-  void turnScalarResidualsAreTheOldTurnScalarValues() {
+  void turnScalarWritesAScalarPerTurnVertex() {
     var ctx = buildings();
-    var old = new TurnScalar(Layout.INTERLEAVED);
     var predictor = Prediction.TURN_SCALAR.predictor();
     var layout = Segmentation.FLAT.layout(ctx, predictor, ctx.vertices().size());
     var streams = Segmentation.split(layout, predictor, ctx.vertices());
 
-    var pairs = old.residualPairs(ctx);
-    assertEquals(pairs.length, streams[0].length);
-    for (var i = 0; i < pairs.length; i++) {
-      assertEquals(pairs[i], EncodingUtils.encodeZigZag(streams[0][i]), "residual value " + i);
-    }
-    assertTrue(old.alongCount(ctx) > 0, "the L-shaped building has turn vertices");
-    assertEquals(old.alongCount(ctx), streams[layout.sideStream()].length);
+    assertEquals(ctx.vertices().size() * 2, streams[0].length);
+    assertTrue(streams[layout.sideStream()].length > 0, "the L-shaped building has turn vertices");
   }
-
   @ParameterizedTest
   @EnumSource(Prediction.class)
   void headerCarriesThePredictor(Prediction prediction) {

@@ -27,7 +27,7 @@ against 398.878 continued vertices: 2 vertices 162.535, 3 vertices 91.676, 4-5 1
 
 ## Stage 0 probe: `LineFramePriorCli`
 
-`./gradlew lineFramePrior --args="../data/extractedBaseline ../data/extracted-chicago ../data/extracted-overture --layer transportation"`.
+`./gradlew research --args="line-frame-prior ../data/extractedBaseline ../data/extracted-chicago ../data/extracted-overture --layer transportation"`.
 Sized stream: `LINE_CONTINUATION`'s layout, interleaved zigzag varints, and the three class streams
 (unframed plain delta | framed edges | continuation residuals) concatenated, each gzipped per buffer.
 Frame sources, all decodable except `OWN_EDGE`:
@@ -82,7 +82,7 @@ already has a zero component on 12,7% of the framed edges, and the frame error o
 
 ## Measured: the pipeline, `--step framelines`
 
-`./gradlew pipeline --args="../data/<corpus> --step framelines --layer transportation --by-zoom"`: every row
+`./gradlew research --args="measure ../data/<corpus> --step framelines --layer transportation --by-zoom"`: every row
 round-tripped, per tile, gzip / Brotli 11 / zstd 19 against `DELTA_ZIGZAG_VARINT`. `HILBERT_CENTROID_ROT_MP`,
 class streams, escape width, byte planes is `forLayer("transportation")`'s terminal:
 

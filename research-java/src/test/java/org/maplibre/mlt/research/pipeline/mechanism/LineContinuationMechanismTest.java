@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoding.research;
+package org.maplibre.mlt.research.pipeline.mechanism;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -7,8 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.Layout;
-import org.maplibre.mlt.research.encoding.PredictedTransform;
+import org.maplibre.mlt.research.pipeline.Prediction;
+import org.maplibre.mlt.research.pipeline.PredictionTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexTransform;
 
@@ -102,15 +102,17 @@ class LineContinuationMechanismTest {
   @Test
   void reconstructsWithoutReadingTheOriginalVertices() {
     final var ctx = mixedColumn();
-    final var transform = new PredictedTransform(new LineContinuation(), Layout.SEGMENTED);
-    final var decoded = transform.invert(transform.apply(ctx), topologyOnly(ctx));
+    final var predictor = new LineContinuation();
+    final var decoded =
+        ClassSegmented.invert(
+            predictor, ClassSegmented.apply(predictor, ctx), topologyOnly(ctx), ctx.vertices().size());
     assertEquals(ctx.vertices(), decoded);
   }
 
   @Test
   void residualMultisetIsPreservedInterleaved() {
     final var ctx = mixedColumn();
-    final var predicted = new PredictedTransform(new LineContinuation(), Layout.INTERLEAVED).apply(ctx);
+    final var predicted = new PredictionTransform(Prediction.LINE_CONTINUATION).apply(ctx);
     final var baseline = new VertexTransform.ZigZagDelta().apply(ctx);
     assertEquals(baseline.length, predicted.length);
     assertNotEquals(java.util.Arrays.toString(baseline), java.util.Arrays.toString(predicted));

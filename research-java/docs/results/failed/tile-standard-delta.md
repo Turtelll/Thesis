@@ -1,5 +1,7 @@
 # Standard deltas learned per tile — `TILE_STD_DELTA_*`
 
+> **Consolidation note.** The Gradle task(s) benchmark named below were removed from the build (the code is at git tag `pre-consolidation`); `research measure` and the other `research` commands replace the rest. The numbers below are unchanged history.
+
 **Status:** measured, regression. Registered compression-only (`--compress --tile-std-delta`),
 class in `encoding/research/failed/TileStandardDelta.java`
 **Effect:** every row is worse than `DELTA_ZIGZAG_VARINT` under every compressor. The best,

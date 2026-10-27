@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoding.research.failed;
+package org.maplibre.mlt.research.pipeline.mechanism;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -10,7 +10,9 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.Layout;
+import org.maplibre.mlt.research.pipeline.Prediction;
+import org.maplibre.mlt.research.pipeline.PredictionTransform;
+import org.maplibre.mlt.research.encoding.ClassifiedPredictor;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 
 /**
@@ -20,6 +22,8 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
  * and the transform reconstructs from the topology streams alone.
  */
 class TurnScalarMechanismTest {
+
+  private static final ClassifiedPredictor PREDICTOR = Prediction.TURN_SCALAR.predictor();
 
   private static final int POLYGON = 2;
   private static final int LINESTRING = 1;
@@ -74,11 +78,11 @@ class TurnScalarMechanismTest {
   @Test
   void rectilinearRingHasZeroCorrectionAndSignedLengthScalar() {
     final var ctx = polygons(List.of(1), List.of(L_SHAPE));
-    final var values = new TurnScalar(Layout.SEGMENTED).apply(ctx);
-    // Regions: start 2 | interior 2 | corner 0 | along 4 | corr 8.
+    final var values = ClassSegmented.apply(PREDICTOR, ctx);
+    // Regions: start 2 | interior 2 | corner 0 | turn corr 8 | along 4 (the side stream last).
     assertEquals(16, values.length);
-    final var along = Arrays.copyOfRange(values, 4, 8);
-    final var corr = Arrays.copyOfRange(values, 8, 16);
+    final var corr = Arrays.copyOfRange(values, 4, 12);
+    final var along = Arrays.copyOfRange(values, 12, 16);
     assertArrayEquals(new int[8], corr);
     // Edges after a convex corner have a positive length; after the reflex corner a negative one.
     assertArrayEquals(new int[] {zz(10), zz(10), zz(-10), zz(10)}, along);
@@ -87,12 +91,12 @@ class TurnScalarMechanismTest {
   @Test
   void innerRingRotatesClockwiseSoConvexCornersStayPositive() {
     final var ctx = polygons(List.of(2), List.of(SQUARE, L_SHAPE_CW));
-    final var values = new TurnScalar(Layout.SEGMENTED).apply(ctx);
-    // Regions: start 4 | interior 6 | corner 2 | along 4 | corr 8.
-    final var along = Arrays.copyOfRange(values, 12, 16);
+    final var values = ClassSegmented.apply(PREDICTOR, ctx);
+    // Regions: start 4 | interior 6 | corner 2 | turn corr 8 | along 4.
+    final var along = Arrays.copyOfRange(values, 20, 24);
     // Only the edge after the reflex corner is negative; the last edge is 20 long.
     assertArrayEquals(new int[] {zz(10), zz(-10), zz(10), zz(20)}, along);
-    assertArrayEquals(new int[8], Arrays.copyOfRange(values, 16, 24));
+    assertArrayEquals(new int[8], Arrays.copyOfRange(values, 12, 20));
   }
 
   @Test
@@ -108,7 +112,7 @@ class TurnScalarMechanismTest {
     final var ctx =
         new BufferContext(L_SHAPE, List.of(LINESTRING), List.of(), List.of(6), List.of());
     assertEquals(0, TurnScalar.classify(ctx, 6).turns());
-    assertEquals(12, new TurnScalar(Layout.INTERLEAVED).apply(ctx).length);
+    assertEquals(12, new PredictionTransform(Prediction.TURN_SCALAR).apply(ctx).length);
   }
 
   @Test
@@ -122,26 +126,24 @@ class TurnScalarMechanismTest {
             new Vertex(10, 30),
             new Vertex(-1, 26),
             new Vertex(0, 0));
-    for (final var layout : Layout.values()) {
-      final var transform = new TurnScalar(layout);
-      for (final var ctx :
-          List.of(
-              polygons(List.of(2, 1), List.of(SQUARE, L_SHAPE_CW, skewed)),
-              polygons(List.of(1), List.of(L_SHAPE)))) {
-        final var values = transform.apply(ctx);
-        assertEquals(transform.valueCount(ctx, ctx.vertices().size()), values.length);
-        assertEquals(ctx.vertices(), transform.invert(values, topologyOnly(ctx)), layout.name());
-      }
+    for (final var ctx :
+        List.of(
+            polygons(List.of(2, 1), List.of(SQUARE, L_SHAPE_CW, skewed)),
+            polygons(List.of(1), List.of(L_SHAPE)))) {
+      final var n = ctx.vertices().size();
+      final var values = ClassSegmented.apply(PREDICTOR, ctx);
+      assertEquals(
+          n * 2 + TurnScalar.classify(ctx, n).turns(), values.length, "one residual pair per vertex plus an along per turn");
+      assertEquals(ctx.vertices(), ClassSegmented.invert(PREDICTOR, values, topologyOnly(ctx), n));
     }
   }
-
   @Test
   void corruptedStreamDoesNotReconstruct() {
     final var ctx = polygons(List.of(1), List.of(L_SHAPE));
-    final var transform = new TurnScalar(Layout.INTERLEAVED);
-    final var values = transform.apply(ctx);
+    final var values = ClassSegmented.apply(PREDICTOR, ctx);
     values[4] += 2;
-    assertNotEquals(ctx.vertices(), transform.invert(values, topologyOnly(ctx)));
+    assertNotEquals(
+        ctx.vertices(), ClassSegmented.invert(PREDICTOR, values, topologyOnly(ctx), ctx.vertices().size()));
   }
 
   private static int zz(int value) {

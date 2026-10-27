@@ -15,13 +15,13 @@ import java.util.Random;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.IntCodec;
-import org.maplibre.mlt.research.encoding.Layout;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
-import org.maplibre.mlt.research.encoding.PredictedTransform;
+import org.maplibre.mlt.research.pipeline.Prediction;
+import org.maplibre.mlt.research.pipeline.PredictionTransform;
 import org.maplibre.mlt.research.encoding.VertexTransform;
-import org.maplibre.mlt.research.encoding.research.QuadCornerLine;
-import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
-import org.maplibre.mlt.research.encoding.research.failed.TurnScalar;
+import org.maplibre.mlt.research.pipeline.mechanism.QuadCornerLine;
+import org.maplibre.mlt.research.pipeline.mechanism.SegmentQuadCorner;
+import org.maplibre.mlt.research.pipeline.mechanism.TurnScalar;
 
 /**
  * Pins the workshop's plumbing: the {@code DELTA} rule is the baseline transform, the
@@ -95,31 +95,18 @@ class WorkshopTest {
     // lines carry no ring: the frame changes nothing, the rows equal their plain predictors
     var lines = lines();
     assertArrayEquals(
-        new PredictedTransform(new QuadCornerLine(), Layout.INTERLEAVED).apply(lines),
+        new PredictionTransform(Prediction.QUAD_CORNER_LINE).apply(lines),
         known("QUAD_CORNER_LINE_FRAME").residuals().apply(lines).pairs());
     assertArrayEquals(
-        new PredictedTransform(new SegmentQuadCorner(), Layout.INTERLEAVED).apply(lines),
+        new PredictionTransform(Prediction.QUAD_CORNER).apply(lines),
         known("QUAD_CORNER_FRAME").residuals().apply(lines).pairs());
     // rings: the same number of pairs, but the rotated edges differ from the plain quad-corner ones
     var rings = rings();
     assertFalse(
         Arrays.equals(
-            new PredictedTransform(new SegmentQuadCorner(), Layout.INTERLEAVED).apply(rings),
+            new PredictionTransform(Prediction.QUAD_CORNER).apply(rings),
             known("QUAD_CORNER_FRAME").residuals().apply(rings).pairs()),
         "the fixture must have ring edges the frame rotates");
-  }
-
-  @Test
-  void turnScalarPairsDropOnlyTheAlongScalars() {
-    var ctx = rings();
-    var turnScalar = new TurnScalar(Layout.INTERLEAVED);
-    var stream = turnScalar.apply(ctx);
-    var pairs = turnScalar.residualPairs(ctx);
-    var along = turnScalar.alongCount(ctx);
-
-    assertTrue(along > 0, "the 8- and 12-vertex rings carry turns");
-    assertEquals(stream.length - along, pairs.length);
-    assertEquals(2 * ctx.vertices().size(), pairs.length);
   }
 
   /**
