@@ -60,6 +60,16 @@ tasks.register('benchmark', JavaExec) {
     mainClass = 'org.maplibre.mlt.research.cli.BenchmarkCli'
 }
 
+/* Golden master of every row (docs/consolidation): ./gradlew goldenDump --args="--out ../data/golden/x"
+ * and ./gradlew goldenDump --args="--diff ../data/golden/pre-consolidation ../data/golden/x" */
+tasks.register('goldenDump', JavaExec) {
+    group = 'application'
+    description = 'Dumps SHA-256 and per-buffer/per-tile compressed sizes of every registered row; --diff compares two dumps.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.maplibre.mlt.research.cli.GoldenDumpCli'
+    jvmArgs = ['-Xmx6g']
+}
+
 /* Charts (SVG) from a benchmark CSV: ./gradlew chart --args="../data/out/wins-check.csv" */
 tasks.register('chart', JavaExec) {
     group = 'application'
