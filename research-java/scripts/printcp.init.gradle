@@ -1,0 +1,13 @@
+// ./gradlew -q -I scripts/printcp.init.gradle printRuntimeClasspath > build/runtime-classpath.txt
+// The main runtime classpath on one line, for tools that run the CLIs with plain `java` (scripts/coverage.ps1).
+allprojects {
+    afterEvaluate { project ->
+        if (project.plugins.hasPlugin('java') && project.path == ':') {
+            project.tasks.register('printRuntimeClasspath') {
+                doLast {
+                    println project.sourceSets.main.runtimeClasspath.asPath
+                }
+            }
+        }
+    }
+}
