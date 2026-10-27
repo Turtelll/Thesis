@@ -52,7 +52,7 @@ import java.util.TreeMap;
  *       alongside curvature rather than left to confound it.
  * </ul>
  *
- * <p>Usage: {@code ./gradlew turnRadius --args="../data/extractedBaseline --layer transportation"}
+ * <p>Usage: {@code ./gradlew research --args="turn-radius ../data/extractedBaseline --layer transportation"}
  */
 public final class TurnRadiusCli {
     private TurnRadiusCli() {

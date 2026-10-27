@@ -21,8 +21,6 @@ import org.maplibre.mlt.research.encoding.PredictedTransform;
 import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.encoding.research.QuadCornerLine;
 import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
-import org.maplibre.mlt.research.encoding.research.failed.ContextDelta;
-import org.maplibre.mlt.research.encoding.research.failed.MidpointReflect;
 import org.maplibre.mlt.research.encoding.research.failed.TurnScalar;
 
 /**
@@ -73,35 +71,6 @@ class WorkshopTest {
 
     assertEquals("DELTA", delta.name());
     assertArrayEquals(new VertexTransform.ZigZagDelta().apply(ctx), delta.residuals().apply(ctx).pairs());
-  }
-
-  @Test
-  void midpointReflectPortHasTheOriginalsResiduals() {
-    var ctx = rings();
-    for (var pairing : MidpointReflect.Pairing.values()) {
-      var original = new MidpointReflect(pairing).apply(ctx);
-      var port = Workshop.midpointReflect(pairing == MidpointReflect.Pairing.SYMMETRIC).transform().apply(ctx);
-
-      assertArrayEquals(sortedPairs(original), sortedPairs(port), pairing.name());
-    }
-  }
-
-  @Test
-  void contextDeltaPortHasTheOriginalsResiduals() {
-    var ctx = lines();
-    var n = ctx.vertices().size();
-    var payload = new ContextDelta("CONTEXT_DELTA_RAW", IntCodec.RAW, 4, 2, 32).encode(ctx).payload();
-    // RAW: the residual stream is the payload's last 2n little-endian ints, behind the count header.
-    var original = new int[2 * n];
-    ByteBuffer.wrap(payload, payload.length - 8 * n, 8 * n).order(ByteOrder.LITTLE_ENDIAN).asIntBuffer().get(original);
-    var port = Workshop.contextDelta(4, 2, 32).transform();
-    var residuals = port.apply(ctx);
-
-    assertArrayEquals(sortedPairs(original), sortedPairs(residuals));
-    assertFalse(
-        Arrays.equals(new VertexTransform.ZigZagDelta().apply(ctx), residuals),
-        "the fixture must take contexts above 0, or this compares two plain deltas");
-    assertEquals(ctx.vertices(), port.invert(residuals, topologyOnly(ctx)));
   }
 
   private static Workshop.Row known(String name) {

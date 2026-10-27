@@ -3,16 +3,12 @@ package org.maplibre.mlt.research.cli;
 import org.maplibre.mlt.research.encoding.Baselines;
 import org.maplibre.mlt.research.encoding.Encoding;
 import org.maplibre.mlt.research.encoding.IntCodec;
-import org.maplibre.mlt.research.encoding.Layout;
-import org.maplibre.mlt.research.encoding.PredictedTransform;
-import org.maplibre.mlt.research.encoding.RansCodec;
-import org.maplibre.mlt.research.encoding.SegmentedEncoding;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
 import org.maplibre.mlt.research.encoding.VertexTransform;
-import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
 import org.maplibre.mlt.research.pipeline.PipelineRegistry;
+import org.maplibre.mlt.research.pipeline.Verification;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 
@@ -37,8 +33,8 @@ import java.util.TreeMap;
  * {@code --encoding} picks any registered encoding by name; both {@link Baselines#baseline()} rows
  * are always measured beside it, and each row is compared against the baseline with the same
  * codec, so a codec difference is never credited to or blamed on the idea. Without {@code
- * --encoding} the original rANS vs FastPFOR, interleaved vs segmented grid runs (see {@code
- * docs/results/decode-time.md}).
+ * --encoding} the baselines and the pipeline's default step (the rANS and segmented-codec grid of {@code
+ * docs/results/decode-time.md} is history, reproducible at the {@code pre-consolidation} tag).
  *
  * <p>Method: in-process, single-threaded, steady-state JVM timing via {@code System.nanoTime()}.
  * No JMH (not a project dependency). A full warmup pass over the corpus runs before any timing is
@@ -46,8 +42,8 @@ import java.util.TreeMap;
  * standard robust estimator against GC/scheduler noise. This is <b>not</b> a cold-start,
  * client-side number: a browser decoder pays JIT warmup cost this harness deliberately excludes.
  *
- * <p>Usage: {@code ./gradlew decodeTime --args="../data/extractedBaseline --encoding
- * LINE_CONTINUATION --layer transportation --reps 5 --warmup 2 --max-ratio 1.5"}
+ * <p>Usage: {@code ./gradlew research --args="decode-time ../data/extractedBaseline --encoding
+ * PIPE_S8 --layer transportation --reps 5 --warmup 2 --max-ratio 1.5"}
  */
 public final class DecodeTimeCli {
     private DecodeTimeCli() {
@@ -58,18 +54,8 @@ public final class DecodeTimeCli {
             "0-50", "50-200", "200-1000", "1000-5000", "5000-inf"
     };
 
-    /**
-     * The original grid, kept as the default so {@code docs/results/decode-time.md} stays
-     * reproducible with a bare {@code ./gradlew decodeTime}.
-     */
-    private static final List<String> DEFAULT_GRID = List.of(
-            "DELTA_ZIGZAG_FASTPFOR",
-            "DELTA_ZIGZAG_RANS",
-            "QUAD_CORNER_FASTPFOR",
-            "QUAD_CORNER_RANS",
-            "QUAD_CORNER_SEG_FASTPFOR",
-            "QUAD_CORNER_SEG_RANS",
-            "QUAD_CORNER_SEG_RANSSEG");
+    /** Without {@code --encoding}: the baselines and the rows of this pipeline step. */
+    private static final String DEFAULT_STEP = "s8";
 
     /** Name prefix of the baseline transform's rows, e.g. {@code DELTA_ZIGZAG_VARINT_XY}. */
     private static final String REFERENCE_TRANSFORM = "DELTA_ZIGZAG_";
@@ -94,8 +80,6 @@ public final class DecodeTimeCli {
             final Optional<CodecOnly> codecOnly;
             if (encoding instanceof VertexBufferCodec codec) {
                 codecOnly = Optional.of(new CodecOnly(codec.codec(), codec.transform()));
-            } else if (encoding instanceof SegmentedEncoding segmented) {
-                codecOnly = Optional.of(new CodecOnly(segmented.codec(), segmented.transform()));
             } else {
                 codecOnly = Optional.empty();
             }
@@ -104,25 +88,12 @@ public final class DecodeTimeCli {
     }
 
     /**
-     * Every encoding selectable by name: {@link Baselines#all()} plus the rANS and FastPFOR rows of
-     * the original grid, which {@code Baselines} does not register in that transform x codec
-     * combination.
+     * Every encoding selectable by name: {@link Baselines#all()} and the pipeline's rows.
      */
     private static Map<String, Encoding> candidates() {
-        final var rans = new RansCodec();
         final var byName = new LinkedHashMap<String, Encoding>();
         for (final var encoding : Baselines.all()) {
             byName.put(encoding.name(), encoding);
-        }
-        for (final var encoding : List.<Encoding>of(
-                new VertexBufferCodec(new VertexTransform.ZigZagDelta(), rans),
-                new VertexBufferCodec(new PredictedTransform(new SegmentQuadCorner(), Layout.INTERLEAVED), rans),
-                new VertexBufferCodec(new PredictedTransform(new SegmentQuadCorner(), Layout.SEGMENTED), rans),
-                new VertexBufferCodec(
-                        new PredictedTransform(new SegmentQuadCorner(), Layout.INTERLEAVED), IntCodec.FASTPFOR),
-                new VertexBufferCodec(
-                        new PredictedTransform(new SegmentQuadCorner(), Layout.SEGMENTED), IntCodec.FASTPFOR))) {
-            byName.putIfAbsent(encoding.name(), encoding);
         }
         // the OpenZL-style pipeline's rows (PIPE_*), measurable by name like any other encoding
         for (final var encoding : PipelineRegistry.all()) {
@@ -138,7 +109,12 @@ public final class DecodeTimeCli {
         final var byName = candidates();
         final var names = new ArrayList<String>();
         if (requested.isEmpty()) {
-            names.addAll(DEFAULT_GRID);
+            for (final var baseline : Baselines.baseline()) {
+                names.add(baseline.name());
+            }
+            for (final var encoding : PipelineRegistry.step(DEFAULT_STEP)) {
+                names.add(encoding.name());
+            }
         } else {
             for (final var baseline : Baselines.baseline()) {
                 names.add(baseline.name());
@@ -173,9 +149,6 @@ public final class DecodeTimeCli {
         if (encoding instanceof VertexBufferCodec codec) {
             return Optional.of(codec.codec());
         }
-        if (encoding instanceof SegmentedEncoding segmented) {
-            return Optional.of(segmented.codec());
-        }
         return Optional.empty();
     }
 
@@ -185,9 +158,6 @@ public final class DecodeTimeCli {
      */
     private static Row referenceOf(Row row, List<Row> rows) {
         final var references = new ArrayList<>(Baselines.baseline().stream().map(Encoding::name).toList());
-        for (final var codec : Baselines.BYTE_SERIALIZERS) {
-            references.add(REFERENCE_TRANSFORM + codec.name());
-        }
         final var codecName = codecOf(row.encoding()).map(IntCodec::name);
         Row fallback = null;
         for (final var candidate : rows) {
@@ -298,7 +268,7 @@ public final class DecodeTimeCli {
                 final var ctx = buffers.get(b);
                 final var encoded = row.encoding().encode(ctx);
                 payloads[r][b] = encoded;
-                BenchmarkCli.verifyRoundTrip(entries.get(b), ctx, row.encoding(), encoded);
+                Verification.roundTrip(Corpus.tileKey(entries.get(b)) + " " + entries.get(b).layerName(), ctx, row.encoding(), encoded);
             }
         }
 

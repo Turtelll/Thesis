@@ -103,21 +103,8 @@ public final class GeometryReorder {
      */
     public static final GeometryReorder PART_CHAIN_REV = new GeometryReorder(Mode.PART_CHAIN_REV);
 
-    /**
-     * Reconstructs roads: line features are chained end to start, forward only, so a feature that
-     * begins exactly where the previous one ended follows it directly. From the current exit the
-     * next feature is an unused one starting at that exact position (the straightest if several),
-     * otherwise the unused feature nearest the exit that no other remaining feature arrives at, so a
-     * road is entered at its beginning. A MultiLineString keeps its part order; its entry is its
-     * first part's first vertex, its exit its last part's last vertex. Polygon features follow the
-     * lines in their original order. No feature is reversed, so direction semantics survive.
-     * {@code docs/results/road-chain.md}.
-     */
-    public static final GeometryReorder ROAD_CHAIN = new GeometryReorder(Mode.ROAD_CHAIN);
-
     private enum Mode {
         NONE("", false),
-        ROAD_CHAIN("_ROAD_CHAIN", false),
         FEATURE("_REORDER", false),
         FEATURE_REV("_REORDER_REV", true),
         RING_ROTATE("_RING_ROTATE", false),
@@ -218,10 +205,6 @@ public final class GeometryReorder {
         if (mode == Mode.PART_CHAIN || mode == Mode.PART_CHAIN_REV) {
             return chainParts(ctx, vertices, starts, lengths, groups);
         }
-        if (mode == Mode.ROAD_CHAIN) {
-            final var roads = roadChain(ctx, vertices, starts, lengths, groups);
-            return roads == null ? ctx : rebuild(ctx, vertices, starts, lengths, groups, roads);
-        }
         final var order = greedyChain(vertices, starts, lengths, groups);
         return rebuild(ctx, vertices, starts, lengths, groups, order);
     }
@@ -250,112 +233,6 @@ public final class GeometryReorder {
         return greedyChain(vertices, starts, runLengths(starts, vertices.size()), groups).stream()
                 .mapToInt(Placed::group)
                 .toArray();
-    }
-
-    // --- road chaining ------------------------------------------------------
-
-    /**
-     * The emission order of {@link #ROAD_CHAIN}, or {@code null} when the buffer has no line
-     * feature. Features are the unit; see {@link #ROAD_CHAIN} for the rules.
-     */
-    private List<Placed> roadChain(
-            BufferContext ctx, List<Vertex> vertices, int[] starts, int[] lengths, List<int[]> groups) {
-        final var n = groups.size();
-        final var isLine = new boolean[n];
-        var lineCount = 0;
-        for (var f = 0; f < n; f++) {
-            final var type = ctx.geometryTypes().get(f);
-            isLine[f] = type != POLYGON && type != MULTIPOLYGON;
-            if (isLine[f]) {
-                lineCount++;
-            }
-        }
-        if (lineCount == 0) {
-            return null;
-        }
-
-        final var entry = new Vertex[n];
-        final var exit = new Vertex[n];
-        final var startingAt = new HashMap<Long, List<Integer>>();
-        final var arriving = new HashMap<Long, Integer>();
-        final var grid = new EndpointGrid(lineCount);
-        for (var f = 0; f < n; f++) {
-            if (!isLine[f]) {
-                continue;
-            }
-            final var group = groups.get(f);
-            entry[f] = first(vertices, starts, group[0]);
-            exit[f] = last(vertices, starts, lengths, group[group.length - 1]);
-            startingAt.computeIfAbsent(key(entry[f]), k -> new ArrayList<>()).add(f);
-            arriving.merge(key(exit[f]), 1, Integer::sum);
-            grid.add(f, false, entry[f]);
-        }
-        grid.build();
-
-        // used: already emitted. blocked: used, or another remaining feature still arrives at its
-        // entry, so it is not the beginning of a road. Restarts prefer unblocked features.
-        final var used = new boolean[n];
-        final var blocked = new boolean[n];
-        for (var f = 0; f < n; f++) {
-            blocked[f] = !isLine[f] || arriving.getOrDefault(key(entry[f]), 0) > 0;
-            used[f] = !isLine[f];
-        }
-
-        final var order = new ArrayList<Placed>(n);
-        Vertex at = null;
-        Vertex before = null;
-        for (var placed = 0; placed < lineCount; placed++) {
-            var pick = -1;
-            if (at != null) {
-                final var predictedX = 2L * at.x() - before.x();
-                final var predictedY = 2L * at.y() - before.y();
-                var bestCost = Long.MAX_VALUE;
-                for (final var candidate : startingAt.getOrDefault(key(at), List.of())) {
-                    if (used[candidate]) {
-                        continue;
-                    }
-                    final var second = second(vertices, starts, lengths, groups.get(candidate)[0], false);
-                    final var cost = Math.abs(second.x() - predictedX) + Math.abs(second.y() - predictedY);
-                    if (cost < bestCost) {
-                        bestCost = cost;
-                        pick = candidate;
-                    }
-                }
-            }
-            if (pick < 0) {
-                final var cursorX = at == null ? 0 : at.x();
-                final var cursorY = at == null ? 0 : at.y();
-                var hit = grid.nearest(cursorX, cursorY, blocked);
-                if (hit.feature() < 0) {
-                    // Only closed loops and cycles remain: every entry still has an arrival.
-                    hit = grid.nearest(cursorX, cursorY, used);
-                }
-                pick = hit.feature();
-            }
-
-            used[pick] = true;
-            blocked[pick] = true;
-            order.add(new Placed(pick, false));
-            at = exit[pick];
-            final var group = groups.get(pick);
-            final var lastPart = group[group.length - 1];
-            before = lengths[lastPart] < 2 ? at : vertices.get(starts[lastPart] + lengths[lastPart] - 2);
-
-            final var endKey = key(exit[pick]);
-            if (arriving.merge(endKey, -1, Integer::sum) == 0) {
-                for (final var released : startingAt.getOrDefault(endKey, List.of())) {
-                    if (!used[released]) {
-                        blocked[released] = false;
-                    }
-                }
-            }
-        }
-        for (var f = 0; f < n; f++) {
-            if (!isLine[f]) {
-                order.add(new Placed(f, false));
-            }
-        }
-        return order;
     }
 
     // --- part chaining inside a MultiLineString -----------------------------

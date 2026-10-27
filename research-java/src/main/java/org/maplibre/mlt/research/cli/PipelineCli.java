@@ -30,14 +30,14 @@ import java.util.TreeMap;
 import java.util.stream.IntStream;
 
 /**
- * Measures the OpenZL-style pipeline ({@code org.maplibre.mlt.research.pipeline}) the way {@link
- * BenchmarkCli} measures the old one: every extracted (tile, layer) buffer is encoded by the two
- * baselines and by the rows of one implementation step, round-tripped, and sized as a browser
- * receives it — every tile's buffers concatenated and compressed on their own, per backend.
+ * The measurement harness: every extracted (tile, layer) buffer is encoded by the two baselines and
+ * by the rows of one implementation step of the pipeline ({@code
+ * org.maplibre.mlt.research.pipeline}), round-tripped, and sized as a browser receives it — every
+ * tile's buffers concatenated and compressed on their own, per backend. Every percentage is against
+ * the smaller of the two baselines under gzip.
  *
  * <p>It lives in {@code cli} only to reuse {@link TileCompression} and {@link Compressor}, which are
- * package-private; it changes nothing of the old pipeline.
- * Every percentage is against the smaller of the two baselines under gzip.
+ * package-private.
  *
  * <p>{@code --oracle} (implied by {@code --step oracle}) replaces the per-row tables by the per-buffer
  * best of the rows: what it chose, how many times, and the result against the reference ({@link
@@ -47,7 +47,7 @@ import java.util.stream.IntStream;
  * chosen on the compressed tile, beside the fixed per-layer default.
  *
  * <p>Usage: {@code [extractionDir] [--step s0|s1|...|tile|ladder|oracle|all] [--oracle] [--rows a,b]
- * [--layer <name>] [--by-zoom] [--stats] [--with-old] [--csv <file>] [--brotli-quality <0-11>]
+ * [--layer <name>] [--by-zoom] [--by-geometry] [--stats] [--with-old] [--csv <file>] [--brotli-quality <0-11>]
  * [--limit-tiles <n>]}.
  */
 public final class PipelineCli {
@@ -66,7 +66,7 @@ public final class PipelineCli {
     public static void main(String[] args) throws IOException {
         final var opts = Options.parse(args);
         final var inDir = Path.of(opts.inDir);
-        final var manifest = tileLimited(groupedByTile(ExtractionReader.readManifest(inDir)), opts.limitTiles);
+        final var manifest = Corpus.tileLimited(Corpus.groupedByTile(ExtractionReader.readManifest(inDir)), opts.limitTiles);
 
         final var baselines = Baselines.baseline();
         final var baselineNames = baselines.stream().map(Encoding::name).toList();
@@ -100,8 +100,7 @@ public final class PipelineCli {
 
         final var probes = opts.stats ? PipelineStats.probes(opts.step) : List.<PipelineStats.Probe>of();
         final var perTile = new TileCompression(compressors);
-        final var byLayer = new TreeMap<String, Map<String, Long>>();
-        final var layerBuffers = new TreeMap<String, Integer>();
+        final var breakdown = new Breakdown();
         final var isolated = new LinkedHashMap<String, long[]>();
         final var selection = new SelectionReport();
         // --oracle: the per-buffer best of the rows, instead of one table row per composition
@@ -133,9 +132,9 @@ public final class PipelineCli {
                 if (ctx.vertices().isEmpty()) {
                     continue;
                 }
-                final var tileKey = tileKey(entry);
+                final var tileKey = Corpus.tileKey(entry);
                 if (!tileKey.equals(currentTile)) {
-                    selectOnTile(tileSelectors, tileEntries, tileContexts, opts.verify(), perTile, byLayer, selection,
+                    selectOnTile(tileSelectors, tileEntries, tileContexts, opts.verify(), perTile, breakdown, selection,
                             correlation);
                     perTile.endTile(currentZoom);
                     currentTile = tileKey;
@@ -147,8 +146,8 @@ public final class PipelineCli {
                     probe.accept(entry, ctx);
                 }
 
-                final var layerTotals = byLayer.computeIfAbsent(entry.layerName(), k -> new LinkedHashMap<>());
-                layerBuffers.merge(entry.layerName(), 1, Integer::sum);
+                final var geometry = dominantGeometryType(ctx.geometryTypes());
+                breakdown.buffer(entry.layerName(), geometry);
                 final var line = new StringBuilder();
                 for (final var encoding : plain) {
                     final var encoded = encoding.encode(ctx);
@@ -160,7 +159,7 @@ public final class PipelineCli {
                         selection.record(encoding.name(), entry, Selector.choiceOf(encoded.payload()));
                     }
                     final var gzip = Compressor.GZIP.size(encoded.payload());
-                    layerTotals.merge(encoding.name(), gzip, Long::sum);
+                    breakdown.add(entry.layerName(), geometry, encoding.name(), gzip);
                     if (opts.isolated) {
                         final var sums = isolated.computeIfAbsent(encoding.name(), k -> new long[compressors.size()]);
                         for (var c = 0; c < sums.length; c++) {
@@ -178,7 +177,7 @@ public final class PipelineCli {
                             .encode(ctx).payload();
                     perTile.add(OracleReport.PER_LAYER, payload);
                     final var gzip = Compressor.GZIP.size(payload);
-                    layerTotals.merge(OracleReport.PER_LAYER, gzip, Long::sum);
+                    breakdown.add(entry.layerName(), geometry, OracleReport.PER_LAYER, gzip);
                     line.append(',').append(gzip);
                 }
                 if (oracle != null) {
@@ -190,7 +189,7 @@ public final class PipelineCli {
                             entry.layerName(), String.valueOf(entry.vertexCount())) + line + "\n");
                 }
             }
-            selectOnTile(tileSelectors, tileEntries, tileContexts, opts.verify(), perTile, byLayer, selection,
+            selectOnTile(tileSelectors, tileEntries, tileContexts, opts.verify(), perTile, breakdown, selection,
                     correlation);
             perTile.endTile(currentZoom);
         } finally {
@@ -234,7 +233,11 @@ public final class PipelineCli {
                 ladderTable(perTile, reference);
             }
             perEncoding(names, perTile, reference);
-            layerTable(names, baselineNames, byLayer, layerBuffers);
+            groupTable("by layer", names, baselineNames, breakdown.byLayer, breakdown.layerBuffers, TOP_LAYERS);
+            if (opts.byGeometry) {
+                groupTable("by dominant geometry type", names, baselineNames, breakdown.byGeometry,
+                        breakdown.geometryBuffers, Integer.MAX_VALUE);
+            }
             if (opts.byZoom) {
                 zoomTable(names, baselineNames, perTile);
             }
@@ -312,7 +315,7 @@ public final class PipelineCli {
             List<BufferContext> contexts,
             boolean verify,
             TileCompression perTile,
-            Map<String, Map<String, Long>> byLayer,
+            Breakdown breakdown,
             SelectionReport selection,
             ChoiceCorrelation correlation) {
         if (entries.isEmpty()) {
@@ -333,7 +336,8 @@ public final class PipelineCli {
                 }
                 final var payload = choice.encoded().payload();
                 perTile.add(selector.name(), payload);
-                byLayer.get(entry.layerName()).merge(selector.name(), Compressor.GZIP.size(payload), Long::sum);
+                breakdown.add(entry.layerName(), dominantGeometryType(contexts.get(b).geometryTypes()), selector.name(),
+                        Compressor.GZIP.size(payload));
                 selection.record(selector.name(), entry, choice.config());
             }
         }
@@ -468,17 +472,62 @@ public final class PipelineCli {
                 + "* = the smallest row in that column. order-0 = byte-entropy bound per tile.%n");
     }
 
-    /** gzip of each (tile, layer) buffer on its own, as a change against the smaller baseline there. */
-    private static void layerTable(
+    /** gzip of each buffer on its own, summed per layer and per dominant geometry type. */
+    private static final class Breakdown {
+        final Map<String, Map<String, Long>> byLayer = new TreeMap<>();
+        final Map<String, Map<String, Long>> byGeometry = new TreeMap<>();
+        final Map<String, Integer> layerBuffers = new TreeMap<>();
+        final Map<String, Integer> geometryBuffers = new TreeMap<>();
+
+        void buffer(String layer, String geometry) {
+            layerBuffers.merge(layer, 1, Integer::sum);
+            geometryBuffers.merge(geometry, 1, Integer::sum);
+        }
+
+        void add(String layer, String geometry, String name, long gzip) {
+            byLayer.computeIfAbsent(layer, k -> new LinkedHashMap<>()).merge(name, gzip, Long::sum);
+            byGeometry.computeIfAbsent(geometry, k -> new LinkedHashMap<>()).merge(name, gzip, Long::sum);
+        }
+    }
+
+    /**
+     * The most frequent geometry type in the column. Buffers with mixed geometry types are common
+     * (~20% of this corpus), so this is a label, not a partition.
+     */
+    static String dominantGeometryType(List<Integer> geometryTypes) {
+        if (geometryTypes == null || geometryTypes.isEmpty()) {
+            return "UNKNOWN";
+        }
+        final var counts = new int[8];
+        for (final var type : geometryTypes) {
+            if (type >= 0 && type < counts.length) {
+                counts[type]++;
+            }
+        }
+        var best = 0;
+        for (var i = 1; i < counts.length; i++) {
+            if (counts[i] > counts[best]) {
+                best = i;
+            }
+        }
+        final var names = new String[] {"POINT", "LINESTRING", "POLYGON", "MULTIPOINT", "MULTILINESTRING", "MULTIPOLYGON"};
+        return best < names.length ? names[best] : "UNKNOWN";
+    }
+
+    /** gzip of each (tile, group) buffer on its own, as a change against the smaller baseline there. */
+    private static void groupTable(
+            String title,
             List<String> names,
             List<String> baselineNames,
             Map<String, Map<String, Long>> byLayer,
-            Map<String, Integer> layerBuffers) {
+            Map<String, Integer> layerBuffers,
+            int limit) {
         final var layers = new ArrayList<>(byLayer.keySet());
         layers.sort(Comparator.comparingLong((String l) -> reference(byLayer.get(l), baselineNames)).reversed());
-        final var shown = new ArrayList<>(layers.subList(0, Math.min(TOP_LAYERS, layers.size())));
+        final var shown = new ArrayList<>(layers.subList(0, Math.min(limit, layers.size())));
 
-        System.out.printf("%n--- by layer: gzip of each buffer on its own, change vs the smaller baseline in that layer ---%n");
+        System.out.printf("%n--- %s: gzip of each buffer on its own, change vs the smaller baseline in that group ---%n",
+                title);
         final var width = Math.max("encoding".length(), names.stream().mapToInt(String::length).max().orElse(0));
         final var header = new StringBuilder(String.format("%-" + width + "s", "encoding"));
         final var refLine = new StringBuilder(String.format("%-" + width + "s", "(ref bytes)"));
@@ -566,43 +615,13 @@ public final class PipelineCli {
         return String.format("%+.2f%%", 100.0 * (bytes - reference) / reference);
     }
 
-    // --- input --------------------------------------------------------------
-
-    private static List<ManifestEntry> groupedByTile(List<ManifestEntry> manifest) {
-        final var byTile = new LinkedHashMap<String, List<ManifestEntry>>();
-        for (final var entry : manifest) {
-            byTile.computeIfAbsent(tileKey(entry), k -> new ArrayList<>()).add(entry);
-        }
-        return byTile.values().stream().flatMap(List::stream).toList();
-    }
-
-    /** The first {@code limit} tiles (all of them when {@code limit <= 0}); for quick development runs. */
-    private static List<ManifestEntry> tileLimited(List<ManifestEntry> manifest, int limit) {
-        if (limit <= 0) {
-            return manifest;
-        }
-        final var tiles = new LinkedHashSet<String>();
-        final var kept = new ArrayList<ManifestEntry>();
-        for (final var entry : manifest) {
-            tiles.add(tileKey(entry));
-            if (tiles.size() > limit) {
-                break;
-            }
-            kept.add(entry);
-        }
-        return kept;
-    }
-
-    private static String tileKey(ManifestEntry entry) {
-        return entry.z() + "/" + entry.x() + "/" + entry.y();
-    }
-
     private record Options(
             String inDir,
             String step,
             String rows,
             String layer,
             boolean byZoom,
+            boolean byGeometry,
             boolean stats,
             boolean withOld,
             String csvFile,
@@ -615,7 +634,7 @@ public final class PipelineCli {
             String featuresCsv) {
 
         private static final String USAGE = "Usage: [extractionDir] [--step s0|s1|...|selector|tile|ladder|oracle|all]"
-                + " [--rows a,b] [--layer <name>] [--by-zoom] [--stats] [--with-old] [--csv <file>]"
+                + " [--rows a,b] [--layer <name>] [--by-zoom] [--by-geometry] [--stats] [--with-old] [--csv <file>]"
                 + " [--brotli-quality <0-11>] [--limit-tiles <n>] [--isolated] [--no-verify] [--oracle]"
                 + " [--trials gzip,brotli,zstd,order0,order1] [--features <file>]";
 
@@ -638,6 +657,7 @@ public final class PipelineCli {
             String rows = null;
             String layer = null;
             var byZoom = false;
+            var byGeometry = false;
             var stats = false;
             var withOld = false;
             String csv = null;
@@ -658,6 +678,7 @@ public final class PipelineCli {
                     case "--rows" -> rows = args[++i];
                     case "--layer" -> layer = args[++i];
                     case "--by-zoom" -> byZoom = true;
+                    case "--by-geometry" -> byGeometry = true;
                     case "--stats" -> stats = true;
                     case "--with-old" -> withOld = true;
                     case "--csv" -> csv = args[++i];
@@ -673,7 +694,7 @@ public final class PipelineCli {
                     }
                 }
             }
-            return new Options(in == null ? DEFAULT_IN_DIR : in, step, rows, layer, byZoom, stats, withOld, csv,
+            return new Options(in == null ? DEFAULT_IN_DIR : in, step, rows, layer, byZoom, byGeometry, stats, withOld, csv,
                     brotliQuality, limitTiles, isolated, skipVerification, oracle, trials, features);
         }
     }

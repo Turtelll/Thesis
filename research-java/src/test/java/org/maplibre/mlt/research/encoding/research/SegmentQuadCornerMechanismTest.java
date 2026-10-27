@@ -12,9 +12,7 @@ import org.maplibre.mlt.research.encoding.PredictedTransform;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 
 /**
- * Pins that {@code SEGMENT_QUAD_CORNER} really is the composition of its two parts: on a line column
- * with no four-vertex rings it is byte-identical to {@link SegmentPair} (only the start grouping
- * fires), and on a polygon column it also applies {@link QuadCorner}'s parallelogram predictor
+ * Pins that {@code SEGMENT_QUAD_CORNER} really is the composition of its two parts: on a polygon column it applies {@link QuadCorner}'s parallelogram predictor
  * (fourth-corner residual zero), reconstructing from topology alone.
  */
 class SegmentQuadCornerMechanismTest {
@@ -54,15 +52,6 @@ class SegmentQuadCornerMechanismTest {
 
   private static PredictedTransform segmented() {
     return new PredictedTransform(new SegmentQuadCorner(), Layout.SEGMENTED);
-  }
-
-  @Test
-  void onLinesReducesToSegmentPair() {
-    final var ctx = lineColumn();
-    assertArrayEquals(
-        new PredictedTransform(new SegmentPair(), Layout.SEGMENTED).apply(ctx),
-        segmented().apply(ctx),
-        "with no four-vertex ring the transform must match SegmentPair exactly");
   }
 
   @Test

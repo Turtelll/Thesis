@@ -37,7 +37,7 @@ import java.util.zip.GZIPOutputStream;
 
 /**
  * The golden master of the consolidation: for every row of {@link Baselines#baseline()}, {@link
- * Baselines#research()}, {@link Baselines#lossy()} and {@link PipelineRegistry#all()}, plus the
+ * Baselines#research()} and {@link PipelineRegistry#all()}, plus the
  * per-layer default ({@value #PER_LAYER}), and every (tile, layer) buffer of an extraction, the
  * SHA-256 of the encoded bytes, their length and the sizes under gzip, Brotli 11 and zstd 19, per
  * buffer (compressed alone) and per tile (the row's buffers concatenated, as the benchmark sizes
@@ -91,7 +91,6 @@ public final class GoldenDumpCli {
         };
         Baselines.baseline().forEach(add);
         Baselines.research().forEach(add);
-        Baselines.lossy().forEach(add);
         PipelineRegistry.all().forEach(add);
         if (rows.putIfAbsent(PER_LAYER, new Row(PER_LAYER, null)) != null) {
             throw new IllegalStateException("two rows are named " + PER_LAYER);
@@ -142,13 +141,13 @@ public final class GoldenDumpCli {
         final var inDir = Path.of(opts.in);
         final var rows = rows();
         final var compressors = Compressor.all(BROTLI_QUALITY);
-        final var manifest = BenchmarkCli.groupedByTile(ExtractionReader.readManifest(inDir));
+        final var manifest = Corpus.groupedByTile(ExtractionReader.readManifest(inDir));
         final var tiles = new LinkedHashMap<String, List<ManifestEntry>>();
         for (final var entry : manifest) {
             if (opts.layer != null && !opts.layer.equals(entry.layerName())) {
                 continue;
             }
-            tiles.computeIfAbsent(BenchmarkCli.tileKey(entry), k -> new ArrayList<>()).add(entry);
+            tiles.computeIfAbsent(Corpus.tileKey(entry), k -> new ArrayList<>()).add(entry);
         }
         Files.createDirectories(Path.of(opts.out));
 
@@ -182,7 +181,7 @@ public final class GoldenDumpCli {
                     }
                     any = true;
                     bufferCount++;
-                    final var where = BenchmarkCli.tileKey(entry) + " " + entry.layerName();
+                    final var where = Corpus.tileKey(entry) + " " + entry.layerName();
                     final var layerEncoding = perLayerEncodings.computeIfAbsent(
                             entry.layerName(), l -> new PipelineEncoding(PipelineRegistry.forLayer(l)));
                     final var range = IntStream.range(0, rows.size());
@@ -286,13 +285,9 @@ public final class GoldenDumpCli {
             List<Compressor> compressors) {
         final var encoding = row.encoding() == null ? layerEncoding : row.encoding();
         final var encoded = encoding.encode(ctx);
-        if (encoding instanceof PipelineEncoding) {
-            Verification.roundTrip(where, ctx, encoding, encoded);
-        } else {
-            BenchmarkCli.verifyRoundTrip(entry, ctx, encoding, encoded);
-        }
+        Verification.roundTrip(where, ctx, encoding, encoded);
         var emitted = "-";
-        if (encoding.reordersGeometries() || encoding.mergesFeatures()) {
+        if (encoding.reordersGeometries()) {
             emitted = topologySha(encoding.emitted(ctx));
         }
         final var isolated = new long[3];

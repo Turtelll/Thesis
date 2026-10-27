@@ -52,7 +52,7 @@ public final class GeometryEquivalence {
 
     /**
      * Whether both contexts hold the same multiset of polygon rings (each up to rotation and
-     * reversal), ignoring line parts. For {@link MergeEquivalence}, which relaxes only the lines.
+     * reversal), ignoring line parts.
      */
     public static boolean holdsRings(BufferContext original, BufferContext other) {
         final var before = parts(original);

@@ -15,12 +15,8 @@ import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.encoding.research.GeometryReorder;
 import org.maplibre.mlt.research.encoding.research.LineContinuation;
 import org.maplibre.mlt.research.encoding.research.QuadCornerLine;
-import org.maplibre.mlt.research.encoding.research.Rot90Fixed;
 import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
 import org.maplibre.mlt.research.encoding.research.SharedVertexRef;
-import org.maplibre.mlt.research.encoding.research.failed.ContextDelta;
-import org.maplibre.mlt.research.encoding.research.failed.RightAngleTurn;
-import org.maplibre.mlt.research.encoding.research.failed.SegmentQuadCornerRot90;
 import org.maplibre.mlt.research.encoding.research.failed.TurnScalar;
 import org.maplibre.mlt.research.pipeline.Prediction;
 import org.maplibre.mlt.research.pipeline.Reorder;
@@ -34,19 +30,17 @@ import java.util.function.UnaryOperator;
 
 /**
  * The prediction workshop's rows, measured interleaved over plain {@link IntCodec#VARINT} by {@code
- * ./gradlew workshop} — mean x/y residual size, Varint bytes and per-tile gzip against the {@code
+ * ./gradlew research --args="workshop"} — mean x/y residual size, Varint bytes and per-tile gzip against the {@code
  * DELTA_ZIGZAG} baselines. To try an idea, add one {@link Predictor} line to {@link #experiments()};
  * the CLI and {@code VertexBufferCodecTest} round-trip it.
  *
  * <p>The pipeline's feature reorderings are measured separately from the predictors: {@link
  * #reorderRows()} runs each on its own (plain {@code DELTA} over the reordered buffer), and {@link
  * #withReorder} puts one in front of the predictor rows ({@code --reorder}). {@link #partChainRows()}
- * chain the parts inside each MultiLineString instead ({@link GeometryReorder#PART_CHAIN}), and {@link
- * #roadChainRows()} chain whole line features end to start ({@link GeometryReorder#ROAD_CHAIN}).
+ * chain the parts inside each MultiLineString instead ({@link GeometryReorder#PART_CHAIN}).
  *
- * <p>Three known rows write side values besides the residual pairs, and pay for them in their
- * bytes: {@code TURN_SCALAR} an {@code along} scalar per turn vertex, {@code RIGHT_ANGLE_TURN} a
- * signalled direction bit per turn vertex (chosen by the encoder, so not expressible as a rule), and
+ * <p>Two known rows write side values besides the residual pairs, and pay for them in their
+ * bytes: {@code TURN_SCALAR} an {@code along} scalar per turn vertex, and
  * {@code QUAD_CORNER_SHARED} ({@link SharedVertexRef}) its reference flags, one per vertex that
  * can reference an earlier ring. It is the full encoding, segmented by predictor class and with its
  * own rotation and plain fallback, not an interleaved rule; a referenced vertex has no residual
@@ -58,11 +52,9 @@ import java.util.function.UnaryOperator;
  * it is not a {@link Predictor} rule, but its residual pairs are one per vertex like the others'.
  * They compose with {@code --reorder} like any known row; a new rule cannot be framed from here.
  *
- * <p>Not here, because they are not predictors over a residual pair: {@code SegmentPair} (identical to
- * {@code DELTA} interleaved), {@code Turn90Bitmap}, {@code EvenRingTurn} and {@code
- * SegmentQuadCornerTurn} (signalling schemes measured against their segmented layouts), the RDP
- * residual encoders (side information), and {@code LineSharedVertexRef} and
- * {@code StandardDelta} (references or tokens).
+ * <p>Retired predictors (right-angle turn, context delta, midpoint reflect, fixed rotation, the road chain)
+ * and their rows are history: their numbers are in {@code docs/results/failed/}, and the code is at the
+ * {@code pre-consolidation} tag.
  */
 public final class Workshop {
 
@@ -83,36 +75,22 @@ public final class Workshop {
     public record Residuals(int[] pairs, int sideValues) {
     }
 
-    /** {@code MidpointReflect}'s threshold: shorter runs have no meaningful half. */
-    private static final int MIDPOINT_MIN_RING = 8;
-
     /**
      * The predictors measured so far, without segmentation. {@code DELTA} is the baseline transform
      * written as a rule, so its Varint bytes equal {@code DELTA_ZIGZAG_VARINT}'s.
      */
     public static List<Row> known() {
         var turnScalar = new TurnScalar(Layout.INTERLEAVED);
-        var rightAngleTurn = new RightAngleTurn("RIGHT_ANGLE_TURN_VARINT", IntCodec.VARINT);
         var sharedVertexRef = new SharedVertexRef();
         return List.of(
                 deltaRow(),
                 row(interleaved(new SegmentQuadCorner())),
                 row(interleaved(new LineContinuation())),
                 row(interleaved(new QuadCornerLine())),
-                row(interleaved(new Rot90Fixed())),
-                row(interleaved(new SegmentQuadCornerRot90())),
-                row(new VertexTransform.ZigZagDelta2()),
-                row(midpointReflect(true).transform()),
-                row(midpointReflect(false).transform()),
-                row(contextDelta(4, 2, 32).transform()),
                 new Row(
                         turnScalar.name(),
                         new VertexBufferCodec(turnScalar, IntCodec.VARINT),
                         ctx -> new Residuals(turnScalar.residualPairs(ctx), turnScalar.alongCount(ctx))),
-                new Row(
-                        "RIGHT_ANGLE_TURN",
-                        rightAngleTurn,
-                        ctx -> new Residuals(rightAngleTurn.residuals(ctx), rightAngleTurn.turnBits(ctx))),
                 new Row(
                         sharedVertexRef.name(),
                         sharedVertexRef,
@@ -177,8 +155,7 @@ public final class Workshop {
      * })
      * }</pre>
      *
-     * A rule with memory across vertices goes through {@link Predictor#stateful}; see {@link
-     * #contextDelta}.
+     * A rule with memory across vertices goes through {@link Predictor#stateful}.
      */
     public static List<Predictor> experiments() {
         return List.of(chainContinuation());
@@ -269,28 +246,9 @@ public final class Workshop {
     }
 
     /**
-     * {@code DELTA}, {@code LINE_CONTINUATION} and {@link #chainContinuation CHAIN_CONTINUATION} over
-     * the buffer {@link GeometryReorder#ROAD_CHAIN} emits, named {@code <row>_ROAD_CHAIN}: line features
-     * chained end to start, forward only, so a road of many features follows one cursor. The rows are
-     * interleaved and signal nothing, so a join is a {@code (0, 0)} start pair that {@code
-     * CHAIN_CONTINUATION} reads off the decoded prefix and continues through; the lossless {@code
-     * RoadChainEncoding} instead drops that vertex and pays a join bit (see {@code
-     * docs/results/road-chain.md}). Like {@link #partChainRows()}, not run behind {@code --reorder}.
-     */
-    public static List<Row> roadChainRows() {
-        var chain = GeometryReorder.ROAD_CHAIN;
-        var inner = List.of(deltaRow(), row(interleaved(new LineContinuation())), row(chainContinuation().transform()));
-        var rows = new ArrayList<Row>();
-        for (var row : inner) {
-            rows.add(reordered(row.name() + chain.nameSuffix(), chain::apply, row));
-        }
-        return rows;
-    }
-
-    /**
      * {@code rows} with {@code reorder} applied to every buffer before its predictor runs, each named
      * {@code <row><suffix>}; the rows themselves are unchanged. {@link Reorder#NONE} returns them as
-     * they are. This is what {@code ./gradlew workshop --reorder} measures the prediction rows
+     * they are. This is what {@code ./gradlew research --args="workshop" --reorder} measures the prediction rows
      * through.
      */
     public static List<Row> withReorder(Reorder reorder, List<Row> rows) {
@@ -304,13 +262,12 @@ public final class Workshop {
 
     /**
      * Every row's encoding, for the round-trip tests: the predictors, the reorder-only rows, the
-     * part-chain and road-chain rows, and the predictors behind {@link Reorder#HILBERT_CENTROID_ROT_MP}.
+     * part-chain rows, and the predictors behind {@link Reorder#HILBERT_CENTROID_ROT_MP}.
      */
     public static List<Encoding> encodings() {
         var all = new ArrayList<>(rows());
         all.addAll(reorderRows());
         all.addAll(partChainRows());
-        all.addAll(roadChainRows());
         all.addAll(withReorder(Reorder.HILBERT_CENTROID_ROT_MP, rows()));
         return all.stream().map(Row::encoding).toList();
     }
@@ -392,65 +349,5 @@ public final class Workshop {
 
     private static VertexTransform interleaved(ClassifiedPredictor predictor) {
         return new PredictedTransform(predictor, Layout.INTERLEAVED);
-    }
-
-    /**
-     * {@code MidpointReflect} without its segmented regions: the second half of a run of at least
-     * {@value #MIDPOINT_MIN_RING} vertices, past the apex at {@code length / 2}, predicted as {@code
-     * start + apex - partner}; the partner is {@code length - r} ({@code symmetric}) or {@code r -
-     * length / 2}. Everything else is plain delta.
-     */
-    static Predictor midpointReflect(boolean symmetric) {
-        return Predictor.of(
-                "MIDPOINT_REFLECT_" + (symmetric ? "SYMMETRIC" : "SPLIT"),
-                (t, i, xs, ys, out) -> {
-                    final var length = t.runLength(i);
-                    final var r = t.indexInRun(i);
-                    if (length < MIDPOINT_MIN_RING || r <= length / 2) {
-                        Predictor.prev(i, xs, ys, out);
-                        return;
-                    }
-                    final var start = t.runStart(i);
-                    final var apex = start + length / 2;
-                    final var partner = start + (symmetric ? length - r : r - length / 2);
-                    out[0] = xs[start] + xs[apex] - xs[partner];
-                    out[1] = ys[start] + ys[apex] - ys[partner];
-                });
-    }
-
-    /**
-     * {@code ContextDelta} without its per-context regions, and so without the count header they
-     * needed: the same {@link ContextDelta.State} picks each vertex's context {@code c}, and the vertex
-     * is predicted as the previous one plus the mean of the last {@code c} edges ({@code c = 0}: plain
-     * delta). The state is folded forward from vertex {@code i - 1} before predicting {@code i}, the
-     * order {@code ContextDelta} fixes.
-     */
-    static Predictor contextDelta(int contexts, int turnShift, int missThreshold) {
-        return Predictor.stateful(
-                "CONTEXT_DELTA_T" + turnShift + "_M" + missThreshold,
-                () -> new Predictor.Rule() {
-                    private ContextDelta.State state;
-                    private int context;
-                    private int predX;
-                    private int predY;
-
-                    @Override
-                    public void predict(Topology t, int i, int[] xs, int[] ys, int[] out) {
-                        if (i == 0) {
-                            state = new ContextDelta.State(t.runStarts(), turnShift, contexts - 1, missThreshold);
-                        } else {
-                            state.advance(i - 1, xs[i - 1], ys[i - 1]);
-                            state.penalise(context, xs[i - 1] - predX, ys[i - 1] - predY);
-                        }
-                        context = state.context();
-                        Predictor.prev(i, xs, ys, out);
-                        if (context > 0) {
-                            out[0] += state.meanEdgeX(context);
-                            out[1] += state.meanEdgeY(context);
-                        }
-                        predX = out[0];
-                        predY = out[1];
-                    }
-                });
     }
 }

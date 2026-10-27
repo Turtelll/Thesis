@@ -48,172 +48,19 @@ java {
 }
 
 application {
-    mainClass = findProperty('mainClass') ?: 'org.maplibre.mlt.research.cli.ExtractCli'
+    mainClass = 'org.maplibre.mlt.research.cli.Research'
 }
 
-/* The benchmark is the everyday command, so it gets its own task rather than a -PmainClass
- * incantation: ./gradlew benchmark --args="../data/extracted" */
-tasks.register('benchmark', JavaExec) {
+/* The one entry point of the research code (docs/consolidation-inventory.md):
+ *   ./gradlew research --args="measure --step s8 --by-zoom"
+ *   ./gradlew research --args="<command> ..."   (no arguments lists the commands)
+ * `./gradlew run --args="extract --mbtiles ..."` is the same main. */
+tasks.register('research', JavaExec) {
     group = 'application'
-    description = 'Baselines vs candidate encodings, compressed per tile with gzip/Brotli/zstd.'
+    description = 'Runs one research command (extract, measure, dump, workshop, ...); no arguments lists them.'
     classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.BenchmarkCli'
-}
-
-/* Golden master of every row (docs/consolidation): ./gradlew goldenDump --args="--out ../data/golden/x"
- * and ./gradlew goldenDump --args="--diff ../data/golden/pre-consolidation ../data/golden/x" */
-tasks.register('goldenDump', JavaExec) {
-    group = 'application'
-    description = 'Dumps SHA-256 and per-buffer/per-tile compressed sizes of every registered row; --diff compares two dumps.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.GoldenDumpCli'
+    mainClass = 'org.maplibre.mlt.research.cli.Research'
     jvmArgs = ['-Xmx6g']
-}
-
-/* Charts (SVG) from a benchmark CSV: ./gradlew chart --args="../data/out/wins-check.csv" */
-tasks.register('chart', JavaExec) {
-    group = 'application'
-    description = 'Renders SVG charts (totals, by layer, by zoom) from a benchmark --csv file.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.ChartCli'
-}
-
-/* Prediction workshop: ./gradlew workshop --args="--layer building --by-zoom" */
-tasks.register('workshop', JavaExec) {
-    group = 'application'
-    description = 'Workshop predictors interleaved over Varint: mean x/y residual size, Varint and per-tile gzip bytes vs baselines.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.WorkshopCli'
-}
-
-/* Measurement probe (encodes nothing): ./gradlew residualBits --args="--layer building" */
-tasks.register('residualBits', JavaExec) {
-    group = 'application'
-    description = 'Probe: mean residual bits, zero pairs and per-vertex change vs DELTA_ZIGZAG per transform.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.ResidualBitsCli'
-}
-
-/* Prior measurement (encodes nothing): ./gradlew ringPrior --args="../data/extracted" */
-tasks.register('ringPrior', JavaExec) {
-    group = 'application'
-    description = 'Measures predictor residual bit widths on >4-vertex polygon rings.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.RingPriorCli'
-}
-
-/* Geometry characterization (encodes nothing): ./gradlew buildingShape --args="../data/extracted" */
-tasks.register('buildingShape', JavaExec) {
-    group = 'application'
-    description = 'Characterizes geometric properties of >4-vertex building polygon rings.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.BuildingShapeCli'
-}
-
-/* WP7 cost-model estimate (encodes nothing beyond SEGMENT_QUAD_CORNER, no new codec): */
-/* ./gradlew entropy --args="../data/extracted --layer building" */
-tasks.register('entropy', JavaExec) {
-    group = 'application'
-    description = 'Order-0 entropy estimate for SEGMENT_QUAD_CORNER residual regions vs FastPFOR bytes.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.EntropyCli'
-}
-
-/* ./gradlew condEntropy --args="../data/extracted --layer building" */
-tasks.register('condEntropy', JavaExec) {
-    group = 'application'
-    description = 'Conditional-entropy probe: y|x, bucket/raw split, order-1 bucket context.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.CondEntropyCli'
-}
-
-/* ./gradlew decodeTime --args="../data/extractedBaseline --encoding LINE_CONTINUATION_FASTPFOR --max-ratio 1.5"
- * Without --encoding: the rANS vs FastPFOR grid of docs/results/decode-time.md. */
-tasks.register('decodeTime', JavaExec) {
-    group = 'application'
-    description = 'Decode-time probe: selected encodings vs the same-codec baseline (default: rANS vs FastPFOR grid).'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.DecodeTimeCli'
-}
-
-/* Measurement probe (encodes nothing): ./gradlew sharedVertex --args="../data/extractedBaseline --layer transportation" */
-tasks.register('sharedVertex', JavaExec) {
-    group = 'application'
-    description = 'Probe: share of vertices repeating an exact position within a buffer, per zoom.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.SharedVertexCli'
-}
-
-/* Stage 0 probe (encodes nothing): ./gradlew roadChain --args="../data/extractedBaseline --layer transportation" */
-tasks.register('roadChain', JavaExec) {
-    group = 'application'
-    description = 'Stage 0 probe: forward joins between line features, roads after ROAD_CHAIN, continuation-eligible vertices, topology entries before/after merging.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.RoadChainCli'
-}
-
-/* Stage 0 protocol probe (encodes nothing): ./gradlew orientationPrior --args="../data/extractedBaseline --layer building" */
-tasks.register('orientationPrior', JavaExec) {
-    group = 'application'
-    description = 'Stage 0 probe: building frame predicted from decoded neighbours or pre-pass frames vs plain delta.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.OrientationPriorCli'
-}
-
-/* Stage 0 protocol probe (encodes nothing): ./gradlew lineFramePrior --args="../data/extractedBaseline --layer transportation" */
-tasks.register('lineFramePrior', JavaExec) {
-    group = 'application'
-    description = 'Stage 0 probe: line-run edges coded in a frame predicted from decoded neighbours vs plain delta.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.LineFramePriorCli'
-}
-
-/* ./gradlew shareTable --args="../data/extractedBaseline" */
-tasks.register('shareTable', JavaExec) {
-    group = 'application'
-    description = 'Probe: rANS frequency tables shared across buffers vs per-buffer.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.ShareTableCli'
-}
-
-/* ./gradlew featureBoundary --args="../data/extracted" */
-tasks.register('featureBoundary', JavaExec) {
-    group = 'application'
-    description = 'Measures what the continuous delta cursor pays at feature/run boundaries.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.FeatureBoundaryCli'
-}
-
-/* Stage 0 protocol probe (encodes nothing): ./gradlew quadCornerResidual --args="../data/extracted --layer landcover" */
-tasks.register('quadCornerResidual', JavaExec) {
-    group = 'application'
-    description = 'Stage 0 probe: second-order corner predictors on non-parallelogram 4-vertex rings.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.QuadCornerResidualCli'
-}
-
-/* Stage 0 protocol probe (encodes nothing): ./gradlew quadRotation --args="../data/extractedBaseline --layer building" */
-tasks.register('quadRotation', JavaExec) {
-    group = 'application'
-    description = 'Stage 0 probe: per-ring best start vertex / direction for 4-vertex rings.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.QuadRotationCli'
-}
-
-/* Stage 0 protocol probe (encodes nothing): ./gradlew turnRadius --args="../data/extractedBaseline --layer transportation" */
-tasks.register('turnRadius', JavaExec) {
-    group = 'application'
-    description = 'Stage 0 probe: per-zoom turn radius, curvature and line-predictor residuals.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.TurnRadiusCli'
-}
-
-/* Stage 0 protocol probe (encodes nothing): ./gradlew turnScalar --args="../data/extractedBaseline --layer building" */
-tasks.register('turnScalar', JavaExec) {
-    group = 'application'
-    description = 'Stage 0 probe: winding-fixed 90 deg turn + edge-length scalar vs delta / rot90 residual.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.TurnScalarCli'
 }
 
 tasks.withType(Test).configureEach {
@@ -223,43 +70,4 @@ tasks.withType(Test).configureEach {
         exceptionFormat = "full"
         showStandardStreams = true
     }
-}
-
-/* Measurement only: ./gradlew turn90Bitmap --args="../data/extractedBaseline --layer building" */
-tasks.register('turn90Bitmap', JavaExec) {
-    group = 'application'
-    description = 'Splits TURN90_BITMAP cost: residual vs flag bits, residual vs bitmap bytes vs headers.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.Turn90BitmapCli'
-}
-
-/* Measurement only: ./gradlew bufferPoint --args="../data/MVT/munich-plantiler.mbtiles" */
-tasks.register('bufferPoint', JavaExec) {
-    group = 'application'
-    description = 'Total MLT bytes with vs without Point features outside the tile extent (buffer points).'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.BufferPointCli'
-}
-
-/* Measurement only: ./gradlew reflexSignal --args="../data/extractedBaseline --layer building" */
-tasks.register('reflexSignal', JavaExec) {
-    group = 'application'
-    description = 'Probe: winding-relative reflex-turn signal - winding compliance, turn context, packing costs.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.ReflexSignalCli'
-}
-
-/* OpenZL-style pipeline (S1-S8 + selection loop): ./gradlew pipeline --args="--step s3 --layer building" */
-tasks.register('pipeline', JavaExec) {
-    group = 'application'
-    description = 'Measures the OpenZL-style VertexBuffer pipeline step by step, compressed per tile.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.PipelineCli'
-}
-
-tasks.register('pipelineTileSize', JavaExec) {
-    group = 'application'
-    description = 'Whole-tile check of the pipeline feature reorders (property columns and ids included).'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.maplibre.mlt.research.cli.PipelineTileSizeCli'
 }

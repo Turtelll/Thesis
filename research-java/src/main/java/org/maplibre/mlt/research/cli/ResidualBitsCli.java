@@ -140,7 +140,7 @@ public final class ResidualBitsCli {
                     "%nA lower mean is a headroom signal, not a result: a transform that narrows the median%n"
                             + "while widening the tail can still cost the same or more once a codec prices a%n"
                             + "block's maximum (FastPFOR) rather than the mean. Whether the reduction above%n"
-                            + "reaches the tile depends on layout and codec - see ./gradlew benchmark. zero pairs =%n"
+                            + "reaches the tile depends on layout and codec - see research measure. zero pairs =%n"
                             + "share of (x, y) residuals exactly (0, 0), what a general-purpose compressor rewards;%n"
                             + "'-' for all-in rows (*_SHARED) with no per-pair stream.%n");
         }

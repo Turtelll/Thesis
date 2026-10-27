@@ -21,7 +21,7 @@ import java.util.List;
  * tile, so they are derivable identically on encode and decode, the same rule {@link
  * PartBoundaries} exists to enforce for part boundaries.
  *
- * <p>Three classes, packed like {@link SegmentPair}/{@link SegmentQuadCorner}:
+ * <p>Three classes, packed like {@link SegmentQuadCorner}:
  *
  * <ol>
  *   <li><b>part starts</b> — the first vertex of each run, plain delta.

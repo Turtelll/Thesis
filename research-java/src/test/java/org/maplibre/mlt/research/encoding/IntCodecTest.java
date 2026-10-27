@@ -48,16 +48,6 @@ class IntCodecTest {
     assertRoundTrip(new IntCodec.FastPfor(), new int[] {1, -2, 3, -4, 5});
   }
 
-  @Test
-  void fastPfor128_roundTripsRandomValues() {
-    assertRoundTrip(new IntCodec.FastPfor128(), randomValues(500));
-  }
-
-  @Test
-  void fastPfor128_roundTripsSmallNonBlockAlignedArray() {
-    assertRoundTrip(new IntCodec.FastPfor128(), new int[] {1, -2, 3, -4, 5});
-  }
-
   @ParameterizedTest
   @MethodSource("byteSerializers")
   void byteSerializer_roundTripsRandomValues(IntCodec codec) {
@@ -73,13 +63,12 @@ class IntCodecTest {
 
   /** Same size as Varint before compression; only the byte order differs. */
   @Test
-  void varintSplitAndXy_matchVarintSize() {
+  void varintSplit_matchesVarintSize() {
     int[] values = randomValues(300);
     for (int i = 0; i < values.length; i++) {
       values[i] >>>= 1 + i % 25;
     }
     int varint = IntCodec.VARINT.encode(values).length;
-    assertEquals(varint, IntCodec.VARINT_XY.encode(values).length);
     assertEquals(varint, IntCodec.VARINT_SPLIT.encode(values).length);
   }
 
@@ -132,10 +121,10 @@ class IntCodecTest {
   }
 
   static List<IntCodec> byteSerializers() {
-    return Baselines.BYTE_SERIALIZERS;
+    return List.of(IntCodec.VARINT_SPLIT, IntCodec.BYTESPLIT);
   }
 
   static List<IntCodec> uint16Serializers() {
-    return Baselines.UINT16_SERIALIZERS;
+    return List.of(IntCodec.UINT16, IntCodec.UINT16_PLANES);
   }
 }

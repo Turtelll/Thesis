@@ -30,8 +30,7 @@ import java.util.stream.IntStream;
  * {@code DELTA} predictor over the reordered buffer (never combined with another predictor), to set
  * against the prediction rows. {@code --reorder} instead reorders every buffer before the prediction
  * rows' predictors run; the baselines stay unordered as the reference. The {@code _PART_CHAIN} rows
- * ({@link Workshop#partChainRows()}) chain the parts inside every MultiLineString and always run, as do
- * the {@code _ROAD_CHAIN} rows ({@link Workshop#roadChainRows()}), which chain line features end to start.
+ * ({@link Workshop#partChainRows()}) chain the parts inside every MultiLineString and always run.
  *
  * <p>Usage: {@code [extractionDir] [--layer <name>] [--zoom <z>] [--only A,B] [--by-layer]
  * [--by-zoom] [--max-tiles N] [--reorder [VARIANT]]}. {@code VARIANT} is a pipeline {@link Reorder}
@@ -192,9 +191,6 @@ public final class WorkshopCli {
         Workshop.partChainRows().stream()
                 .filter(row -> opts.only == null || opts.only.contains(row.name()))
                 .forEach(rows::add);
-        Workshop.roadChainRows().stream()
-                .filter(row -> opts.only == null || opts.only.contains(row.name()))
-                .forEach(rows::add);
         if (rows.isEmpty()) {
             System.out.println("No workshop rows match --only " + opts.only);
             return;
@@ -218,7 +214,7 @@ public final class WorkshopCli {
         var currentZoom = 0;
         var tiles = 0;
 
-        for (var entry : BenchmarkCli.groupedByTile(ExtractionReader.readManifest(inDir))) {
+        for (var entry : Corpus.groupedByTile(ExtractionReader.readManifest(inDir))) {
             if (opts.layer != null && !opts.layer.equals(entry.layerName())) {
                 continue;
             }
@@ -229,7 +225,7 @@ public final class WorkshopCli {
             if (ctx.vertices().isEmpty()) {
                 continue;
             }
-            var tileKey = BenchmarkCli.tileKey(entry);
+            var tileKey = Corpus.tileKey(entry);
             if (!tileKey.equals(currentTile)) {
                 if (tiles == opts.maxTiles) {
                     break;
@@ -311,7 +307,7 @@ public final class WorkshopCli {
                         + "in the bytes. varint = raw payload bytes (FastPFOR's own for its baseline),%n"
                         + "gzip = every tile's buffers concatenated and compressed on their own. ref = %s for%n"
                         + "varint, the smaller baseline for gzip. Interleaved, no segmentation: compare a predictor%n"
-                        + "with ./gradlew benchmark before calling it a result.%n"
+                        + "with research measure before calling it a result.%n"
                         + "REORDER_<variant> = plain DELTA over the buffer that pipeline reordering emits; with%n"
                         + "--reorder every predictor row is <name>_<variant>, reordered the same way before it%n"
                         + "predicts. Baselines are never reordered.%n"

@@ -17,7 +17,7 @@ import java.util.stream.IntStream;
 /**
  * The "Measure" probes of the design document. A probe sees every extracted buffer once (the
  * original, unreordered context) and prints its table at the end; it encodes nothing and writes no
- * bytes. {@code ./gradlew pipeline --args="--step sN --stats"} runs the probes of step N.
+ * bytes. {@code ./gradlew research --args="measure --step sN --stats"} runs the probes of step N.
  */
 public final class PipelineStats {
 

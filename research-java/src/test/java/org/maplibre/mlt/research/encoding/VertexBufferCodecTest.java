@@ -89,7 +89,7 @@ class VertexBufferCodecTest {
   /**
    * Asserts the decode reconstructed the buffer, by the contract the encoding actually claims.
    *
-   * <p>Mirrors {@code BenchmarkCli.verifyRoundTrip}: an encoding declaring {@link
+   * <p>Mirrors {@code pipeline.Verification.roundTrip}: an encoding declaring {@link
    * Encoding#reordersGeometries()} reconstructs an <em>equivalent</em> buffer rather than an
    * identical one, so it is checked for geometry preservation plus a faithful decode of what it
    * emitted. Everything else is held to exact equality. Without the split these tests would either
@@ -98,13 +98,7 @@ class VertexBufferCodecTest {
   private static void assertReconstructs(
       Encoding encoding, BufferContext ctx, VertexBufferCodec.EncodedBuffer encoded) {
     var decoded = encoding.decode(encoded, ctx, ctx.vertices().size());
-    if (encoding.mergesFeatures()) {
-      var emitted = encoding.emitted(ctx);
-      assertEquals(emitted.vertices(), decoded, "must decode to the buffer it emitted");
-      assertTrue(
-          MergeEquivalence.holds(ctx, emitted),
-          "merging must keep every line part cuttable: " + MergeEquivalence.describe(ctx, emitted));
-    } else if (encoding.reordersGeometries()) {
+    if (encoding.reordersGeometries()) {
       var emitted = encoding.emitted(ctx);
       assertEquals(emitted.vertices(), decoded, "must decode to the buffer it emitted");
       assertTrue(

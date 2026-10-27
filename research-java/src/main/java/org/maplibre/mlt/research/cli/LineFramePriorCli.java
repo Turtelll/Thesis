@@ -51,7 +51,7 @@ import java.util.Map;
  * three class streams (unframed plain delta | framed edges | continuation residuals) concatenated,
  * the shape {@code Segmentation.CLASS} gives. Both are gzipped per buffer.
  *
- * <p>Usage: {@code ./gradlew lineFramePrior --args="../data/extractedBaseline [more dirs] --layer
+ * <p>Usage: {@code ./gradlew research --args="line-frame-prior ../data/extractedBaseline [more dirs] --layer
  * transportation"}
  */
 public final class LineFramePriorCli {

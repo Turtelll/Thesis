@@ -8,7 +8,7 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import java.util.List;
 
 /**
- * Composes {@link SegmentPair}'s part-start grouping with a parallelogram-corner predictor, which
+ * Composes a part-start grouping with a parallelogram-corner predictor, which
  * target disjoint geometry populations (LINESTRING vs POLYGON) so they stack rather than compete.
  *
  * <p>Every residual is the same componentwise delta + zigzag as the baseline, split into three

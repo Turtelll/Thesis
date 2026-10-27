@@ -41,7 +41,7 @@ import java.util.TreeMap;
  * <p>All percentages are vertex-weighted over the pooled buffers of a zoom, not a mean of
  * per-buffer percentages — small low-zoom buffers must not outvote the z14 mass.
  *
- * <p>Usage: {@code ./gradlew sharedVertex --args="../data/extractedBaseline [--layer <name>]"}
+ * <p>Usage: {@code ./gradlew research --args="shared-vertex ../data/extractedBaseline [--layer <name>]"}
  */
 public final class SharedVertexCli {
     private SharedVertexCli() {

@@ -6,7 +6,7 @@ import java.util.function.Supplier;
 
 /**
  * A workshop predictor: a name and the {@link Rule} giving each vertex's predicted position. Measured
- * interleaved over plain Varint by {@code ./gradlew workshop}; see {@link Workshop}.
+ * interleaved over plain Varint by {@code ./gradlew research --args="workshop"}; see {@link Workshop}.
  *
  * <p>{@code rules} hands out a fresh rule per pass over a buffer (one encode, one decode), and that
  * rule is called for {@code i = 0, 1, ..., n - 1} in order, once each. So a rule may keep state

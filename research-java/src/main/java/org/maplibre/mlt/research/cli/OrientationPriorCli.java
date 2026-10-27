@@ -52,7 +52,7 @@ import java.util.Map;
  * parallelogram corner residual. Only the edges change between sources. The {@code gated} rows apply
  * a source to even rings of 4+ vertices only (derivable from {@code numRings}), plain delta elsewhere.
  *
- * <p>Usage: {@code ./gradlew orientationPrior --args="../data/extractedBaseline --layer building"}
+ * <p>Usage: {@code ./gradlew research --args="orientation-prior ../data/extractedBaseline --layer building"}
  */
 public final class OrientationPriorCli {
     private OrientationPriorCli() {

@@ -8,7 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 
 /**
- * The rows of the pipeline, per implementation step. {@code ./gradlew pipeline --args="--step s3"}
+ * The rows of the pipeline, per implementation step. {@code ./gradlew research --args="measure --step s3"}
  * measures {@code step("s3")}; {@link #all()} is the round-trip surface the tests parameterize over.
  *
  * <p>Each step is measured over the winners of the steps before it ({@code AFTER_S0} ...) and varies
@@ -98,7 +98,7 @@ public final class PipelineRegistry {
      * smallest total over the layer's buffers, each compressed alone under gzip (the project's reference
      * metric), with {@link Reorder#HILBERT_CENTROID_ROT_MP} except on {@link #CHAIN_LAYERS} (the greedy
      * {@link Reorder#CHAIN}). Predictor, segmentation, terminal and reorder were fitted on the Munich
-     * corpus with {@code ./gradlew pipeline --args="--step fit"} ("best fixed composition per layer":
+     * corpus with {@code ./gradlew research --args="measure --step fit"} ("best fixed composition per layer":
      * every predictor incl. the ring frame, shared references and heading x flat/class streams x the
      * three byte terminals x Hilbert or chain); {@code building} and {@code transportation} are as before
      * ({@code transportation} was fitted on geometry plus property columns). The chain layers are those
@@ -370,7 +370,7 @@ public final class PipelineRegistry {
      * three byte terminals x the given reorders ({@code --step fit}: {@link Reorder#HILBERT_CENTROID_ROT_MP}
      * and the greedy {@link Reorder#CHAIN}; {@code --step fithilbert}: Hilbert only).
      * The oracle grid has none of the later predictors, so its per-layer winners cannot replace the
-     * fitted compositions. Run {@code ./gradlew pipeline --args="--step fit"}: it implies {@code --oracle},
+     * fitted compositions. Run {@code ./gradlew research --args="measure --step fit"}: it implies {@code --oracle},
      * and the "best fixed composition per layer" table is the fit. Not part of {@link #all()}.
      */
     static List<Encoding> fitRows(List<Reorder> reorders) {

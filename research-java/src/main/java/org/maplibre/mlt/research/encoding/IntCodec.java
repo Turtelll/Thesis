@@ -1,16 +1,10 @@
 package org.maplibre.mlt.research.encoding;
 
-import me.lemire.integercompression.Composition;
-import me.lemire.integercompression.FastPFOR128;
 import me.lemire.integercompression.IntWrapper;
-import me.lemire.integercompression.IntegerCODEC;
-import me.lemire.integercompression.VariableByte;
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.decoder.DecodingUtils;
 
 import java.io.ByteArrayOutputStream;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 /**
  * Physical-layer codec: packs an already-transformed {@code int[]} into bytes and back.
@@ -23,12 +17,6 @@ public interface IntCodec {
     IntCodec VARINT = new Varint();
 
     IntCodec FASTPFOR = new FastPfor();
-
-    IntCodec FASTPFOR128 = new FastPfor128();
-
-    IntCodec RAW = new Raw();
-
-    IntCodec VARINT_XY = new VarintXy();
 
     IntCodec VARINT_SPLIT = new VarintSplit();
 
@@ -98,104 +86,6 @@ public interface IntCodec {
     }
 
     /**
-     * {@link FastPfor} with 128-value blocks instead of 256 (the block size the next MLT version
-     * adopts). Same framing as mlt-core's {@code encodeFastPfor128}: FastPFOR128 + VariableByte for
-     * the tail, big-endian 32-bit words.
-     */
-    final class FastPfor128 implements IntCodec {
-
-        @Override
-        public String name() {
-            return "FASTPFOR128";
-        }
-
-        @Override
-        public byte[] encode(int[] values) {
-            final var compressed = new int[values.length + 1024];
-            final var outputOffset = new IntWrapper(0);
-            codec().compress(values, new IntWrapper(0), values.length, compressed, outputOffset);
-            final var bytes = ByteBuffer.allocate(outputOffset.get() * 4);
-            bytes.asIntBuffer().put(compressed, 0, outputOffset.get());
-            return bytes.array();
-        }
-
-        @Override
-        public int[] decode(byte[] data, int numValues) {
-            final var words = new int[data.length / 4];
-            ByteBuffer.wrap(data).asIntBuffer().get(words);
-            final var decoded = new int[numValues];
-            codec().uncompress(words, new IntWrapper(0), words.length, decoded, new IntWrapper(0));
-            return decoded;
-        }
-
-        private static IntegerCODEC codec() {
-            return new Composition(new FastPFOR128(), new VariableByte());
-        }
-    }
-
-    /**
-     * No physical encoding: every value as a fixed 32-bit little-endian word. Only meaningful under
-     * a general-purpose compressor, which is then the only stage packing the residuals.
-     */
-    final class Raw implements IntCodec {
-
-        @Override
-        public String name() {
-            return "RAW";
-        }
-
-        @Override
-        public byte[] encode(int[] values) {
-            final var bytes = ByteBuffer.allocate(values.length * Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN);
-            bytes.asIntBuffer().put(values);
-            return bytes.array();
-        }
-
-        @Override
-        public int[] decode(byte[] data, int numValues) {
-            final var decoded = new int[numValues];
-            ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN).asIntBuffer().get(decoded);
-            return decoded;
-        }
-    }
-
-    /**
-     * {@link Varint} over the values at even indices, then the values at odd indices — every x
-     * residual, then every y residual, for the interleaved stream a {@link VertexTransform} emits.
-     * Same size as Varint before compression; under a general-purpose compressor a byte's
-     * predecessor is the same coordinate's previous residual rather than the other coordinate, and
-     * the x and y distributions no longer alternate inside one Huffman block.
-     */
-    final class VarintXy implements IntCodec {
-
-        @Override
-        public String name() {
-            return "VARINT_XY";
-        }
-
-        @Override
-        public byte[] encode(int[] values) {
-            final var split = new int[values.length];
-            final var evens = (values.length + 1) / 2;
-            for (var i = 0; i < values.length; i++) {
-                split[(i & 1) == 0 ? i / 2 : evens + i / 2] = values[i];
-            }
-            return VARINT.encode(split);
-        }
-
-        @Override
-        public int[] decode(byte[] data, int numValues) {
-            final var split = VARINT.decode(data, numValues);
-            final var values = new int[numValues];
-            final var evens = (numValues + 1) / 2;
-            for (var i = 0; i < numValues; i++) {
-                values[i] = split[(i & 1) == 0 ? i / 2 : evens + i / 2];
-            }
-            return values;
-        }
-    }
-
-    /**
      * Unsigned LEB128 varints with the first byte of every value in one stream and every
      * continuation byte in a second, appended after it. Same size as {@link Varint}; the dominant
      * one-byte values stay contiguous instead of being interrupted by the rare multi-byte ones, so
@@ -248,10 +138,10 @@ public interface IntCodec {
 
     /**
      * Every value as a 32-bit little-endian word, transposed into four byte planes (all low bytes,
-     * then all second bytes, ...) — Parquet's {@code BYTE_STREAM_SPLIT}. {@link Raw}'s size before
-     * compression and as meaningless; under a general-purpose compressor the high planes of small
-     * residuals are long zero runs that cost almost nothing, where {@link Raw} scatters those zeros
-     * between the low bytes.
+     * then all second bytes, ...) — Parquet's {@code BYTE_STREAM_SPLIT}. The size before
+     * compression is that of fixed 32-bit words; under a general-purpose compressor the high planes of
+     * small residuals are long zero runs that cost almost nothing. Kept as the byte-layout anchor of
+     * the pipeline's {@code Transpose} (see {@code TransposeMechanismTest}).
      */
     final class ByteSplit implements IntCodec {
 
@@ -288,8 +178,8 @@ public interface IntCodec {
 
     /**
      * Every value as a fixed 16-bit little-endian word. Rejects a value outside {@code [0, 0xFFFF]}
-     * rather than truncating it: an encoding emitting larger values has to escape them itself (see
-     * {@link org.maplibre.mlt.research.encoding.research.failed.StandardDelta}).
+     * rather than truncating it: an encoding emitting larger values has to escape them itself. Kept as
+     * the byte-layout anchor of the pipeline's {@code Transpose}.
      */
     final class Uint16 implements IntCodec {
 
