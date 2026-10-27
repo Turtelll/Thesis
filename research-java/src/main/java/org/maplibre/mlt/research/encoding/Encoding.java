@@ -48,6 +48,18 @@ public interface Encoding {
     }
 
     /**
+     * Whether this encoding is <b>lossy</b> in the one way a later linear-referencing step can undo:
+     * it fuses line features that meet end to start into one, dropping the feature boundaries.
+     *
+     * <p>Such an encoding is verified with {@link MergeEquivalence} against {@link #emitted}, which
+     * is the merged buffer (fewer vertices and features than the input), and must not be part of any
+     * oracle or headline row: it is not a lossless candidate. Defaults to {@code false}.
+     */
+    default boolean mergesFeatures() {
+        return false;
+    }
+
+    /**
      * The buffer this encoding actually emits, which is what {@link #decode} must reconstruct.
      *
      * <p>Identical to {@code ctx} unless {@link #reordersGeometries()} — the benchmark compares the

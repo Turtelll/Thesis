@@ -51,6 +51,7 @@ public final class SharedVertexRef implements Encoding {
     private final String prefix;
     private final ClassifiedPredictor predictor;
     private final GeometryReorder reorder;
+    private final boolean framed;
 
     public SharedVertexRef() {
         this("QUAD_CORNER", new SegmentQuadCorner());
@@ -69,14 +70,26 @@ public final class SharedVertexRef implements Encoding {
      * @param reorder applied to the buffer before ring rotation; never transmitted either
      */
     public SharedVertexRef(String prefix, ClassifiedPredictor predictor, GeometryReorder reorder) {
+        this(prefix, predictor, reorder, false);
+    }
+
+    /**
+     * @param framed code the edges of polygon rings in the frame {@link RingFramePrior} predicts from
+     *               the rings decoded so far, instead of the tile's axes. Only the edges the predictor
+     *               codes as plain delta ({@code !hasPrediction}) change; starts, corners, references
+     *               and lines are untouched. Nothing is transmitted.
+     */
+    public SharedVertexRef(
+            String prefix, ClassifiedPredictor predictor, GeometryReorder reorder, boolean framed) {
         this.prefix = prefix;
         this.predictor = predictor;
         this.reorder = reorder;
+        this.framed = framed;
     }
 
     @Override
     public String name() {
-        return prefix + "_SHARED" + reorder.nameSuffix();
+        return prefix + "_SHARED" + (framed ? "_FRAME" : "") + reorder.nameSuffix();
     }
 
     @Override
@@ -200,6 +213,157 @@ public final class SharedVertexRef implements Encoding {
         return out;
     }
 
+    // --- reference walk (for the pipeline) -------------------------------------
+
+    /**
+     * What the encoder knows about the references of one buffer: its rings rotated to start where a
+     * shared stretch begins, which vertices are references (they carry no residual), and the entry
+     * and follow flags and the entry indices as the bit streams a decoder reads back with {@link
+     * Walk#forDecoding}.
+     */
+    public record Scan(List<Vertex> vertices, boolean[] referenced, byte[] flags, byte[] indices) {
+    }
+
+    /**
+     * The references of {@code ctx}, or {@code null} when its runs are not derivable from the
+     * topology streams (then no vertex can be a reference). {@code ctx} must hold the vertices.
+     */
+    public static Scan scan(BufferContext ctx) {
+        final var vertices = ctx.vertices();
+        final var runs = Runs.of(ctx, vertices.size());
+        if (runs == null) {
+            return null;
+        }
+        final var rotated = rotate(vertices, runs);
+        final var walk = new Walk(runs, null, null);
+        final var referenced = new boolean[rotated.size()];
+        for (var i = 0; i < rotated.size(); i++) {
+            referenced[i] = walk.encode(i, rotated);
+            walk.accept(i, rotated);
+        }
+        return new Scan(rotated, referenced, walk.flagsOut.toBytes(), walk.indicesOut.toBytes());
+    }
+
+    /**
+     * What a decoder needs from a reference scheme, ring ({@link Walk}) or line ({@link
+     * LineSharedVertexRef#walkForDecoding}): per vertex in order, first {@link #decode} (the vertex
+     * it references, or {@code null} when it carries a residual), then {@link #accept} once the
+     * vertex is known.
+     */
+    public interface ReferenceWalk {
+
+        /** The vertex {@code i} references, or {@code null}; {@code vertices} holds {@code 0..i-1}. */
+        Vertex decode(int i, List<Vertex> vertices);
+
+        /** Vertex {@code i} is known ({@code vertices} holds {@code 0..i}). */
+        void accept(int i, List<Vertex> vertices);
+    }
+
+    /**
+     * The shared-vertex state of one pass over a buffer's vertices in order: encoding writes the
+     * flags, decoding reads them. {@link #accept} follows every vertex, referenced or not, so a
+     * finished ring becomes a candidate for the rings after it.
+     */
+    public static final class Walk implements ReferenceWalk {
+        private final Runs runs;
+        private final BitWriter flagsOut = new BitWriter();
+        private final BitWriter indicesOut = new BitWriter();
+        private final BitReader flagsIn;
+        private final BitReader indicesIn;
+        private State state;
+        private int run;
+
+        private Walk(Runs runs, BitReader flagsIn, BitReader indicesIn) {
+            this.runs = runs;
+            this.flagsIn = flagsIn;
+            this.indicesIn = indicesIn;
+        }
+
+        /**
+         * A decoding walk over {@code vertexCount} vertices.
+         *
+         * @param topo topology streams of the emitted buffer; no vertices needed
+         */
+        public static Walk forDecoding(BufferContext topo, int vertexCount, byte[] flags, byte[] indices) {
+            final var runs = Runs.of(topo, vertexCount);
+            if (runs == null) {
+                throw new IllegalStateException("the runs of a shared-reference buffer must follow from the topology");
+            }
+            return new Walk(runs, new BitReader(flags), new BitReader(indices));
+        }
+
+        private State state(List<Vertex> vertices) {
+            if (state == null) {
+                state = new State(vertices, runs.vertexCount());
+            }
+            return state;
+        }
+
+        private void advance(int i) {
+            while (run + 1 < runs.count() && runs.starts[run + 1] <= i) {
+                run++;
+            }
+        }
+
+        /**
+         * Encoder: whether vertex {@code i} of {@code vertices} is a reference; writes its flag. The
+         * list holds at least {@code 0..i}.
+         */
+        boolean encode(int i, List<Vertex> vertices) {
+            advance(i);
+            final var state = state(vertices);
+            final var ring = !runs.isLine[run];
+            final var start = runs.starts[run];
+            final var vertex = vertices.get(i);
+            final var source = ring && i > start ? state.sourceOf(vertices.get(i - 1)) : -1;
+            if (source >= 0) {
+                final var referenced = vertex.equals(state.previousOnSource(source));
+                flagsOut.write(referenced ? 1 : 0, 1);
+                return referenced;
+            }
+            if (ring && i == start && state.hasCandidates()) {
+                state.collectCandidates();
+                final var index = state.candidateIndex(vertex);
+                flagsOut.write(index >= 0 ? 1 : 0, 1);
+                if (index >= 0) {
+                    indicesOut.write(index, width(state.candidateCount()));
+                }
+                return index >= 0;
+            }
+            return false;
+        }
+
+        /**
+         * Decoder: the vertex {@code i} references, or {@code null} when it carries a residual.
+         * {@code vertices} holds {@code 0..i-1}.
+         */
+        @Override
+        public Vertex decode(int i, List<Vertex> vertices) {
+            advance(i);
+            final var state = state(vertices);
+            final var ring = !runs.isLine[run];
+            final var start = runs.starts[run];
+            final var source = ring && i > start ? state.sourceOf(vertices.get(i - 1)) : -1;
+            if (source >= 0) {
+                return flagsIn.read(1) == 1 ? state.previousOnSource(source) : null;
+            }
+            if (ring && i == start && state.hasCandidates() && flagsIn.read(1) == 1) {
+                state.collectCandidates();
+                return state.candidate(indicesIn.read(width(state.candidateCount())));
+            }
+            return null;
+        }
+
+        /** Vertex {@code i} is known ({@code vertices} holds {@code 0..i}); a ring's last closes it. */
+        @Override
+        public void accept(int i, List<Vertex> vertices) {
+            advance(i);
+            if (!runs.isLine[run] && i == runs.end(run) - 1) {
+                state(vertices).addRing(runs.starts[run], runs.end(run));
+            }
+        }
+    }
+
     // --- shared stream --------------------------------------------------------
 
     /**
@@ -227,6 +391,31 @@ public final class SharedVertexRef implements Encoding {
             }
         }
         return new long[]{sum, vertices.size() * 2L};
+    }
+
+    /**
+     * The zigzag residual pairs {@link #encode} writes for one buffer, interleaved {@code x, y}, and
+     * the number of flags it writes besides them. A referenced vertex has no pair, so the pairs
+     * cover fewer vertices than the buffer holds. Mirrors the encoder's choice: the shared stream
+     * when it is the smaller, else the plain predictor's residuals with no flags.
+     */
+    public record Residuals(int[] pairs, int flags) {
+    }
+
+    public Residuals residuals(BufferContext original) {
+        final var ctx = reorder.apply(original);
+        final var choice = choose(ctx);
+        final var runs = Runs.of(ctx, ctx.vertices().size());
+        if (runs == null || choice.vertices() == ctx.vertices()) {
+            return new Residuals(ClassRegions.concat(ClassRegions.split(predictor, ctx), predictor.regionOrder()), 0);
+        }
+        final var streams = streams(ctx, choice.vertices(), runs);
+        return new Residuals(
+                streams.regions().stream()
+                        .flatMap(List::stream)
+                        .mapToInt(Integer::intValue)
+                        .toArray(),
+                streams.flags().length());
     }
 
     private static long bitSum(int[] values) {
@@ -280,6 +469,7 @@ public final class SharedVertexRef implements Encoding {
             regions.add(new ArrayList<>());
         }
 
+        final var frame = framed ? new RingFramePrior() : null;
         var prevX = 0;
         var prevY = 0;
         for (var r = 0; r < runs.count(); r++) {
@@ -290,9 +480,6 @@ public final class SharedVertexRef implements Encoding {
                 final var vertex = vertices.get(i);
                 final var predX = predictX(classes[i], i, vertices, prevX);
                 final var predY = predictY(classes[i], i, vertices, prevY);
-                final var zx = EncodingUtils.encodeZigZag(vertex.x() - predX);
-                final var zy = EncodingUtils.encodeZigZag(vertex.y() - predY);
-
                 var referenced = false;
                 final var source = ring && i > start ? state.sourceOf(vertices.get(i - 1)) : -1;
                 if (source >= 0) {
@@ -311,14 +498,32 @@ public final class SharedVertexRef implements Encoding {
                 }
                 if (!referenced) {
                     final var region = regions.get(classes[i]);
-                    region.add(zx);
-                    region.add(zy);
+                    final var dx = vertex.x() - predX;
+                    final var dy = vertex.y() - predY;
+                    if (frame != null && ring && i > start && !predictor.hasPrediction(classes[i])) {
+                        frame.forward(dx, dy);
+                        region.add(EncodingUtils.encodeZigZag(frame.x()));
+                        region.add(EncodingUtils.encodeZigZag(frame.y()));
+                    } else {
+                        region.add(EncodingUtils.encodeZigZag(dx));
+                        region.add(EncodingUtils.encodeZigZag(dy));
+                    }
+                }
+                if (frame != null && ring) {
+                    if (i == start) {
+                        frame.beginRing(vertex);
+                    } else {
+                        frame.edge(vertex.x() - prevX, vertex.y() - prevY);
+                    }
                 }
                 prevX = vertex.x();
                 prevY = vertex.y();
             }
             if (ring) {
                 state.addRing(start, end);
+                if (frame != null) {
+                    frame.endRing(vertices, start, end);
+                }
             }
         }
         return new Streams(flags, indices, regions);
@@ -350,6 +555,7 @@ public final class SharedVertexRef implements Encoding {
 
             final var vertices = new ArrayList<Vertex>(vertexCount);
             final var state = new State(vertices, vertexCount);
+            final var frame = framed ? new RingFramePrior() : null;
             var prevX = 0;
             var prevY = 0;
             for (var r = 0; r < runs.count(); r++) {
@@ -373,17 +579,32 @@ public final class SharedVertexRef implements Encoding {
                         final var predX = predictX(classes[i], i, vertices, prevX);
                         final var predY = predictY(classes[i], i, vertices, prevY);
                         final var region = classes[i];
-                        vertex = new Vertex(
-                                predX + DecodingUtils.decodeZigZag(residuals[cursors[region]]),
-                                predY + DecodingUtils.decodeZigZag(residuals[cursors[region] + 1]));
+                        final var rx = DecodingUtils.decodeZigZag(residuals[cursors[region]]);
+                        final var ry = DecodingUtils.decodeZigZag(residuals[cursors[region] + 1]);
+                        if (frame != null && ring && i > start && !predictor.hasPrediction(classes[i])) {
+                            frame.inverse(rx, ry);
+                            vertex = new Vertex(predX + frame.x(), predY + frame.y());
+                        } else {
+                            vertex = new Vertex(predX + rx, predY + ry);
+                        }
                         cursors[region] += 2;
                     }
                     vertices.add(vertex);
+                    if (frame != null && ring) {
+                        if (i == start) {
+                            frame.beginRing(vertex);
+                        } else {
+                            frame.edge(vertex.x() - prevX, vertex.y() - prevY);
+                        }
+                    }
                     prevX = vertex.x();
                     prevY = vertex.y();
                 }
                 if (ring) {
                     state.addRing(start, end);
+                    if (frame != null) {
+                        frame.endRing(vertices, start, end);
+                    }
                 }
             }
             return vertices;

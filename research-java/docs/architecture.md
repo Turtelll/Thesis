@@ -107,7 +107,8 @@ research-java/
   src/main/java/org/maplibre/mlt/research/
     cli/                          every entry point (also: DecodeTimeCli, ShareTableCli, QuadRotationCli,
                                     TurnRadiusCli, TurnScalarCli, Turn90BitmapCli, BufferPointCli,
-                                    ReflexSignalCli, TileSizeCli — see build.gradle for the task of each)
+                                    ReflexSignalCli, OrientationPriorCli, TileSizeCli — see build.gradle for
+                                    the task of each)
       ExtractCli.java              extract-step CLI (default mainClass)
       BenchmarkCli.java             baselines vs candidates vs oracles, compressed per tile
       Compressor.java               gzip / Brotli / zstd, one-shot size of a byte[]

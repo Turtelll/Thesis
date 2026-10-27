@@ -503,6 +503,30 @@ and `LayerDefaultTest` checks that, that every fitted layer reorders, and the fa
 are the gated fit, before the reorder was opened to every layer.
 `pipeline --step layer --by-zoom` sizes it against `DEFAULT`.
 
+**`building`, `landcover`, `landuse` and `aeroway` now use the ring frame** (`QUAD_CORNER_FRAME`, `landuse`
+`QUAD_CORNER_LINE_FRAME`; [orientation-prior.md](orientation-prior.md)), entries that are not rows of the
+oracle grid: `TileSelector` appends the layer defaults the grid lacks (52 candidates) so a tile can still
+start from its default. The three added layers were picked with `--step framelayers`, each layer's own
+terminal, framed against plain, the rule being a win under gzip, Brotli and zstd (per tile, change vs
+`DELTA_ZIGZAG_VARINT`, plain → framed): `landcover` -4,70% → -5,15% / -7,38% → -7,92% / -5,64% → -6,21%,
+`landuse` -4,70% → -5,72% / -8,41% → -9,63% / -6,16% → -7,29%, `aeroway` (58 buffers, 22 kB)
+-2,14% → -2,21% / -16,47% → -17,84% / -10,96% → -11,13%. Not switched: `water` (-2,41% → -2,24% gzip, the
+reference metric, Brotli +0,07 points), `boundary` and `park` (ties within 0,02 points). With the three
+added layers the whole-corpus `PER LAYER` row is 10.399.717 gzip (-7,45%), 9.702.273 Brotli (-13,66%),
+10.192.769 zstd (-9,29%), against -7,36% / -13,55% / -9,16% with `building` alone: the layers are small
+(together about 2,2 MB of the 11,2 MB `DELTA_ZIGZAG_VARINT` gzip reference). Decode on those layers is cheaper than on `building`: `landcover`
+2,41x FastPFOR (plain 0,56x), `landuse` 1,55x (plain 0,46x), as they carry fewer ring vertices.
+The `building` numbers follow. With it, `--step layer --by-zoom` (4.368 buffers,
+358 tiles, reorder on every layer, sizes only) gives `PER LAYER` 10.410.201 bytes gzip (-7,36%), 9.713.986
+Brotli (-13,55%), 10.207.389 zstd (-9,16%) against `DEFAULT` -3,63% / -9,52% / -5,24%; `building` -12,69%
+gzip against -8,11% for `DEFAULT`. The frame is worth about 131.800 bytes of the gzip total (derived from
+the `building` rows of `--step frame`: 3.433.158 with `QUAD_CORNER`, 3.301.330 with the frame), i.e. the
+default would be -6,19% gzip without it. Decode of the `building` buffers
+(`decodeTime --layer building`, 310 buffers, end to end): 490 ms against 127 ms for the previous
+`building` row and 84 ms for FastPFOR, so 5,86x FastPFOR (the previous row 1,52x), 112 ns/value above 5000
+vertices against 29 ns. That is outside the 1,5x budget of `decodeTime`, which does not apply to the
+general-purpose-compression target ([general-purpose-compression.md](general-purpose-compression.md)).
+
 | Row (geometry buffers, per tile) | gzip | Brotli 11 | zstd 19 |
 |---|---|---|---|
 | `DEFAULT` (one row for all layers) | 10.829.102 (-3,63%) | 10.166.114 (-9,53%) | 10.648.585 (-5,24%) |

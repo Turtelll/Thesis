@@ -66,6 +66,15 @@ class GeometryReorderMechanismTest {
         reordered.vertices());
   }
 
+  /** The permutation a caller applies to the property columns is the one {@code apply} applies. */
+  @Test
+  void featureOrderIsThePermutationApplyUses() {
+    final var ctx = lineColumn();
+    assertArrayEquals(new int[] {0, 2, 1}, GeometryReorder.FEATURE.featureOrder(ctx));
+    assertEquals(null, GeometryReorder.FEATURE.featureOrder(new BufferContext(
+        List.of(new Vertex(1, 1)), List.of(0), List.of(), List.of(), List.of())));
+  }
+
   @Test
   void preservesEveryGeometry() {
     final var ctx = lineColumn();
@@ -294,5 +303,119 @@ class GeometryReorderMechanismTest {
     assertEquals(new Vertex(0, 0), vertices.get(0), "nearest start to the origin goes first");
     assertEquals(new Vertex(100, 100), vertices.get(6));
     assertEquals("_RING_CANONICAL_REORDER", GeometryReorder.RING_CANONICAL_THEN_FEATURE.nameSuffix());
+  }
+
+  // --- part chaining inside a MultiLineString ------------------------------
+
+  private static final int LINESTRING = 1;
+  private static final int MULTILINESTRING = 4;
+
+  /**
+   * A LineString, then a MultiLineString stored as A, C, B although A ends where B starts and B
+   * ends where C starts, then a MultiLineString whose part D starts where C ends. C has three
+   * vertices, so the run lengths show whether the part-length stream was permuted with the parts.
+   */
+  @Test
+  void chainsMultiLineStringPartsWithinTheirFeature() {
+    final var ctx =
+        new BufferContext(
+            List.of(
+                new Vertex(100, 100), new Vertex(101, 101),
+                // feature 1: A, C, B
+                new Vertex(0, 0), new Vertex(10, 0),
+                new Vertex(20, 0), new Vertex(25, 0), new Vertex(30, 0),
+                new Vertex(10, 0), new Vertex(20, 0),
+                // feature 2: E, D
+                new Vertex(500, 500), new Vertex(501, 501),
+                new Vertex(30, 0), new Vertex(40, 0)),
+            List.of(LINESTRING, MULTILINESTRING, MULTILINESTRING),
+            List.of(3, 2),
+            List.of(2, 2, 3, 2, 2, 2),
+            List.of());
+
+    final var chained = GeometryReorder.PART_CHAIN.apply(ctx);
+    assertTrue(GeometryEquivalence.holds(ctx, chained));
+    // D joins C's end but belongs to feature 2: it only moves to the front of its own feature.
+    assertEquals(
+        List.of(
+            new Vertex(100, 100), new Vertex(101, 101),
+            new Vertex(0, 0), new Vertex(10, 0),
+            new Vertex(10, 0), new Vertex(20, 0),
+            new Vertex(20, 0), new Vertex(25, 0), new Vertex(30, 0),
+            new Vertex(30, 0), new Vertex(40, 0),
+            new Vertex(500, 500), new Vertex(501, 501)),
+        chained.vertices());
+    assertEquals(List.of(2, 2, 2, 3, 2, 2), chained.numParts());
+    assertEquals(ctx.geometryTypes(), chained.geometryTypes());
+    assertEquals(ctx.numGeometries(), chained.numGeometries());
+    assertEquals("_PART_CHAIN", GeometryReorder.PART_CHAIN.nameSuffix());
+  }
+
+  /** A part joinable only backwards: reversed under {@code PART_CHAIN_REV}, kept under {@code PART_CHAIN}. */
+  @Test
+  void reversesAPartToJoinItOnlyWhenAllowed() {
+    final var ctx =
+        new BufferContext(
+            List.of(new Vertex(0, 0), new Vertex(10, 0), new Vertex(20, 0), new Vertex(10, 0)),
+            List.of(MULTILINESTRING),
+            List.of(2),
+            List.of(2, 2),
+            List.of());
+
+    assertEquals(ctx.vertices(), GeometryReorder.PART_CHAIN.apply(ctx).vertices());
+
+    final var reversed = GeometryReorder.PART_CHAIN_REV.apply(ctx);
+    assertTrue(GeometryEquivalence.holds(ctx, reversed));
+    assertEquals(
+        List.of(new Vertex(0, 0), new Vertex(10, 0), new Vertex(10, 0), new Vertex(20, 0)),
+        reversed.vertices());
+  }
+
+  /** At a junction the chain takes the part that continues straight, not the first one stored. */
+  @Test
+  void prefersTheStraightContinuationAtAJunction() {
+    final var ctx =
+        new BufferContext(
+            List.of(
+                new Vertex(0, 0), new Vertex(10, 0),
+                // a turn off the junction
+                new Vertex(10, 0), new Vertex(10, 10),
+                // straight on
+                new Vertex(10, 0), new Vertex(20, 0)),
+            List.of(MULTILINESTRING),
+            List.of(3),
+            List.of(2, 2, 2),
+            List.of());
+
+    assertEquals(
+        List.of(
+            new Vertex(0, 0), new Vertex(10, 0),
+            new Vertex(10, 0), new Vertex(20, 0),
+            new Vertex(10, 0), new Vertex(10, 10)),
+        GeometryReorder.PART_CHAIN.apply(ctx).vertices());
+  }
+
+  /** Polygon rings in the column are emitted as they were; only the line parts are chained. */
+  @Test
+  void leavesPolygonsInAMixedColumnUnchanged() {
+    final var ctx =
+        new BufferContext(
+            List.of(
+                new Vertex(0, 0), new Vertex(5, 0), new Vertex(5, 5), new Vertex(0, 5),
+                new Vertex(20, 0), new Vertex(30, 0),
+                new Vertex(10, 0), new Vertex(20, 0)),
+            List.of(2, MULTILINESTRING),
+            List.of(2),
+            List.of(1),
+            List.of(4, 2, 2));
+
+    final var chained = GeometryReorder.PART_CHAIN.apply(ctx);
+    assertTrue(GeometryEquivalence.holds(ctx, chained));
+    assertEquals(ctx.vertices().subList(0, 4), chained.vertices().subList(0, 4));
+    assertEquals(
+        List.of(new Vertex(10, 0), new Vertex(20, 0), new Vertex(20, 0), new Vertex(30, 0)),
+        chained.vertices().subList(4, 8));
+    assertEquals(ctx.numParts(), chained.numParts());
+    assertEquals(List.of(4, 2, 2), chained.numRings());
   }
 }

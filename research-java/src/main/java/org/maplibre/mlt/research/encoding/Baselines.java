@@ -5,6 +5,8 @@ import org.maplibre.mlt.research.encoding.research.LineContinuationEncoding;
 import org.maplibre.mlt.research.encoding.research.LineSharedVertexRef;
 import org.maplibre.mlt.research.encoding.research.QuadCornerEncoding;
 import org.maplibre.mlt.research.encoding.research.QuadCornerLine;
+import org.maplibre.mlt.research.encoding.research.RoadChainEncoding;
+import org.maplibre.mlt.research.encoding.research.RoadMergeEncoding;
 import org.maplibre.mlt.research.encoding.research.Rot90Fixed;
 import org.maplibre.mlt.research.encoding.research.SegmentPair;
 import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
@@ -54,16 +56,40 @@ public final class Baselines {
                 new QuadCornerEncoding(),
                 new LineContinuationEncoding(),
                 new SharedVertexRef(),
+                // Ring edges coded in the frame of the nearest decoded ring, refined by the ring's own
+                // walls (RingFramePrior); nothing transmitted. docs/results/orientation-prior.md
+                new SharedVertexRef("QUAD_CORNER", new SegmentQuadCorner(), GeometryReorder.NONE, true),
                 // Shared references over features chained nearest-endpoint first.
                 new SharedVertexRef("QUAD_CORNER", new SegmentQuadCorner(), GeometryReorder.FEATURE),
                 // Rings rotated to a canonical start, then features chained over the rotated starts.
                 // The canonical start alone was revisited under split varints and is the smallest
                 // row on building; composed with the chaining it is the smallest on the tileset.
                 new SharedVertexRef("QUAD_CORNER", new SegmentQuadCorner(), GeometryReorder.RING_CANONICAL_THEN_FEATURE),
+                // The frame prior over the same reordered buffer: how much of it survives chaining.
+                new SharedVertexRef(
+                        "QUAD_CORNER", new SegmentQuadCorner(), GeometryReorder.RING_CANONICAL_THEN_FEATURE, true),
                 // Quad-corner shared references, plus continuation on line runs longer than 6 vertices.
                 new SharedVertexRef("QUAD_CORNER_LINE", new QuadCornerLine()),
                 new LineSharedVertexRef(),
-                new LineSharedVertexRef(LineSharedVertexRef.Table.MARKED));
+                new LineSharedVertexRef(LineSharedVertexRef.Table.MARKED),
+                // Roads: line features chained end to start, forward only. The first two are the
+                // controls that separate the effect of the order from the effect of the joins
+                // (docs/results/road-chain.md).
+                new RoadChainEncoding(GeometryReorder.FEATURE, false),
+                new RoadChainEncoding(GeometryReorder.ROAD_CHAIN, false),
+                new RoadChainEncoding(),
+                // The length gate over roads instead of features (4 vs the shared 6).
+                new RoadChainEncoding(GeometryReorder.ROAD_CHAIN, true, 4));
+    }
+
+    /**
+     * <b>Lossy</b> rows: they fuse line features that meet end to start (the feature boundaries are
+     * to be restored by linear referencing), verified by {@link MergeEquivalence}. Reported by the
+     * benchmark in a section of their own and never part of the research oracle or a winner column.
+     * Included in {@link #all()} so the round-trip tests cover them.
+     */
+    public static List<Encoding> lossy() {
+        return List.of(new RoadMergeEncoding(), new RoadMergeEncoding(4));
     }
 
     /**
@@ -170,6 +196,7 @@ public final class Baselines {
     public static List<Encoding> all() {
         var all = new ArrayList<Encoding>(baseline());
         all.addAll(research());
+        all.addAll(lossy());
         all.addAll(retired());
         return all;
     }

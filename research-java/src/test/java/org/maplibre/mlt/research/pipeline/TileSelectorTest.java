@@ -109,7 +109,18 @@ class TileSelectorTest {
   @Test
   void startsFromThePerLayerDefault() {
     var candidates = new TileSelector("gzip", SelectorTest::gzipSize).candidates();
-    assertEquals(48, candidates.size());
+    // the 48-row oracle grid first, then each distinct layer default it lacks (the ring-frame rows)
+    var grid = Selector.oracleConfigs();
+    assertEquals(48, grid.size());
+    assertEquals(grid, candidates.subList(0, 48));
+    var extras =
+        PipelineRegistry.fittedLayers().stream()
+            .map(PipelineRegistry::forLayer)
+            .filter(config -> !grid.contains(config))
+            .distinct()
+            .count();
+    assertTrue(extras > 0, "the ring-frame defaults are outside the grid");
+    assertEquals(48 + extras, candidates.size());
     for (var layer : PipelineRegistry.fittedLayers()) {
       assertTrue(candidates.contains(PipelineRegistry.forLayer(layer)), layer);
     }

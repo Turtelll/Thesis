@@ -17,7 +17,10 @@ import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.IntCodec;
 import org.maplibre.mlt.research.encoding.Layout;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.PredictedTransform;
 import org.maplibre.mlt.research.encoding.VertexTransform;
+import org.maplibre.mlt.research.encoding.research.QuadCornerLine;
+import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
 import org.maplibre.mlt.research.encoding.research.failed.ContextDelta;
 import org.maplibre.mlt.research.encoding.research.failed.MidpointReflect;
 import org.maplibre.mlt.research.encoding.research.failed.TurnScalar;
@@ -32,6 +35,7 @@ class WorkshopTest {
 
   private static final int LINESTRING = 1;
   private static final int POLYGON = 2;
+  private static final int MULTILINESTRING = 4;
 
   /** Four rings of 8, 9, 5 and 12 vertices with random coordinates. */
   private static BufferContext rings() {
@@ -100,6 +104,42 @@ class WorkshopTest {
     assertEquals(ctx.vertices(), port.invert(residuals, topologyOnly(ctx)));
   }
 
+  private static Workshop.Row known(String name) {
+    return Workshop.known().stream().filter(row -> row.name().equals(name)).findFirst().orElseThrow();
+  }
+
+  @Test
+  void ringFrameRowsRoundTripAndAreTheFrameOfThePipelinePredictors() {
+    for (var name : List.of("QUAD_CORNER_FRAME", "QUAD_CORNER_LINE_FRAME")) {
+      var row = known(name);
+      var ctx = rings();
+      var encoded = row.encoding().encode(ctx);
+      assertEquals(
+          ctx.vertices(), row.encoding().decode(encoded, topologyOnly(ctx), ctx.vertices().size()), name);
+      assertEquals(2 * ctx.vertices().size(), row.residuals().apply(ctx).pairs().length, name);
+      assertEquals(0, row.residuals().apply(ctx).sideValues(), name);
+    }
+  }
+
+  @Test
+  void ringFrameRowsRotateRingEdgesAndLeaveLinesAlone() {
+    // lines carry no ring: the frame changes nothing, the rows equal their plain predictors
+    var lines = lines();
+    assertArrayEquals(
+        new PredictedTransform(new QuadCornerLine(), Layout.INTERLEAVED).apply(lines),
+        known("QUAD_CORNER_LINE_FRAME").residuals().apply(lines).pairs());
+    assertArrayEquals(
+        new PredictedTransform(new SegmentQuadCorner(), Layout.INTERLEAVED).apply(lines),
+        known("QUAD_CORNER_FRAME").residuals().apply(lines).pairs());
+    // rings: the same number of pairs, but the rotated edges differ from the plain quad-corner ones
+    var rings = rings();
+    assertFalse(
+        Arrays.equals(
+            new PredictedTransform(new SegmentQuadCorner(), Layout.INTERLEAVED).apply(rings),
+            known("QUAD_CORNER_FRAME").residuals().apply(rings).pairs()),
+        "the fixture must have ring edges the frame rotates");
+  }
+
   @Test
   void turnScalarPairsDropOnlyTheAlongScalars() {
     var ctx = rings();
@@ -111,6 +151,23 @@ class WorkshopTest {
     assertTrue(along > 0, "the 8- and 12-vertex rings carry turns");
     assertEquals(stream.length - along, pairs.length);
     assertEquals(2 * ctx.vertices().size(), pairs.length);
+  }
+
+  /**
+   * Two 2-vertex parts of one MultiLineString, the second starting where the first ends and going
+   * straight on: its start is {@code (0, 0)} and its second vertex continues the first part's edge,
+   * where {@code LINE_CONTINUATION}'s length gate would leave both parts on plain delta.
+   */
+  @Test
+  void chainContinuationPredictsAcrossAJoin() {
+    var ctx = new BufferContext(
+        List.of(new Vertex(0, 0), new Vertex(10, 0), new Vertex(10, 0), new Vertex(20, 0)),
+        List.of(MULTILINESTRING), List.of(2), List.of(2, 2), List.of());
+    var chain = Workshop.chainContinuation().transform();
+    var residuals = chain.apply(ctx);
+
+    assertArrayEquals(new int[] {0, 0, 20, 0, 0, 0, 0, 0}, residuals);
+    assertEquals(ctx.vertices(), chain.invert(residuals, topologyOnly(ctx)));
   }
 
   @Test

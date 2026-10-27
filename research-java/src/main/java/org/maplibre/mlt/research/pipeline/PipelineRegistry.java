@@ -94,53 +94,68 @@ public final class PipelineRegistry {
     }
 
     /**
-     * The fixed composition of each layer: per layer the one row of the oracle grid with the smallest
-     * total over the layer's buffers, each compressed alone under gzip (the project's reference
-     * metric), with {@link Reorder#HILBERT_CENTROID_ROT_MP} on every layer. Predictor, segmentation
-     * and terminal were fitted on the Munich corpus with
-     * {@code ./gradlew pipeline --args="--step oracle"} ("best fixed composition per layer"); Brotli
-     * and zstd pick the same row on most layers and differ by 0,1 to 0,5% where they do not (see
-     * docs/results/openzl-pipeline.md). A layer not listed takes {@link #DEFAULT}.
+     * The fixed composition of each layer: per layer the one row of the {@link #fitRows fit grid} with the
+     * smallest total over the layer's buffers, each compressed alone under gzip (the project's reference
+     * metric), with {@link Reorder#HILBERT_CENTROID_ROT_MP} except on {@link #CHAIN_LAYERS} (the greedy
+     * {@link Reorder#CHAIN}). Predictor, segmentation, terminal and reorder were fitted on the Munich
+     * corpus with {@code ./gradlew pipeline --args="--step fit"} ("best fixed composition per layer":
+     * every predictor incl. the ring frame, shared references and heading x flat/class streams x the
+     * three byte terminals x Hilbert or chain); {@code building} and {@code transportation} are as before
+     * ({@code transportation} was fitted on geometry plus property columns). The chain layers are those
+     * where {@code --step fit} picks it and {@code pipelineTileSize --modes NONE,HILBERT_CENTROID_ROT_MP,CHAIN
+     * --by-layer} shows the chain's property columns no larger than Hilbert's net of the geometry gain:
+     * {@code transportation_name} (+701 property bytes, -2.885 geometry), {@code waterway}, {@code water},
+     * {@code aeroway} (smaller on both sides). The fit is geometry only; the property side is the
+     * single-layer-tile measure above. A layer not listed takes {@link #DEFAULT}.
      */
     private static final java.util.Map<String, PipelineConfig> BY_LAYER = java.util.Map.ofEntries(
+            // (the layers on CHAIN_LAYERS carry .withReorder(Reorder.CHAIN) below)
             java.util.Map.entry("place", composition(Prediction.QUAD_CORNER_LINE,
-                    Segmentation.FLAT, ByteWidth.ESCAPE, Transpose.NONE)),
-            java.util.Map.entry("transportation", composition(Prediction.LINE_CONTINUATION,
-                    Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
-            java.util.Map.entry("landcover", composition(Prediction.QUAD_CORNER,
-                    Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
-            java.util.Map.entry("transportation_name", composition(Prediction.LINE_CONTINUATION,
-                    Segmentation.CLASS, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
-            java.util.Map.entry("landuse", composition(Prediction.QUAD_CORNER_LINE,
-                    Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
-            java.util.Map.entry("water", composition(Prediction.QUAD_CORNER,
-                    Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.NONE)),
-            java.util.Map.entry("park", composition(Prediction.DELTA,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
-            java.util.Map.entry("boundary", composition(Prediction.QUAD_CORNER,
-                    Segmentation.CLASS, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
-            java.util.Map.entry("poi", composition(Prediction.QUAD_CORNER,
+            // the greedy chain, not Hilbert, and the references to earlier line parts' positions: fitted on
+            // geometry plus property columns compressed together (docs/results/line-shared-vertices.md)
+            java.util.Map.entry("transportation", composition(Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING,
+                    Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)
+                    .withReorder(Reorder.CHAIN)),
+            java.util.Map.entry("landcover", composition(Prediction.QUAD_CORNER_SHARED_FRAME,
+                    Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
+            java.util.Map.entry("transportation_name", composition(Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING,
+                    Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE).withReorder(Reorder.CHAIN)),
+            java.util.Map.entry("landuse", composition(Prediction.QUAD_CORNER_SHARED_FRAME,
+                    Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
+            java.util.Map.entry("water", composition(Prediction.QUAD_CORNER_SHARED_FRAME,
+                    Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.NONE).withReorder(Reorder.CHAIN)),
+            java.util.Map.entry("park", composition(Prediction.QUAD_CORNER_SHARED,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
-            java.util.Map.entry("building", composition(Prediction.QUAD_CORNER,
+            java.util.Map.entry("boundary", composition(Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING,
+                    Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
+            java.util.Map.entry("poi", composition(Prediction.DELTA,
+                    Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
+            java.util.Map.entry("building", composition(Prediction.QUAD_CORNER_SHARED_FRAME,
                     Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.NONE)),
             java.util.Map.entry("water_name", composition(Prediction.LINE_CONTINUATION,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
             java.util.Map.entry("housenumber", composition(Prediction.QUAD_CORNER_LINE,
                     Segmentation.FLAT, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
-            java.util.Map.entry("waterway", composition(Prediction.LINE_CONTINUATION,
-                    Segmentation.CLASS, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
-            java.util.Map.entry("mountain_peak", composition(Prediction.LINE_CONTINUATION,
+            java.util.Map.entry("waterway", composition(Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING,
+                    Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE).withReorder(Reorder.CHAIN)),
+            java.util.Map.entry("mountain_peak", composition(Prediction.LINE_CONTINUATION_HEADING,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
-            java.util.Map.entry("aeroway", composition(Prediction.QUAD_CORNER,
-                    Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
-            java.util.Map.entry("aerodrome_label", composition(Prediction.QUAD_CORNER_LINE,
+            java.util.Map.entry("aeroway", composition(Prediction.QUAD_CORNER_SHARED_FRAME,
+                    Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE).withReorder(Reorder.CHAIN)),
+            java.util.Map.entry("aerodrome_label", composition(Prediction.DELTA,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)));
+
+    /** The layers whose composition uses the greedy chain reorder instead of Hilbert (see {@link #BY_LAYER}). */
+    public static final java.util.Set<String> CHAIN_LAYERS =
+            java.util.Set.of("transportation", "transportation_name", "waterway", "water", "aeroway");
 
     /**
      * The pipeline's default: one fixed composition per layer, {@link #DEFAULT} for a layer without an
      * entry (a layer the fit has not seen). The decoder knows the layer, so the choice needs no
      * signalling beyond the buffer header; the reorder is the one choice the header does not carry, and
-     * every fitted layer uses {@link Reorder#HILBERT_CENTROID_ROT_MP}.
+     * every fitted layer reorders ({@link Reorder#HILBERT_CENTROID_ROT_MP}, or {@link Reorder#CHAIN} for
+     * {@link #CHAIN_LAYERS}).
      */
     public static PipelineConfig forLayer(String layer) {
         return BY_LAYER.getOrDefault(layer, DEFAULT);
@@ -175,7 +190,210 @@ public final class PipelineRegistry {
 
     /** The step names, in order. */
     public static List<String> steps() {
-        return List.of("s0", "s1", "s2", "s3", "s4", "s6", "s7", "s8", "selector");
+        return List.of("s0", "s1", "s2", "s3", "s4", "s6", "s7", "s8", "selector", "turn", "frame", "framelayers",
+                "shared", "framelines", "linesshared");
+    }
+
+    /**
+     * {@code TURN_SCALAR} against {@code QUAD_CORNER} on the same terminal (S8's {@link #DEFAULT}),
+     * per segmentation, without and then with the {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder,
+     * then on the {@code building} layer's own composition ({@link #forLayer}: Hilbert reorder,
+     * class streams, escape width). The side value (the edge-length scalar) is a stream of its own
+     * under every segmentation, so the rows show what separating the near-zero corrections from the
+     * scalars is worth, and what the reorder adds on top.
+     */
+    private static List<Encoding> turnRows() {
+        final var rows = new ArrayList<Encoding>();
+        for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
+            for (final var predictor : List.of(Prediction.QUAD_CORNER, Prediction.TURN_SCALAR)) {
+                for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS, Segmentation.ROLE_CLASS)) {
+                    rows.add(row(DEFAULT.withReorder(reorder).withPredictor(predictor).withSegmentation(segmentation)));
+                }
+            }
+        }
+        // forLayer("building") uses the ring frame and shared references; QUAD_CORNER is the plain reference
+        final var building = forLayer("building");
+        rows.add(row(building.withPredictor(Prediction.QUAD_CORNER)));
+        rows.add(row(building.withPredictor(Prediction.TURN_SCALAR)));
+        return rows;
+    }
+
+    /**
+     * The ring frame beside its plain predictor on the {@code building} layer: {@code QUAD_CORNER}
+     * against {@code QUAD_CORNER_FRAME}, per segmentation, without and then with the
+     * {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder, then the frame on the layer's own composition
+     * ({@link #forLayer}, which uses the frame) with the other terminals and with the line predictor. The
+     * rows after the grid are the previous default ({@code QUAD_CORNER}), the current one, then variants. Rows that equal a grid row (the planes terminal is
+     * {@link #DEFAULT}'s) are not repeated: a duplicate name is summed twice by the benchmark.
+     */
+    private static List<Encoding> frameRows() {
+        final var rows = new ArrayList<Encoding>();
+        for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
+            for (final var predictor : List.of(Prediction.QUAD_CORNER, Prediction.QUAD_CORNER_FRAME)) {
+                for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS, Segmentation.ROLE_CLASS)) {
+                    rows.add(row(DEFAULT.withReorder(reorder).withPredictor(predictor).withSegmentation(segmentation)));
+                }
+            }
+        }
+        // forLayer("building") has the shared references on top of the frame since the shared step; the framed
+        // row is the one the frame step was fitted on, the plain predictor the one before it
+        final var building = forLayer("building");
+        rows.add(row(building.withPredictor(Prediction.QUAD_CORNER)));
+        rows.add(row(building.withPredictor(Prediction.QUAD_CORNER_FRAME)));
+        rows.add(row(building.withPredictor(Prediction.QUAD_CORNER_LINE_FRAME)));
+        rows.add(row(building.withPredictor(Prediction.QUAD_CORNER_FRAME).withWidth(ByteWidth.VARINT_SPLIT)));
+        rows.add(row(building.withPredictor(Prediction.QUAD_CORNER_FRAME).withReorder(Reorder.HILBERT_CENTROID_ROT)));
+        return rows;
+    }
+
+    /**
+     * The shared-vertex references on the {@code building} layer: {@code QUAD_CORNER} and its ring
+     * frame against {@code QUAD_CORNER_SHARED} and {@code QUAD_CORNER_SHARED_FRAME}, flat and class
+     * streams, without and then with the {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder, on {@link
+     * #DEFAULT}'s terminal (escape width, byte planes) and on the terminal {@code building} uses
+     * (escape width, no planes). The reorder rotates every ring to start nearest the previous
+     * vertex; the references then rotate the rings that share a wall to start where it begins, so
+     * the order of the two is what the reorder rows measure.
+     */
+    private static List<Encoding> sharedRows() {
+        final var rows = new ArrayList<Encoding>();
+        for (final var terminal : List.of(DEFAULT, forLayer("building"))) {
+            for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
+                for (final var predictor : List.of(Prediction.QUAD_CORNER, Prediction.QUAD_CORNER_FRAME,
+                        Prediction.QUAD_CORNER_SHARED, Prediction.QUAD_CORNER_SHARED_FRAME)) {
+                    for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
+                        rows.add(row(terminal.withReorder(reorder).withPredictor(predictor)
+                                .withSegmentation(segmentation)));
+                    }
+                }
+            }
+        }
+        return rows;
+    }
+
+    /**
+     * The ring frame on every layer, not just {@code building}: the four quad-corner predictors
+     * (plain and framed, with and without the line rule) under each (segmentation, width, transpose) the
+     * fitted layers use, all with {@link Reorder#HILBERT_CENTROID_ROT_MP}. Read the by-layer table: a layer
+     * compares the rows of its own terminal. The rows are layer-independent, so a layer without rings
+     * (or whose predictor is not a quad-corner one) shows the frame doing nothing.
+     */
+    private static List<Encoding> frameLayerRows() {
+        final var rows = new ArrayList<Encoding>();
+        final var terminals = List.of(
+                composition(Prediction.QUAD_CORNER, Segmentation.CLASS, ByteWidth.ESCAPE,
+                        Transpose.INTERLEAVED_PLANES),
+                composition(Prediction.QUAD_CORNER, Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.NONE),
+                composition(Prediction.QUAD_CORNER, Segmentation.CLASS, ByteWidth.VARINT_SPLIT, Transpose.NONE),
+                composition(Prediction.QUAD_CORNER, Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE));
+        for (final var terminal : terminals) {
+            for (final var predictor : List.of(Prediction.QUAD_CORNER, Prediction.QUAD_CORNER_FRAME,
+                    Prediction.QUAD_CORNER_LINE, Prediction.QUAD_CORNER_LINE_FRAME)) {
+                rows.add(row(terminal.withPredictor(predictor)));
+            }
+        }
+        return rows;
+    }
+
+    /**
+     * The frame on line parts: {@code LINE_CONTINUATION} against {@code LINE_CONTINUATION_FRAME}, the
+     * heading rotation of the continued vertices ({@code _HEADING}) and both ({@code _FRAME_HEADING}), per
+     * segmentation, without and then with the {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder, on the
+     * terminal {@code transportation} uses (escape width, byte planes: {@link #forLayer}) and on the
+     * one {@code transportation_name} and {@code waterway} use (split varint, no planes). The rows are
+     * layer-independent, so read the by-layer table: a layer without line parts shows the frame doing
+     * nothing. The {@code transportation} row of the current default is the Hilbert, class-stream one.
+     */
+    private static List<Encoding> frameLineRows() {
+        final var rows = new ArrayList<Encoding>();
+        final var terminals = List.of(
+                forLayer("transportation"),
+                forLayer("waterway"));
+        for (final var terminal : terminals) {
+            for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
+                for (final var predictor : List.of(Prediction.LINE_CONTINUATION, Prediction.LINE_CONTINUATION_FRAME,
+                        Prediction.LINE_CONTINUATION_HEADING, Prediction.LINE_CONTINUATION_FRAME_HEADING)) {
+                    for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
+                        rows.add(row(terminal.withReorder(reorder).withPredictor(predictor)
+                                .withSegmentation(segmentation)));
+                    }
+                }
+            }
+        }
+        return rows;
+    }
+
+    /**
+     * The references to earlier line parts' positions ({@link Prediction#LINE_CONTINUATION_SHARED}) beside
+     * their plain predictors: {@code LINE_CONTINUATION} and the frame and heading one {@code transportation}
+     * uses, each without and with the references, per segmentation, without and then with the
+     * {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder, on the terminal {@code transportation} uses (escape
+     * width, byte planes: {@link #forLayer}) and on the one {@code transportation_name} and {@code
+     * waterway} use (split varint, no planes). The rows are layer-independent, so read the by-layer table:
+     * a layer without line parts shows the references doing nothing.
+     */
+    private static List<Encoding> lineSharedRows() {
+        final var rows = new ArrayList<Encoding>();
+        final var terminals = List.of(
+                forLayer("transportation"),
+                forLayer("waterway"));
+        for (final var terminal : terminals) {
+            for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
+                for (final var predictor : List.of(
+                        Prediction.LINE_CONTINUATION, Prediction.LINE_CONTINUATION_SHARED,
+                        Prediction.LINE_CONTINUATION_FRAME_HEADING,
+                        Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING)) {
+                    for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
+                        rows.add(row(terminal.withReorder(reorder).withPredictor(predictor)
+                                .withSegmentation(segmentation)));
+                    }
+                }
+            }
+        }
+        // the old pipeline's greedy nearest-endpoint chaining as the reorder, class streams only, on the
+        // transportation terminal: chaining already turns junction starts into short jumps, so the
+        // references have less to catch (it never reverses a part)
+        for (final var reorder : List.of(Reorder.CHAIN, Reorder.CANON_CHAIN)) {
+            for (final var predictor : List.of(
+                    Prediction.LINE_CONTINUATION_FRAME_HEADING,
+                    Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING)) {
+                rows.add(row(forLayer("transportation").withReorder(reorder).withPredictor(predictor)
+                        .withSegmentation(Segmentation.CLASS)));
+            }
+        }
+        return rows;
+    }
+
+    /**
+     * The grid {@link #forLayer} is fitted on: every predictor (the ring frame, shared references and
+     * heading rotation included; {@code TURN_SCALAR} is left out, it lost) x flat or class streams x the
+     * three byte terminals x the given reorders ({@code --step fit}: {@link Reorder#HILBERT_CENTROID_ROT_MP}
+     * and the greedy {@link Reorder#CHAIN}; {@code --step fithilbert}: Hilbert only).
+     * The oracle grid has none of the later predictors, so its per-layer winners cannot replace the
+     * fitted compositions. Run {@code ./gradlew pipeline --args="--step fit"}: it implies {@code --oracle},
+     * and the "best fixed composition per layer" table is the fit. Not part of {@link #all()}.
+     */
+    static List<Encoding> fitRows(List<Reorder> reorders) {
+        final var rows = new ArrayList<Encoding>();
+        for (final var reorder : reorders) {
+            for (final var predictor : Prediction.values()) {
+                if (predictor == Prediction.TURN_SCALAR) {
+                    continue;
+                }
+                for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
+                    rows.add(row(DEFAULT.withReorder(reorder).withPredictor(predictor)
+                            .withSegmentation(segmentation).withWidth(ByteWidth.ESCAPE)
+                            .withTranspose(Transpose.INTERLEAVED_PLANES)));
+                    rows.add(row(DEFAULT.withReorder(reorder).withPredictor(predictor)
+                            .withSegmentation(segmentation).withWidth(ByteWidth.ESCAPE)
+                            .withTranspose(Transpose.NONE)));
+                    rows.add(row(DEFAULT.withReorder(reorder).withPredictor(predictor)
+                            .withSegmentation(segmentation).withWidth(ByteWidth.VARINT_SPLIT)
+                            .withTranspose(Transpose.NONE)));
+                }
+            }
+        }
+        return rows;
     }
 
     /**
@@ -217,10 +435,26 @@ public final class PipelineRegistry {
             // the fixed rows the per-buffer selection is measured against; the selectors themselves
             // need a compressor and are built by PipelineCli
             case "selector" -> List.of(row(DEFAULT), row(GEOMETRY_BEST));
+            // not a step of the build-up: TURN_SCALAR beside QUAD_CORNER, for the building layer
+            case "turn" -> turnRows();
+            // not a step of the build-up: the ring frame beside QUAD_CORNER, for the building layer
+            case "frame" -> frameRows();
+            // the ring frame on every layer, under each layer terminal
+            case "framelayers" -> frameLayerRows();
+            // the shared-vertex references beside the plain and framed predictors, for the building layer
+            case "shared" -> sharedRows();
+            // the ring frame on line parts: LINE_CONTINUATION beside LINE_CONTINUATION_FRAME
+            case "framelines" -> frameLineRows();
+            // the references to earlier line parts' positions beside the line predictors
+            case "linesshared" -> lineSharedRows();
             // not a step of the build-up: the cumulative stages, for the benchmark run
             case "ladder" -> ladder().stream().map(stage -> row(stage.config())).toList();
             // the grid the oracle chooses among; its rows are added to all() below
             case "oracle" -> oracle();
+            // the grid forLayer is fitted on (frame, shared and heading predictors, chain reorder included)
+            case "fit" -> fitRows(List.of(Reorder.HILBERT_CENTROID_ROT_MP, Reorder.CHAIN));
+            // the same without the chain reorder, whose property-column cost is only measured for transportation
+            case "fithilbert" -> fitRows(List.of(Reorder.HILBERT_CENTROID_ROT_MP));
             // the previous default, beside which the benchmark sizes the per-layer default (forLayer)
             case "layer" -> List.of(row(DEFAULT));
             // the fixed rows the tile selection is measured against; the TileSelectors need a
@@ -308,6 +542,11 @@ public final class PipelineRegistry {
         }
         // the oracle's grid holds combinations no step measures; round-tripped with the rest
         for (final var encoding : oracle()) {
+            byName.putIfAbsent(encoding.name(), encoding);
+        }
+        // so are the per-layer compositions (the chain ones pair it with predictors no step measures)
+        for (final var layer : fittedLayers()) {
+            final var encoding = row(forLayer(layer));
             byName.putIfAbsent(encoding.name(), encoding);
         }
         return new ArrayList<>(byName.values());

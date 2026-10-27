@@ -98,7 +98,13 @@ class VertexBufferCodecTest {
   private static void assertReconstructs(
       Encoding encoding, BufferContext ctx, VertexBufferCodec.EncodedBuffer encoded) {
     var decoded = encoding.decode(encoded, ctx, ctx.vertices().size());
-    if (encoding.reordersGeometries()) {
+    if (encoding.mergesFeatures()) {
+      var emitted = encoding.emitted(ctx);
+      assertEquals(emitted.vertices(), decoded, "must decode to the buffer it emitted");
+      assertTrue(
+          MergeEquivalence.holds(ctx, emitted),
+          "merging must keep every line part cuttable: " + MergeEquivalence.describe(ctx, emitted));
+    } else if (encoding.reordersGeometries()) {
       var emitted = encoding.emitted(ctx);
       assertEquals(emitted.vertices(), decoded, "must decode to the buffer it emitted");
       assertTrue(

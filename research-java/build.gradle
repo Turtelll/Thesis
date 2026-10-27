@@ -134,6 +134,30 @@ tasks.register('sharedVertex', JavaExec) {
     mainClass = 'org.maplibre.mlt.research.cli.SharedVertexCli'
 }
 
+/* Stage 0 probe (encodes nothing): ./gradlew roadChain --args="../data/extractedBaseline --layer transportation" */
+tasks.register('roadChain', JavaExec) {
+    group = 'application'
+    description = 'Stage 0 probe: forward joins between line features, roads after ROAD_CHAIN, continuation-eligible vertices, topology entries before/after merging.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.maplibre.mlt.research.cli.RoadChainCli'
+}
+
+/* Stage 0 protocol probe (encodes nothing): ./gradlew orientationPrior --args="../data/extractedBaseline --layer building" */
+tasks.register('orientationPrior', JavaExec) {
+    group = 'application'
+    description = 'Stage 0 probe: building frame predicted from decoded neighbours or pre-pass frames vs plain delta.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.maplibre.mlt.research.cli.OrientationPriorCli'
+}
+
+/* Stage 0 protocol probe (encodes nothing): ./gradlew lineFramePrior --args="../data/extractedBaseline --layer transportation" */
+tasks.register('lineFramePrior', JavaExec) {
+    group = 'application'
+    description = 'Stage 0 probe: line-run edges coded in a frame predicted from decoded neighbours vs plain delta.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.maplibre.mlt.research.cli.LineFramePriorCli'
+}
+
 /* ./gradlew shareTable --args="../data/extractedBaseline" */
 tasks.register('shareTable', JavaExec) {
     group = 'application'

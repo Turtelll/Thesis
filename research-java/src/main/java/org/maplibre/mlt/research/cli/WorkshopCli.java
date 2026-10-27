@@ -4,6 +4,8 @@ import org.maplibre.mlt.research.encoding.Baselines;
 import org.maplibre.mlt.research.encoding.Encoding;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
+import org.maplibre.mlt.research.pipeline.Reorder;
+import org.maplibre.mlt.research.pipeline.Verification;
 import org.maplibre.mlt.research.workshop.Workshop;
 
 import java.io.IOException;
@@ -20,12 +22,21 @@ import java.util.stream.IntStream;
 /**
  * The prediction workshop ({@link Workshop}): every workshop predictor interleaved over plain
  * Varint, no segmentation, against both {@code DELTA_ZIGZAG} baselines. Per row it reports the mean
- * residual size of the x and y components (zigzag bit width and absolute value), the share of
+ * and median absolute residual of the x and y components, the share of
  * {@code (0, 0)} pairs and of side values outside the pairs, Varint bytes, and gzip bytes with every
  * tile compressed on its own, as {@code BenchmarkCli} does. Every row is round-tripped on every buffer.
  *
+ * <p>The pipeline's feature reorderings run alongside as {@code REORDER_<variant>} rows, each the plain
+ * {@code DELTA} predictor over the reordered buffer (never combined with another predictor), to set
+ * against the prediction rows. {@code --reorder} instead reorders every buffer before the prediction
+ * rows' predictors run; the baselines stay unordered as the reference. The {@code _PART_CHAIN} rows
+ * ({@link Workshop#partChainRows()}) chain the parts inside every MultiLineString and always run, as do
+ * the {@code _ROAD_CHAIN} rows ({@link Workshop#roadChainRows()}), which chain line features end to start.
+ *
  * <p>Usage: {@code [extractionDir] [--layer <name>] [--zoom <z>] [--only A,B] [--by-layer]
- * [--by-zoom] [--max-tiles N]}. {@code extractionDir} defaults to {@code ../data/extractedBaseline}.
+ * [--by-zoom] [--max-tiles N] [--reorder [VARIANT]]}. {@code VARIANT} is a pipeline {@link Reorder}
+ * name (default {@code HILBERT_CENTROID_ROT_MP}). {@code extractionDir} defaults to
+ * {@code ../data/extractedBaseline}.
  */
 public final class WorkshopCli {
     private WorkshopCli() {
@@ -34,9 +45,12 @@ public final class WorkshopCli {
     /** Layers shown under {@code --by-layer}, the ones with the most vertices. */
     private static final int TOP_LAYERS = 6;
 
+    /** The reordering {@code --reorder} applies when no variant is named: the pipeline's own choice. */
+    private static final Reorder DEFAULT_REORDER = Reorder.HILBERT_CENTROID_ROT_MP;
+
     private record Options(
             String inDir, String layer, Integer zoom, Set<String> only, boolean byLayer, boolean byZoom,
-            int maxTiles) {
+            int maxTiles, Reorder reorder) {
 
         static Options parse(String[] args) {
             var inDir = "../data/extractedBaseline";
@@ -46,6 +60,7 @@ public final class WorkshopCli {
             var byLayer = false;
             var byZoom = false;
             var maxTiles = Integer.MAX_VALUE;
+            Reorder reorder = null;
             var positional = 0;
             for (var i = 0; i < args.length; i++) {
                 switch (args[i]) {
@@ -55,24 +70,48 @@ public final class WorkshopCli {
                     case "--by-layer" -> byLayer = true;
                     case "--by-zoom" -> byZoom = true;
                     case "--max-tiles" -> maxTiles = Integer.parseInt(args[++i]);
+                    case "--reorder" -> {
+                        // The variant is optional: take the next argument only if it names one.
+                        var named = i + 1 < args.length ? reorderNamed(args[i + 1]) : null;
+                        reorder = named != null ? named : DEFAULT_REORDER;
+                        if (named != null) {
+                            i++;
+                        }
+                    }
                     default -> {
                         if (args[i].startsWith("-") || positional++ > 0) {
                             throw new IllegalArgumentException(
                                     "Usage: [extractionDir] [--layer <name>] [--zoom <z>] [--only A,B] [--by-layer]"
-                                            + " [--by-zoom] [--max-tiles N]");
+                                            + " [--by-zoom] [--max-tiles N] [--reorder [VARIANT]]");
                         }
                         inDir = args[i];
                     }
                 }
             }
-            return new Options(inDir, layer, zoom, only, byLayer, byZoom, maxTiles);
+            return new Options(inDir, layer, zoom, only, byLayer, byZoom, maxTiles, reorder);
+        }
+
+        /** The variant called {@code name} (case-insensitive), or {@code null} for any other argument. */
+        private static Reorder reorderNamed(String name) {
+            for (var reorder : Reorder.values()) {
+                if (reorder.reorders() && reorder.name().equalsIgnoreCase(name)) {
+                    return reorder;
+                }
+            }
+            return null;
         }
     }
 
-    /** Running sums over one row's residual pairs and side values. */
+    /**
+     * Running sums over one row's residual pairs and side values: per component the summed absolute
+     * residual and a histogram of it for the median, exact up to {@link #HISTOGRAM_CAP}.
+     */
     private static final class ResidualSums {
-        private long bitsX;
-        private long bitsY;
+        /** Absolute residuals above this share the last histogram bucket; the tile extent is 4096. */
+        private static final int HISTOGRAM_CAP = 4096;
+
+        private final long[] histX = new long[HISTOGRAM_CAP + 2];
+        private final long[] histY = new long[HISTOGRAM_CAP + 2];
         private long absX;
         private long absY;
         private long zeroPairs;
@@ -83,29 +122,17 @@ public final class WorkshopCli {
             final var zigzag = residuals.pairs();
             sideValues += residuals.sideValues();
             for (var i = 0; i + 1 < zigzag.length; i += 2) {
-                bitsX += bits(zigzag[i]);
-                bitsY += bits(zigzag[i + 1]);
-                absX += abs(zigzag[i]);
-                absY += abs(zigzag[i + 1]);
-                if (zigzag[i] == 0 && zigzag[i + 1] == 0) {
+                final var x = abs(zigzag[i]);
+                final var y = abs(zigzag[i + 1]);
+                absX += x;
+                absY += y;
+                histX[(int) Math.min(x, HISTOGRAM_CAP + 1)]++;
+                histY[(int) Math.min(y, HISTOGRAM_CAP + 1)]++;
+                if (x == 0 && y == 0) {
                     zeroPairs++;
                 }
             }
             vertices += zigzag.length / 2;
-        }
-
-        void add(ResidualSums other) {
-            bitsX += other.bitsX;
-            bitsY += other.bitsY;
-            absX += other.absX;
-            absY += other.absY;
-            zeroPairs += other.zeroPairs;
-            sideValues += other.sideValues;
-            vertices += other.vertices;
-        }
-
-        private static int bits(int zigzag) {
-            return 32 - Integer.numberOfLeadingZeros(zigzag);
         }
 
         private static long abs(int zigzag) {
@@ -114,6 +141,22 @@ public final class WorkshopCli {
 
         private double mean(long sum) {
             return vertices == 0 ? 0.0 : (double) sum / vertices;
+        }
+
+        /** The lower median of the absolute residual. */
+        private String median(long[] histogram) {
+            if (vertices == 0) {
+                return "-";
+            }
+            final var half = (vertices + 1) / 2;
+            var seen = 0L;
+            for (var value = 0; value <= HISTOGRAM_CAP; value++) {
+                seen += histogram[value];
+                if (seen >= half) {
+                    return String.valueOf(value);
+                }
+            }
+            return ">" + HISTOGRAM_CAP;
         }
     }
 
@@ -126,7 +169,7 @@ public final class WorkshopCli {
     }
 
     /** One row's result on one buffer. */
-    private record Measured(String name, byte[] payload, ResidualSums residuals) {
+    private record Measured(String name, byte[] payload, Workshop.Residuals residuals) {
     }
 
     public static void main(String[] args) throws IOException {
@@ -134,9 +177,24 @@ public final class WorkshopCli {
         var inDir = Path.of(opts.inDir);
 
         var baselines = Baselines.baseline();
-        var rows = Workshop.rows().stream()
+        // --only names the predictors as they are listed (before --reorder renames them) and the
+        // reorder-only rows by their own names.
+        var predictors = Workshop.rows().stream()
                 .filter(row -> opts.only == null || opts.only.contains(row.name()))
                 .toList();
+        if (opts.reorder != null) {
+            predictors = Workshop.withReorder(opts.reorder, predictors);
+        }
+        var rows = new ArrayList<>(predictors);
+        Workshop.reorderRows().stream()
+                .filter(row -> opts.only == null || opts.only.contains(row.name()))
+                .forEach(rows::add);
+        Workshop.partChainRows().stream()
+                .filter(row -> opts.only == null || opts.only.contains(row.name()))
+                .forEach(rows::add);
+        Workshop.roadChainRows().stream()
+                .filter(row -> opts.only == null || opts.only.contains(row.name()))
+                .forEach(rows::add);
         if (rows.isEmpty()) {
             System.out.println("No workshop rows match --only " + opts.only);
             return;
@@ -149,6 +207,7 @@ public final class WorkshopCli {
         }
         var baselineNames = baselines.stream().map(Encoding::name).toList();
         var varintBaseline = baselines.get(1).name();
+        var baselineResiduals = Workshop.baselineResiduals();
 
         var corpus = new Group();
         var byLayer = new TreeMap<String, Group>();
@@ -184,12 +243,14 @@ public final class WorkshopCli {
             var measured = IntStream.range(0, encodings.size()).parallel().mapToObj(r -> {
                 var encoding = encodings.get(r);
                 EncodedBuffer encoded = encoding.encode(ctx);
-                BenchmarkCli.verifyRoundTrip(entry, ctx, encoding, encoded);
-                ResidualSums residuals = null;
-                if (r >= baselines.size()) {
-                    residuals = new ResidualSums();
-                    residuals.add(rows.get(r - baselines.size()).residuals().apply(ctx));
-                }
+                // The pipeline's gate, not BenchmarkCli's: it also compares reordered Point/MultiPoint
+                // columns, which GeometryEquivalence (parts only) would reject.
+                Verification.roundTrip(
+                        String.format("%d/%d/%d %s", entry.z(), entry.x(), entry.y(), entry.layerName()),
+                        ctx, encoding, encoded);
+                var residuals = r < baselines.size()
+                        ? baselineResiduals.apply(ctx)
+                        : rows.get(r - baselines.size()).residuals().apply(ctx);
                 return new Measured(names.get(r), encoded.payload(), residuals);
             }).toList();
 
@@ -244,13 +305,18 @@ public final class WorkshopCli {
             }
         }
         System.out.printf(
-                "%nbits x/y = mean zigzag bit width per component, |x|/|y| = mean absolute residual,%n"
+                "%nmean/med |x|, |y| = mean and median absolute residual per component, in tile units,%n"
                         + "zero = share of (0, 0) pairs, side = side values per vertex outside the (x, y) pair%n"
-                        + "(TURN_SCALAR's along scalar, RIGHT_ANGLE_TURN's direction bit) - not in bits/|x|/|y|, but%n"
+                        + "(TURN_SCALAR's along scalar, RIGHT_ANGLE_TURN's direction bit) - not in |x|/|y|, but%n"
                         + "in the bytes. varint = raw payload bytes (FastPFOR's own for its baseline),%n"
                         + "gzip = every tile's buffers concatenated and compressed on their own. ref = %s for%n"
                         + "varint, the smaller baseline for gzip. Interleaved, no segmentation: compare a predictor%n"
-                        + "with ./gradlew benchmark before calling it a result.%n",
+                        + "with ./gradlew benchmark before calling it a result.%n"
+                        + "REORDER_<variant> = plain DELTA over the buffer that pipeline reordering emits; with%n"
+                        + "--reorder every predictor row is <name>_<variant>, reordered the same way before it%n"
+                        + "predicts. Baselines are never reordered.%n"
+                        + "<row>_PART_CHAIN(_REV) = the row over the buffer with every MultiLineString's parts%n"
+                        + "chained end to start (_REV: parts may be reversed), feature order kept.%n",
                 varintBaseline);
     }
 
@@ -270,7 +336,10 @@ public final class WorkshopCli {
                 .orElse(0);
         var varintRef = group.payloadBytes.getOrDefault(varintBaseline, 0L);
         var names = new ArrayList<>(group.payloadBytes.keySet());
-        names.sort(Comparator.comparingLong(name -> gzipTotals.get(name)[TileCompression.GZIP]));
+        // Baselines first (smaller gzip first among them), then the rest by gzip bytes.
+        names.sort(Comparator
+                .comparing((String name) -> !baselineNames.contains(name))
+                .thenComparingLong(name -> gzipTotals.get(name)[TileCompression.GZIP]));
         var labels = new LinkedHashMap<String, String>();
         for (var name : names) {
             labels.put(name, baselineNames.contains(name) ? name + " (baseline)" : name);
@@ -278,9 +347,9 @@ public final class WorkshopCli {
         var width = Math.max("predictor".length(), labels.values().stream().mapToInt(String::length).max().orElse(0));
 
         System.out.printf("%n--- %s: %d buffers, %,d vertices ---%n", title, group.buffers, group.vertices);
-        var format = "%-" + width + "s %7s %7s %8s %8s %6s %6s %13s %9s %12s %9s%n";
-        System.out.printf(format, "predictor", "bits x", "bits y", "|x|", "|y|", "zero", "side", "varint", "change",
-                "gzip", "change");
+        var format = "%-" + width + "s %8s %8s %8s %8s %6s %6s %13s %9s %12s %9s%n";
+        System.out.printf(format, "predictor", "mean |x|", "mean |y|", "med |x|", "med |y|", "zero", "side",
+                "varint", "change", "gzip", "change");
         var gzipRefName = names.stream()
                 .filter(baselineNames::contains)
                 .findFirst()
@@ -293,10 +362,10 @@ public final class WorkshopCli {
             System.out.printf(
                     format,
                     labels.get(name),
-                    r == null ? "-" : String.format("%.2f", r.mean(r.bitsX)),
-                    r == null ? "-" : String.format("%.2f", r.mean(r.bitsY)),
                     r == null ? "-" : String.format("%.1f", r.mean(r.absX)),
                     r == null ? "-" : String.format("%.1f", r.mean(r.absY)),
+                    r == null ? "-" : r.median(r.histX),
+                    r == null ? "-" : r.median(r.histY),
                     r == null ? "-" : share(r.zeroPairs, r.vertices),
                     r == null ? "-" : share(r.sideValues, r.vertices),
                     String.format("%,d", payload),

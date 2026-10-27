@@ -6,12 +6,21 @@ import org.locationtech.jts.geom.MultiPoint;
 import org.locationtech.jts.geom.Point;
 import org.maplibre.mlt.converter.ConversionConfig;
 import org.maplibre.mlt.converter.MltConverter;
+import org.maplibre.mlt.converter.encodings.GeometryEncoder;
 import org.maplibre.mlt.converter.mvt.MvtUtils;
 import org.maplibre.mlt.data.Feature;
 import org.maplibre.mlt.data.Layer;
 import org.maplibre.mlt.data.MapboxVectorTile;
+import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.research.GeometryReorder;
 import org.maplibre.mlt.research.extraction.MbtilesSource;
+import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
+import org.maplibre.mlt.research.pipeline.PipelineConfig;
+import org.maplibre.mlt.research.pipeline.PipelineEncoding;
+import org.maplibre.mlt.research.pipeline.PipelineRegistry;
+import org.maplibre.mlt.research.pipeline.Prediction;
 import org.maplibre.mlt.research.pipeline.Reorder;
+import org.maplibre.mlt.research.pipeline.Segmentation;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -38,7 +47,9 @@ import java.util.List;
  * unreordered tile. Measurement only, no bytes written.
  *
  * <p>Usage: {@code PipelineTileSizeCli <tileset.mbtiles> [--modes A,B,..] [--brotli-quality N]
- * [--limit-tiles N]}.
+ * [--limit-tiles N] [--by-layer] [--runs] [--ids keep|sequential|drop] [--joint <layer>]}.
+ * {@code --joint} compresses a layer's pipeline geometry payload and its property tile together,
+ * once, per tile.
  */
 public final class PipelineTileSizeCli {
 
@@ -81,6 +92,8 @@ public final class PipelineTileSizeCli {
         var limit = Integer.MAX_VALUE;
         var byLayer = false;
         var runs = false;
+        var joint = false;
+        String jointLayer = null;
         for (var i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--ids" -> ids = IdPolicy.valueOf(args[++i].trim().toUpperCase());
@@ -94,6 +107,10 @@ public final class PipelineTileSizeCli {
                 case "--limit-tiles" -> limit = Integer.parseInt(args[++i]);
                 case "--by-layer" -> byLayer = true;
                 case "--runs" -> runs = true;
+                case "--joint" -> {
+                    joint = true;
+                    jointLayer = args[++i];
+                }
                 default -> file = new File(args[i]);
             }
         }
@@ -102,6 +119,10 @@ public final class PipelineTileSizeCli {
         }
         if (runs) {
             runs(file, modes.get(0), limit);
+            return;
+        }
+        if (joint) {
+            joint(file, jointLayer, limit, brotli);
             return;
         }
         if (byLayer) {
@@ -205,6 +226,98 @@ public final class PipelineTileSizeCli {
         });
     }
 
+    /**
+     * The line compositions {@link #joint} compares, for the layer's terminal: the layer's default
+     * (the reference), the same without the reorder, the references with no reorder, with Hilbert and
+     * with the two greedy chains, and the chains without the references.
+     */
+    private static List<PipelineConfig> jointConfigs(String layer) {
+        final var base = PipelineRegistry.forLayer(layer)
+                .withPredictor(Prediction.LINE_CONTINUATION_FRAME_HEADING)
+                .withSegmentation(Segmentation.CLASS);
+        final var shared = Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING;
+        return List.of(
+                base.withReorder(Reorder.HILBERT_CENTROID_ROT_MP),
+                base.withReorder(Reorder.NONE),
+                base.withReorder(Reorder.CHAIN),
+                base.withReorder(Reorder.NONE).withPredictor(shared),
+                base.withReorder(Reorder.HILBERT_CENTROID_ROT_MP).withPredictor(shared),
+                base.withReorder(Reorder.CHAIN).withPredictor(shared),
+                base.withReorder(Reorder.CANON_CHAIN).withPredictor(shared));
+    }
+
+    /**
+     * What a tile of one layer costs when its geometry and properties are compressed together, as a
+     * browser receives them: per tile, the pipeline's geometry payload of the layer followed by the
+     * property-only MLT tile of the layer with the same feature order, compressed once. The sum of the
+     * two compressed alone is printed beside it, so the gap of the additive estimate shows. The MLT
+     * writer cannot take the pipeline's geometry bytes, so this concatenation stands in for the tile;
+     * other layers are not part of it. The first configuration is the reference of the change column.
+     */
+    private static void joint(File file, String layerName, int limit, int brotli) throws Exception {
+        final var compressors = Compressor.all(brotli);
+        final var configs = jointConfigs(layerName);
+        final var mlt = ConversionConfig.builder().useFastPFOR(true).includeIds(ids != IdPolicy.DROP).build();
+        // per configuration, per kind (geometry alone, properties alone, both together), per compressor
+        final var sums = new long[configs.size()][3][compressors.size()];
+        final var tiles = new long[1];
+        MbtilesSource.forEachTile(file, Integer.MIN_VALUE, Integer.MAX_VALUE, tileRef -> {
+            if (tiles[0] >= limit) {
+                return;
+            }
+            try {
+                final var mvt = MvtUtils.decodeMvt(tileRef.mvtBytes());
+                for (var layer : mvt.getLayerStream(false).toList()) {
+                    if (!layer.name().equals(layerName)) {
+                        continue;
+                    }
+                    final var geometries = layer.features().stream()
+                            .filter(GeometryEncoder::hasGeometry)
+                            .map(Feature::getGeometry)
+                            .toList();
+                    if (geometries.isEmpty()) {
+                        continue;
+                    }
+                    final var column = VertexBufferExtractor.extract(geometries);
+                    if (column.vertexBuffer().isEmpty()) {
+                        continue;
+                    }
+                    final var ctx = new BufferContext(
+                            column.vertexBuffer(), column.geometryTypes(), column.numGeometries(),
+                            column.numParts(), column.numRings());
+                    tiles[0]++;
+                    for (var c = 0; c < configs.size(); c++) {
+                        final var geometry = new PipelineEncoding(configs.get(c)).encode(ctx).payload();
+                        final var props = encode(
+                                List.of(stripGeometry(applyIds(reorder(layer, configs.get(c).reorder())))), mlt);
+                        final var both = new byte[geometry.length + props.length];
+                        System.arraycopy(geometry, 0, both, 0, geometry.length);
+                        System.arraycopy(props, 0, both, geometry.length, props.length);
+                        for (var k = 0; k < compressors.size(); k++) {
+                            sums[c][0][k] += compressors.get(k).size(geometry);
+                            sums[c][1][k] += compressors.get(k).size(props);
+                            sums[c][2][k] += compressors.get(k).size(both);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("tile " + tileRef.z() + "/" + tileRef.x() + "/" + tileRef.y(), e);
+            }
+        });
+        System.out.printf("layer %s, %d tiles, ids %s%n", layerName, tiles[0], ids);
+        for (var k = 0; k < compressors.size(); k++) {
+            System.out.printf("%n--- %s: geometry payload + property-only tile, per tile ---%n", compressors.get(k).label());
+            System.out.printf("%-90s %11s %11s %11s %11s %8s%n", "composition", "geometry", "props", "alone+alone",
+                    "together", "vs ref");
+            final var reference = sums[0][2][k];
+            for (var c = 0; c < configs.size(); c++) {
+                System.out.printf("%-90s %,11d %,11d %,11d %,11d %+7.2f%%%n", new PipelineEncoding(configs.get(c)).name(),
+                        sums[c][0][k], sums[c][1][k], sums[c][0][k] + sums[c][1][k], sums[c][2][k],
+                        100.0 * (sums[c][2][k] - reference) / reference);
+            }
+        }
+    }
+
     private static void record(long[] into, byte[] bytes, List<Compressor> compressors) {
         into[0] += bytes.length;
         for (var c = 0; c < compressors.size(); c++) {
@@ -230,7 +343,53 @@ public final class PipelineTileSizeCli {
         return new Layer(layer.name(), features, layer.tileExtent());
     }
 
+    /**
+     * The old pipeline's greedy nearest-endpoint chain ({@link Reorder#CHAIN}, {@link
+     * Reorder#CANON_CHAIN}): the feature permutation {@link GeometryReorder#featureOrder} derives from
+     * the layer's vertex buffer, applied to the features. Features without a geometry are not in the
+     * buffer and keep their place at the end; a layer the chain would leave alone (points, runs not
+     * derivable) is returned unchanged.
+     */
+    private static Layer chain(Layer layer, Reorder mode) {
+        final var features = new ArrayList<>(layer.features());
+        final var located = new ArrayList<Integer>();
+        final var geometries = new ArrayList<Geometry>();
+        for (var i = 0; i < features.size(); i++) {
+            if (GeometryEncoder.hasGeometry(features.get(i))) {
+                located.add(i);
+                geometries.add(features.get(i).getGeometry());
+            }
+        }
+        if (geometries.size() < 2) {
+            return layer;
+        }
+        final var column = VertexBufferExtractor.extract(geometries);
+        final var ctx = new BufferContext(
+                column.vertexBuffer(), column.geometryTypes(), column.numGeometries(), column.numParts(),
+                column.numRings());
+        final var order = (mode == Reorder.CHAIN ? GeometryReorder.FEATURE : GeometryReorder.RING_CANONICAL_THEN_FEATURE)
+                .featureOrder(ctx);
+        if (order == null) {
+            return layer;
+        }
+        final var sorted = new ArrayList<Feature>(features.size());
+        final var placed = new boolean[features.size()];
+        for (final var f : order) {
+            sorted.add(features.get(located.get(f)));
+            placed[located.get(f)] = true;
+        }
+        for (var i = 0; i < features.size(); i++) {
+            if (!placed[i]) {
+                sorted.add(features.get(i));
+            }
+        }
+        return new Layer(layer.name(), sorted, layer.tileExtent());
+    }
+
     private static Layer reorder(Layer layer, Reorder mode) {
+        if (mode == Reorder.CHAIN || mode == Reorder.CANON_CHAIN) {
+            return chain(layer, mode);
+        }
         final var features = new ArrayList<>(layer.features());
         if (!mode.keyed() || features.size() < 2) {
             return layer;

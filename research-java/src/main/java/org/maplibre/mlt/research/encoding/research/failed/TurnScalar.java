@@ -43,10 +43,10 @@ import java.util.List;
 public final class TurnScalar implements VertexTransform {
 
     // INTERIOR is 0 so the default-zeroed class array already means "interior".
-    private static final int INTERIOR = 0;
-    private static final int START = 1;
-    private static final int CORNER = 2;
-    private static final int TURN = 3;
+    public static final int INTERIOR = 0;
+    public static final int START = 1;
+    public static final int CORNER = 2;
+    public static final int TURN = 3;
 
     private static final int POLYGON = 2;
     private static final int MULTIPOLYGON = 5;
@@ -70,10 +70,10 @@ public final class TurnScalar implements VertexTransform {
     /**
      * Per-vertex class, and for turn vertices whether the ring is outer (rotate CCW) or inner (CW).
      */
-    record Classes(int[] classes, boolean[] ccw, int turns) {
+    public record Classes(int[] classes, boolean[] ccw, int turns) {
     }
 
-    static Classes classify(BufferContext ctx, int vertexCount) {
+    public static Classes classify(BufferContext ctx, int vertexCount) {
         final var starts = PartBoundaries.of(ctx, vertexCount);
         final var outer = outerRings(ctx, starts.length);
         final var classes = new int[vertexCount];
@@ -233,25 +233,25 @@ public final class TurnScalar implements VertexTransform {
     }
 
     // rot90ccw(e) = (-ey, ex); rot90cw(e) = (ey, -ex), with e = p1 - p2.
-    private static int ux(boolean ccw, Vertex p1, Vertex p2) {
+    public static int ux(boolean ccw, Vertex p1, Vertex p2) {
         final var ey = p1.y() - p2.y();
         return ccw ? -ey : ey;
     }
 
-    private static int uy(boolean ccw, Vertex p1, Vertex p2) {
+    public static int uy(boolean ccw, Vertex p1, Vertex p2) {
         final var ex = p1.x() - p2.x();
         return ccw ? ex : -ex;
     }
 
-    private static int scaled(int along, int u, double len) {
+    public static int scaled(int along, int u, double len) {
         return len == 0 ? 0 : (int) Math.round(along * (double) u / len);
     }
 
-    private static int cornerX(int i, List<Vertex> vertices) {
+    public static int cornerX(int i, List<Vertex> vertices) {
         return vertices.get(i - 3).x() + vertices.get(i - 1).x() - vertices.get(i - 2).x();
     }
 
-    private static int cornerY(int i, List<Vertex> vertices) {
+    public static int cornerY(int i, List<Vertex> vertices) {
         return vertices.get(i - 3).y() + vertices.get(i - 1).y() - vertices.get(i - 2).y();
     }
 

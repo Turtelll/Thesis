@@ -123,7 +123,9 @@ class SegmentationMechanismTest {
           assertEquals(encoder.valueCounts()[s], streams[s].length, "stream " + s + " of " + segmentation);
           total += streams[s].length;
         }
-        assertEquals(2 * n, total);
+        // two values per vertex, plus one side value per vertex that carries one
+        var sideValues = encoder.sideStream() < 0 ? 0 : encoder.valueCounts()[encoder.sideStream()];
+        assertEquals(2 * n + sideValues, total);
         assertEquals(ctx.vertices(), Segmentation.join(decoder, predictor, streams, n));
       }
     }

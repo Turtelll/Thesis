@@ -6,7 +6,9 @@ import org.maplibre.mlt.research.encoding.PartBoundaries;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Reorders whole features within a buffer so each one starts near where the previous one ended,
@@ -30,7 +32,8 @@ import java.util.List;
  *
  * <ul>
  *   <li>a multi-part feature's parts stay contiguous and in order, or the feature's geometry
- *       changes;
+ *       changes; {@link #PART_CHAIN} permutes a MultiLineString's parts only among themselves,
+ *       which leaves the set of lines it describes unchanged;
  *   <li>a buffer whose topology does not yield usable part runs is returned unchanged, matching how
  *       {@link PartBoundaries} degrades rather than guessing at boundaries.
  * </ul>
@@ -85,13 +88,43 @@ public final class GeometryReorder {
     public static final GeometryReorder RING_CANONICAL_THEN_FEATURE =
             new GeometryReorder(Mode.RING_CANONICAL_THEN_FEATURE);
 
+    /**
+     * Keeps feature order, but reorders the parts inside every MultiLineString so that each part
+     * starts, where possible, at the vertex the previous part ended on: its start delta is then
+     * {@code (0, 0)} and a continuation predictor can carry the previous part's last edge across the
+     * join. Parts keep their direction. A MultiLineString's part order carries no rendering meaning,
+     * so nothing is transmitted beyond the permuted part lengths.
+     */
+    public static final GeometryReorder PART_CHAIN = new GeometryReorder(Mode.PART_CHAIN);
+
+    /**
+     * {@link #PART_CHAIN} that may also reverse a part to join it, with {@link #FEATURE_REV}'s
+     * caveat: a reversed part loses its direction semantics (one-way streets).
+     */
+    public static final GeometryReorder PART_CHAIN_REV = new GeometryReorder(Mode.PART_CHAIN_REV);
+
+    /**
+     * Reconstructs roads: line features are chained end to start, forward only, so a feature that
+     * begins exactly where the previous one ended follows it directly. From the current exit the
+     * next feature is an unused one starting at that exact position (the straightest if several),
+     * otherwise the unused feature nearest the exit that no other remaining feature arrives at, so a
+     * road is entered at its beginning. A MultiLineString keeps its part order; its entry is its
+     * first part's first vertex, its exit its last part's last vertex. Polygon features follow the
+     * lines in their original order. No feature is reversed, so direction semantics survive.
+     * {@code docs/results/road-chain.md}.
+     */
+    public static final GeometryReorder ROAD_CHAIN = new GeometryReorder(Mode.ROAD_CHAIN);
+
     private enum Mode {
         NONE("", false),
+        ROAD_CHAIN("_ROAD_CHAIN", false),
         FEATURE("_REORDER", false),
         FEATURE_REV("_REORDER_REV", true),
         RING_ROTATE("_RING_ROTATE", false),
         RING_CANONICAL("_RING_CANONICAL", false),
-        RING_CANONICAL_THEN_FEATURE("_RING_CANONICAL_REORDER", false);
+        RING_CANONICAL_THEN_FEATURE("_RING_CANONICAL_REORDER", false),
+        PART_CHAIN("_PART_CHAIN", false),
+        PART_CHAIN_REV("_PART_CHAIN_REV", true);
 
         private final String suffix;
         private final boolean allowReversal;
@@ -182,8 +215,317 @@ public final class GeometryReorder {
         }
 
         final var lengths = runLengths(starts, vertices.size());
+        if (mode == Mode.PART_CHAIN || mode == Mode.PART_CHAIN_REV) {
+            return chainParts(ctx, vertices, starts, lengths, groups);
+        }
+        if (mode == Mode.ROAD_CHAIN) {
+            final var roads = roadChain(ctx, vertices, starts, lengths, groups);
+            return roads == null ? ctx : rebuild(ctx, vertices, starts, lengths, groups, roads);
+        }
         final var order = greedyChain(vertices, starts, lengths, groups);
         return rebuild(ctx, vertices, starts, lengths, groups, order);
+    }
+
+    /**
+     * The emission order of the greedy feature chain ({@link #FEATURE}, {@link
+     * #RING_CANONICAL_THEN_FEATURE}) as original feature indices, for a caller that has to permute
+     * something besides the vertices (the property columns of a tile); {@code null} when {@link
+     * #apply} would leave the buffer alone. Features are the entries of the geometry-type stream, in
+     * the order the buffer holds them.
+     */
+    public int[] featureOrder(BufferContext ctx) {
+        if (mode != Mode.FEATURE && mode != Mode.RING_CANONICAL_THEN_FEATURE) {
+            throw new UnsupportedOperationException("no feature permutation for " + mode);
+        }
+        final var source = mode == Mode.RING_CANONICAL_THEN_FEATURE ? RING_CANONICAL.apply(ctx) : ctx;
+        final var vertices = source.vertices();
+        final var starts = PartBoundaries.of(source, vertices.size());
+        if (starts.length < 2) {
+            return null;
+        }
+        final var groups = featureGroups(source, starts.length);
+        if (groups == null) {
+            return null;
+        }
+        return greedyChain(vertices, starts, runLengths(starts, vertices.size()), groups).stream()
+                .mapToInt(Placed::group)
+                .toArray();
+    }
+
+    // --- road chaining ------------------------------------------------------
+
+    /**
+     * The emission order of {@link #ROAD_CHAIN}, or {@code null} when the buffer has no line
+     * feature. Features are the unit; see {@link #ROAD_CHAIN} for the rules.
+     */
+    private List<Placed> roadChain(
+            BufferContext ctx, List<Vertex> vertices, int[] starts, int[] lengths, List<int[]> groups) {
+        final var n = groups.size();
+        final var isLine = new boolean[n];
+        var lineCount = 0;
+        for (var f = 0; f < n; f++) {
+            final var type = ctx.geometryTypes().get(f);
+            isLine[f] = type != POLYGON && type != MULTIPOLYGON;
+            if (isLine[f]) {
+                lineCount++;
+            }
+        }
+        if (lineCount == 0) {
+            return null;
+        }
+
+        final var entry = new Vertex[n];
+        final var exit = new Vertex[n];
+        final var startingAt = new HashMap<Long, List<Integer>>();
+        final var arriving = new HashMap<Long, Integer>();
+        final var grid = new EndpointGrid(lineCount);
+        for (var f = 0; f < n; f++) {
+            if (!isLine[f]) {
+                continue;
+            }
+            final var group = groups.get(f);
+            entry[f] = first(vertices, starts, group[0]);
+            exit[f] = last(vertices, starts, lengths, group[group.length - 1]);
+            startingAt.computeIfAbsent(key(entry[f]), k -> new ArrayList<>()).add(f);
+            arriving.merge(key(exit[f]), 1, Integer::sum);
+            grid.add(f, false, entry[f]);
+        }
+        grid.build();
+
+        // used: already emitted. blocked: used, or another remaining feature still arrives at its
+        // entry, so it is not the beginning of a road. Restarts prefer unblocked features.
+        final var used = new boolean[n];
+        final var blocked = new boolean[n];
+        for (var f = 0; f < n; f++) {
+            blocked[f] = !isLine[f] || arriving.getOrDefault(key(entry[f]), 0) > 0;
+            used[f] = !isLine[f];
+        }
+
+        final var order = new ArrayList<Placed>(n);
+        Vertex at = null;
+        Vertex before = null;
+        for (var placed = 0; placed < lineCount; placed++) {
+            var pick = -1;
+            if (at != null) {
+                final var predictedX = 2L * at.x() - before.x();
+                final var predictedY = 2L * at.y() - before.y();
+                var bestCost = Long.MAX_VALUE;
+                for (final var candidate : startingAt.getOrDefault(key(at), List.of())) {
+                    if (used[candidate]) {
+                        continue;
+                    }
+                    final var second = second(vertices, starts, lengths, groups.get(candidate)[0], false);
+                    final var cost = Math.abs(second.x() - predictedX) + Math.abs(second.y() - predictedY);
+                    if (cost < bestCost) {
+                        bestCost = cost;
+                        pick = candidate;
+                    }
+                }
+            }
+            if (pick < 0) {
+                final var cursorX = at == null ? 0 : at.x();
+                final var cursorY = at == null ? 0 : at.y();
+                var hit = grid.nearest(cursorX, cursorY, blocked);
+                if (hit.feature() < 0) {
+                    // Only closed loops and cycles remain: every entry still has an arrival.
+                    hit = grid.nearest(cursorX, cursorY, used);
+                }
+                pick = hit.feature();
+            }
+
+            used[pick] = true;
+            blocked[pick] = true;
+            order.add(new Placed(pick, false));
+            at = exit[pick];
+            final var group = groups.get(pick);
+            final var lastPart = group[group.length - 1];
+            before = lengths[lastPart] < 2 ? at : vertices.get(starts[lastPart] + lengths[lastPart] - 2);
+
+            final var endKey = key(exit[pick]);
+            if (arriving.merge(endKey, -1, Integer::sum) == 0) {
+                for (final var released : startingAt.getOrDefault(endKey, List.of())) {
+                    if (!used[released]) {
+                        blocked[released] = false;
+                    }
+                }
+            }
+        }
+        for (var f = 0; f < n; f++) {
+            if (!isLine[f]) {
+                order.add(new Placed(f, false));
+            }
+        }
+        return order;
+    }
+
+    // --- part chaining inside a MultiLineString -----------------------------
+
+    /**
+     * Emits every feature in place, the parts of each MultiLineString in {@link #partChain} order;
+     * only the run-length stream ({@code numParts}, or {@code numRings} in a polygon column) changes,
+     * permuted within each feature.
+     */
+    private BufferContext chainParts(
+            BufferContext ctx, List<Vertex> vertices, int[] starts, int[] lengths, List<int[]> groups) {
+        final var polygonColumn = containsPolygon(ctx.geometryTypes());
+        final var out = new ArrayList<Vertex>(vertices.size());
+        final var runs = new ArrayList<Integer>(starts.length);
+        var cursor = new Vertex(0, 0);
+        for (var f = 0; f < groups.size(); f++) {
+            final var group = groups.get(f);
+            final List<Placed> order;
+            if (ctx.geometryTypes().get(f) == MULTILINESTRING && group.length >= 2) {
+                order = partChain(vertices, starts, lengths, group, cursor);
+            } else {
+                order = new ArrayList<>(group.length);
+                for (final var part : group) {
+                    order.add(new Placed(part, false));
+                }
+            }
+            for (final var placed : order) {
+                final var from = starts[placed.group()];
+                final var length = lengths[placed.group()];
+                for (var v = 0; v < length; v++) {
+                    out.add(vertices.get(from + (placed.reversed() ? length - 1 - v : v)));
+                }
+                runs.add(length);
+            }
+            cursor = out.get(out.size() - 1);
+        }
+        return new BufferContext(
+                out,
+                ctx.geometryTypes(),
+                ctx.numGeometries(),
+                polygonColumn ? ctx.numParts() : runs,
+                polygonColumn ? runs : ctx.numRings());
+    }
+
+    /**
+     * The emission order of one MultiLineString's parts ({@link Placed#group()} holds the part
+     * index). From the current exit, the next part is an unused one entering at that exact position,
+     * the one whose second vertex is nearest the previous edge continued (the residual a continuation
+     * predictor pays across the join). With none, the chain restarts at the unused entry nearest the
+     * exit, preferring entries a chain should start from: an odd remaining degree with reversal, more
+     * remaining parts leaving than arriving without it. Ties keep the lower part index, forward
+     * first.
+     */
+    private List<Placed> partChain(
+            List<Vertex> vertices, int[] starts, int[] lengths, int[] group, Vertex cursor) {
+        final var allowReversal = mode.allowReversal;
+        final var m = group.length;
+        final var leaving = new HashMap<Long, Integer>();
+        final var arriving = new HashMap<Long, Integer>();
+        // Every (part, orientation) entering at a position, encoded local * 2 + reversed.
+        final var entering = new HashMap<Long, List<Integer>>();
+        for (var local = 0; local < m; local++) {
+            final var first = key(first(vertices, starts, group[local]));
+            final var last = key(last(vertices, starts, lengths, group[local]));
+            leaving.merge(first, 1, Integer::sum);
+            arriving.merge(last, 1, Integer::sum);
+            entering.computeIfAbsent(first, k -> new ArrayList<>()).add(local * 2);
+            if (allowReversal) {
+                entering.computeIfAbsent(last, k -> new ArrayList<>()).add(local * 2 + 1);
+            }
+        }
+
+        final var used = new boolean[m];
+        final var order = new ArrayList<Placed>(m);
+        Vertex exit = cursor;
+        Vertex beforeExit = null;
+        for (var placed = 0; placed < m; placed++) {
+            var pick = -1;
+            if (beforeExit != null) {
+                final var predictedX = 2L * exit.x() - beforeExit.x();
+                final var predictedY = 2L * exit.y() - beforeExit.y();
+                var bestCost = Long.MAX_VALUE;
+                for (final var code : entering.getOrDefault(key(exit), List.of())) {
+                    if (used[code >> 1]) {
+                        continue;
+                    }
+                    final var second = second(vertices, starts, lengths, group[code >> 1], (code & 1) == 1);
+                    final var cost = Math.abs(second.x() - predictedX) + Math.abs(second.y() - predictedY);
+                    if (cost < bestCost) {
+                        bestCost = cost;
+                        pick = code;
+                    }
+                }
+            }
+            if (pick < 0) {
+                pick = restart(vertices, starts, lengths, group, used, leaving, arriving, exit);
+            }
+
+            final var local = pick >> 1;
+            final var reversed = (pick & 1) == 1;
+            final var part = group[local];
+            used[local] = true;
+            leaving.merge(key(first(vertices, starts, part)), -1, Integer::sum);
+            arriving.merge(key(last(vertices, starts, lengths, part)), -1, Integer::sum);
+            order.add(new Placed(part, reversed));
+            exit = reversed ? first(vertices, starts, part) : last(vertices, starts, lengths, part);
+            beforeExit = lengths[part] < 2
+                    ? exit
+                    : vertices.get(reversed ? starts[part] + 1 : starts[part] + lengths[part] - 2);
+        }
+        return order;
+    }
+
+    /** The unused (part, orientation) a new chain starts from, encoded as in {@link #partChain}. */
+    private int restart(
+            List<Vertex> vertices,
+            int[] starts,
+            int[] lengths,
+            int[] group,
+            boolean[] used,
+            Map<Long, Integer> leaving,
+            Map<Long, Integer> arriving,
+            Vertex exit) {
+        var pick = -1;
+        var pickPreferred = false;
+        var pickDistance = Long.MAX_VALUE;
+        for (var local = 0; local < group.length; local++) {
+            if (used[local]) {
+                continue;
+            }
+            for (var r = 0; r < (mode.allowReversal ? 2 : 1); r++) {
+                final var entry = r == 1
+                        ? last(vertices, starts, lengths, group[local])
+                        : first(vertices, starts, group[local]);
+                final var position = key(entry);
+                final var out = leaving.getOrDefault(position, 0);
+                final var in = arriving.getOrDefault(position, 0);
+                final var preferred = mode.allowReversal ? (out + in) % 2 == 1 : out > in;
+                final var distance =
+                        Math.abs((long) entry.x() - exit.x()) + Math.abs((long) entry.y() - exit.y());
+                if (pick < 0
+                        || (preferred && !pickPreferred)
+                        || (preferred == pickPreferred && distance < pickDistance)) {
+                    pick = local * 2 + r;
+                    pickPreferred = preferred;
+                    pickDistance = distance;
+                }
+            }
+        }
+        return pick;
+    }
+
+    private static Vertex first(List<Vertex> vertices, int[] starts, int part) {
+        return vertices.get(starts[part]);
+    }
+
+    private static Vertex last(List<Vertex> vertices, int[] starts, int[] lengths, int part) {
+        return vertices.get(starts[part] + lengths[part] - 1);
+    }
+
+    /** The vertex after the entry, in the given orientation; the entry itself for a 1-vertex part. */
+    private static Vertex second(List<Vertex> vertices, int[] starts, int[] lengths, int part, boolean reversed) {
+        if (lengths[part] < 2) {
+            return vertices.get(starts[part]);
+        }
+        return vertices.get(reversed ? starts[part] + lengths[part] - 2 : starts[part] + 1);
+    }
+
+    private static long key(Vertex vertex) {
+        return ((long) vertex.x() << 32) | (vertex.y() & 0xFFFFFFFFL);
     }
 
     // --- ring rotation ------------------------------------------------------
@@ -283,7 +625,7 @@ public final class GeometryReorder {
      * one run. In a polygon column the runs are rings, and {@code numParts} counts the rings of each
      * polygon, so a feature there owns as many runs as its polygons have rings.
      */
-    private static List<int[]> featureGroups(BufferContext ctx, int partCount) {
+    public static List<int[]> featureGroups(BufferContext ctx, int partCount) {
         final var polygonColumn = containsPolygon(ctx.geometryTypes());
         final var groups = new ArrayList<int[]>();
         var part = 0;

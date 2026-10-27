@@ -3,6 +3,8 @@ package org.maplibre.mlt.research.cli;
 import org.maplibre.mlt.research.encoding.Baselines;
 import org.maplibre.mlt.research.encoding.Encoding;
 import org.maplibre.mlt.research.encoding.GeometryEquivalence;
+import org.maplibre.mlt.research.encoding.MergeEquivalence;
+import org.maplibre.mlt.research.encoding.research.RoadChainEncoding;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
@@ -177,6 +179,11 @@ public final class BenchmarkCli {
             brotliOracle = new Oracle(
                     BROTLI_ORACLE, brotli.label() + " bytes of each buffer compressed on its own");
         }
+        /* Lossy rows are encoded and verified like the others but kept out of `names`, the oracle and
+         * every winner column: they are not candidates, they are reported in a section of their own. */
+        var lossy = Baselines.lossy();
+        var lossyNames = lossy.stream().map(Encoding::name).toList();
+        rows.addAll(lossyNames);
         var perTile = new TileCompression(compressors);
         var byLayer = new TreeMap<String, Totals>();
         var byGeometry = new TreeMap<String, Totals>();
@@ -234,6 +241,11 @@ public final class BenchmarkCli {
                 payloads.put(RESEARCH_ORACLE, researchOracle.take());
                 if (brotliOracle != null) {
                     payloads.put(BROTLI_ORACLE, brotliOracle.take());
+                }
+                for (var encoding : lossy) {
+                    var encoded = encoding.encode(ctx);
+                    verifyRoundTrip(entry, ctx, encoding, encoded);
+                    payloads.put(encoding.name(), encoded.payload());
                 }
 
                 var groups = List.of(
@@ -293,6 +305,7 @@ public final class BenchmarkCli {
         if (brotliOracle != null) {
             brotliOracle.report();
         }
+        lossySection(lossyNames, perTile, reference, opts.byZoom);
 
         System.out.printf(
                 "%n=== breakdowns: gzip bytes; ref = the smaller baseline in that group ===%n"
@@ -414,6 +427,79 @@ public final class BenchmarkCli {
                 "%nref = the smaller baseline under gzip; * = the smallest row in that column. order-0 =%n"
                         + "byte-entropy bound per tile; order-0 minus a compressed column is what LZ77 matching found.%n");
     }
+
+    /**
+     * The lossy, feature-merging rows, each against the smaller baseline and against its lossless
+     * sibling ({@link #LOSSY_SIBLING}): the bitmap and nothing else is what separates them in the
+     * vertex buffer. Only the vertex buffers are counted here; what merging saves in the topology
+     * and feature streams is reported by {@code RoadChainCli}.
+     */
+    private static void lossySection(List<String> lossyNames, TileCompression perTile, long reference, boolean byZoom) {
+        if (lossyNames.isEmpty()) {
+            return;
+        }
+        var totals = perTile.totals();
+        var compressors = perTile.compressors();
+        var sibling = totals.get(LOSSY_SIBLING);
+        var width = maxLength(Stream.concat(lossyNames.stream(), Stream.of(LOSSY_SIBLING)), "row".length());
+
+        System.out.printf(
+                "%n--- lossy rows: line features fused into roads (not in any oracle or winner; vertex buffer only) ---%n");
+        var header = new StringBuilder(String.format("%-" + width + "s %14s", "row", "raw"));
+        for (var compressor : compressors) {
+            header.append(String.format(" %14s", compressor.label()));
+        }
+        header.append(String.format(" %9s %9s", "vs ref", "vs sibling"));
+        System.out.println(header);
+        var shown = new ArrayList<String>();
+        if (sibling != null) {
+            shown.add(LOSSY_SIBLING);
+        }
+        shown.addAll(lossyNames);
+        for (var name : shown) {
+            var sizes = totals.get(name);
+            var row = new StringBuilder(String.format("%-" + width + "s %,14d", name, sizes[TileCompression.RAW]));
+            for (var c = 0; c < compressors.size(); c++) {
+                row.append(String.format(" %,14d", sizes[TileCompression.GZIP + c]));
+            }
+            row.append(String.format(
+                    " %9s %9s",
+                    change(sizes[TileCompression.GZIP], reference),
+                    sibling == null || name.equals(LOSSY_SIBLING)
+                            ? "-"
+                            : change(sizes[TileCompression.GZIP], sibling[TileCompression.GZIP])));
+            System.out.println(row.toString().stripTrailing());
+        }
+        System.out.printf(
+                "%nref = the smaller baseline under gzip; sibling = %s, the lossless row with the join bitmap.%n",
+                LOSSY_SIBLING);
+
+        if (byZoom && sibling != null) {
+            System.out.printf("%n--- lossy rows by zoom (whole tiles, gzip bytes) ---%n");
+            System.out.printf("%-6s %14s", "zoom", LOSSY_SIBLING);
+            for (var name : lossyNames) {
+                System.out.printf(" %14s", name);
+            }
+            System.out.println();
+            perTile.byZoom().forEach((zoom, rows) -> {
+                var base = rows.get(LOSSY_SIBLING);
+                if (base == null) {
+                    return;
+                }
+                var line = new StringBuilder(String.format("z%-5d %,14d", zoom, base[TileCompression.GZIP]));
+                for (var name : lossyNames) {
+                    var sizes = rows.get(name);
+                    line.append(String.format(
+                            " %,14d %s",
+                            sizes[TileCompression.GZIP],
+                            change(sizes[TileCompression.GZIP], base[TileCompression.GZIP])));
+                }
+                System.out.println(line);
+            });
+        }
+    }
+
+    private static final String LOSSY_SIBLING = new RoadChainEncoding().name();
 
     private static String change(long bytes, long reference) {
         if (reference == 0) {
@@ -691,6 +777,29 @@ public final class BenchmarkCli {
     static void verifyRoundTrip(
             ManifestEntry entry, BufferContext ctx, Encoding encoding, EncodedBuffer encoded) {
         var decoded = encoding.decode(encoded, ctx, ctx.vertices().size());
+
+        if (encoding.mergesFeatures()) {
+            // Lossy in exactly one way: line features that meet end to start may be fused. The decode
+            // must still reproduce the merged buffer, and every original line part must be a
+            // vertex-aligned slice of it (MergeEquivalence), so linear referencing can cut it back.
+            var emitted = encoding.emitted(ctx);
+            if (!emitted.vertices().equals(decoded)) {
+                throw new IllegalStateException(
+                        String.format(
+                                "%s does not decode to the buffer it emitted on %d/%d/%d %s (%d vertices)",
+                                encoding.name(), entry.z(), entry.x(), entry.y(), entry.layerName(),
+                                ctx.vertices().size()));
+            }
+            var reason = MergeEquivalence.describe(ctx, emitted);
+            if (reason != null) {
+                throw new IllegalStateException(
+                        String.format(
+                                "%s did not keep the line parts of %d/%d/%d %s (%d vertices) cuttable: %s",
+                                encoding.name(), entry.z(), entry.x(), entry.y(), entry.layerName(),
+                                ctx.vertices().size(), reason));
+            }
+            return;
+        }
 
         if (encoding.reordersGeometries()) {
             var emitted = encoding.emitted(ctx);

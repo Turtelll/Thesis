@@ -129,6 +129,14 @@ A run prints, in order:
    baseline under gzip, and **every percentage in every column is against it**. The oracle selects
    on uncompressed bytes and charges nothing for signalling the choice.
 
+Lossy rows (`Baselines.lossy()`, e.g. `LINE_CONTINUATION_ROAD_MERGE`, which fuses line features
+that meet end to start and drops their boundaries for later linear referencing) are encoded and
+verified on every buffer too, but declare `mergesFeatures()`, are checked by `MergeEquivalence` (every
+original line part must be a vertex-aligned slice of a merged part) and are printed in their own
+section after the oracle composition. They are never part of the research oracle or a winner
+column. The probe that motivated them: `./gradlew roadChain --args="--layer transportation"`
+([docs/results/road-chain.md](docs/results/road-chain.md)).
+
 Reordering is not a benchmark flag: an encoding that wants it calls `GeometryReorder` itself
 and declares `reordersGeometries()`. It is not always available (some cases need the original
 feature order), so say so when a row depends on it.
@@ -233,8 +241,8 @@ The CSV holds gzip bytes **per (tile, layer) buffer**, so the numbers match the 
 
 `./gradlew workshop` measures prediction ideas only: every row interleaved (no segmentation,
 reordering or shared references) over plain Varint, against `DELTA_ZIGZAG_VARINT` and
-`DELTA_ZIGZAG_FASTPFOR`. Per row it prints the mean residual size of the x and y components
-(zigzag bit width and absolute value), the share of `(0, 0)` pairs, Varint bytes, and gzip bytes
+`DELTA_ZIGZAG_FASTPFOR`. Per row it prints the mean and median absolute residual of the x and y
+components (in tile units), the share of `(0, 0)` pairs, Varint bytes, and gzip bytes
 with every tile compressed on its own. Every row is round-tripped on every buffer.
 
 1. **Write the rule.** In `workshop/Workshop.experiments()`, add one `Predictor`. A rule writes the
@@ -264,6 +272,19 @@ as a rule; its Varint bytes equal `DELTA_ZIGZAG_VARINT`'s), `QUAD_CORNER`, `LINE
 | `--by-layer` | The same table for the 6 layers with the most vertices, each tile restricted to that layer |
 | `--by-zoom` | The same table per tile zoom |
 | `--max-tiles <n>` | Stop after `n` tiles, for a quick look |
+| `--reorder [VARIANT]` | Reorder every buffer before the prediction rows predict (rows are named `<row>_<VARIANT>`); `VARIANT` is a pipeline `Reorder` name, default `HILBERT_CENTROID_ROT_MP`. Baselines stay unordered |
+
+The pipeline's reorderings also run on their own, as `REORDER_<VARIANT>` rows (`Workshop.reorderRows()`):
+the plain `DELTA` predictor over the reordered buffer, never combined with another predictor, so a row
+isolates what the reordering alone buys. Set them against the prediction rows, or add `--reorder` to
+measure the two together. `--only` names the predictors as listed (before `--reorder` renames them) and
+the `REORDER_` rows by their own names.
+
+The `_PART_CHAIN` rows (`Workshop.partChainRows()`) keep feature order but reorder the parts inside every
+MultiLineString (`GeometryReorder.PART_CHAIN`; `_PART_CHAIN_REV` may also reverse a part): `DELTA`,
+`LINE_CONTINUATION` and `CHAIN_CONTINUATION` (continuation carried across a part that starts where
+the previous one ended) over the chained buffer, e.g. `CHAIN_CONTINUATION_PART_CHAIN_REV`. They always
+run and are not combined with `--reorder`. Results: [docs/results/line-part-chain.md](docs/results/line-part-chain.md).
 
 A workshop win is a lead, not a result: promote the idea to an `Encoding` (below) and measure it
 with `./gradlew benchmark`, where segmentation and the split-varint layout apply.

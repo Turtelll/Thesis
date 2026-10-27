@@ -14,6 +14,8 @@ import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.research.encoding.IntCodec;
+import org.maplibre.mlt.research.encoding.Layout;
+import org.maplibre.mlt.research.encoding.research.failed.TurnScalar;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.research.LineContinuationEncoding;
 import org.maplibre.mlt.research.encoding.research.QuadCornerEncoding;
@@ -140,6 +142,24 @@ class PredictionMechanismTest {
       assertArrayEquals(layout.classes(), decodedLayout.classes(), "classes come from the topology");
       assertEquals(ctx.vertices(), Segmentation.join(decodedLayout, predictor, streams, n));
     }
+  }
+
+  /** The pipeline's TURN_SCALAR writes the old transform's values: its residual pairs, and its scalars as a stream. */
+  @Test
+  void turnScalarResidualsAreTheOldTurnScalarValues() {
+    var ctx = buildings();
+    var old = new TurnScalar(Layout.INTERLEAVED);
+    var predictor = Prediction.TURN_SCALAR.predictor();
+    var layout = Segmentation.FLAT.layout(ctx, predictor, ctx.vertices().size());
+    var streams = Segmentation.split(layout, predictor, ctx.vertices());
+
+    var pairs = old.residualPairs(ctx);
+    assertEquals(pairs.length, streams[0].length);
+    for (var i = 0; i < pairs.length; i++) {
+      assertEquals(pairs[i], EncodingUtils.encodeZigZag(streams[0][i]), "residual value " + i);
+    }
+    assertTrue(old.alongCount(ctx) > 0, "the L-shaped building has turn vertices");
+    assertEquals(old.alongCount(ctx), streams[layout.sideStream()].length);
   }
 
   @ParameterizedTest

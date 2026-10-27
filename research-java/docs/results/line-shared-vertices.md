@@ -252,6 +252,45 @@ in both runs here, under it in the earlier runs above — machine load). So the 
 `transportation` is -3,72% instead of -6,11% bytes for roughly a third of `_DICT`'s decode
 overhead. `_DICT` stays the bytes winner; `_MARKED` is the choice if decode time is binding.
 
+## In the pipeline — `LINE_CONTINUATION_SHARED[_FRAME_HEADING]`, and the reorder under it
+
+`Prediction.LINE_CONTINUATION_SHARED` and `LINE_CONTINUATION_SHARED_FRAME_HEADING` (`_DICT` table) run
+`LineSharedVertexRef`'s references inside `PipelineEncoding`; a buffer the references do not shrink is
+written under the plain predictor id. Rows: `./gradlew pipeline --args="--step linesshared --layer
+transportation --by-zoom"`; mechanism test `pipeline/LineSharedMechanismTest`.
+
+Munich `transportation`, geometry buffers alone, per-tile gzip vs `DELTA_ZIGZAG_VARINT` (class streams,
+escape width, byte planes):
+
+| reorder | `LINE_CONTINUATION_FRAME_HEADING` | `…_SHARED_FRAME_HEADING` |
+|---|---|---|
+| none | -4,97% | -10,75% |
+| `HILBERT_CENTROID_ROT_MP` | -6,89% | -11,59% |
+| `CHAIN` | -9,19% | -12,06% |
+
+The chain beats Hilbert on lines, and by less once the references take the junction starts it would
+have shortened. The reorder also permutes the property columns, so the geometry figure alone is not
+the choice. `./gradlew pipelineTileSize --args="../data/MVT/munich-plantiler.mbtiles --joint
+transportation [--ids sequential]"` compresses the layer's pipeline geometry payload and its
+property-only tile together, once per tile (a stand-in for the tile: the MLT writer cannot take the
+pipeline's geometry bytes; the single pass is 0,1% to 1% larger than the two compressed alone).
+Change vs the previous default (Hilbert, no references), gzip / brotli9 / zstd19:
+
+| composition | ids kept | ids regenerated |
+|---|---|---|
+| no reorder, no references | -2,64% / -3,36% / -2,71% | +0,62% / -0,16% / +0,74% |
+| no reorder + references | **-7,54% / -8,01% / -7,43%** | -4,83% / -5,46% / -4,52% |
+| Hilbert + references | -4,02% / -4,54% / -3,88% | -4,42% / -4,83% / -4,19% |
+| `CHAIN` + references | -4,83% / -5,12% / -4,65% | **-5,14% / -5,55% / -4,86%** |
+
+With ids kept, any reorder costs more in the property columns than it saves (+20% to +23% there); with
+ids regenerated (MLT does not preserve feature order) `CHAIN` leads no reorder by 0,3 to 0,4 points in
+all three backends. `PipelineRegistry.forLayer("transportation")` is therefore `CHAIN` +
+`LINE_CONTINUATION_SHARED_FRAME_HEADING` (geometry alone -12,06% gzip, -15,87% brotli, -13,09% zstd).
+`PipelineTileSizeCli` now derives the real chain permutation (`GeometryReorder.featureOrder`) instead
+of leaving `CHAIN` as a no-op. Munich only; the `--ids sequential` property figures regenerate ids as
+0, 1, 2, .. in feature order.
+
 ## Not measured / open
 
 - The encoding without reversal (no direction change).

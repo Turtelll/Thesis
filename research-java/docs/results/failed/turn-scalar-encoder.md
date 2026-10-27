@@ -59,3 +59,30 @@ corpus-wide.
 behind `QUAD_CORNER_SEG`. The per-buffer oracle picks `TURN_SCALAR_SEG_FASTPFOR` on 82 of 4.368
 buffers (244.967 bytes), moving the oracle ceiling from −7,0% to −7,1% — not enough to pay for
 signalling.
+
+## Re-run in the OpenZL-style pipeline (`Prediction.TURN_SCALAR`)
+
+`TURN_SCALAR` is now a pipeline predictor (`pipeline/Prediction.java`): the same classes, the same
+corner and turn rule, with the `along` scalar as a side-value stream of its own after the residual
+streams (under every segmentation; the header's predictor field grew to 3 bits). Its residual
+pairs equal the old transform's, value for value (`PredictionMechanismTest`). Measured with
+`./gradlew pipeline --args="--step turn --layer building --by-zoom --with-old"` on
+`data/extractedBaseline` (310 `building` buffers, per tile, change vs `DELTA_ZIGZAG_VARINT` gzip):
+
+```
+                                  gzip      brotli11   zstd19
+QUAD_CORNER      FLAT           -4,48%     -8,29%     -6,48%
+TURN_SCALAR      FLAT           -0,67%     -6,85%     -3,26%
+QUAD_CORNER      CLASS          -8,11%    -12,99%     -9,25%
+TURN_SCALAR      CLASS          -6,17%    -12,50%     -8,45%
+QUAD_CORNER      ROLE_CLASS     -7,62%    -12,40%     -8,77%
+TURN_SCALAR      ROLE_CLASS     -5,79%    -12,17%     -8,06%
+building composition (Hilbert reorder, CLASS, ESCAPE):
+QUAD_CORNER                     -9,20%    -13,61%    -10,41%
+TURN_SCALAR                     -7,09%    -13,06%     -9,38%
+```
+
+Class streams help `TURN_SCALAR` more than `QUAD_CORNER` (+5,5 points against +3,6 on gzip), but it
+still ends 1,8 to 2,1 points (gzip) behind `QUAD_CORNER` on the same terminal, and 0,5 behind under
+Brotli. By zoom the gap is z13 +5,75% vs -3,15% and z14 -10,21% vs -10,68% (building composition).
+Verdict unchanged: stays out of the per-layer defaults.

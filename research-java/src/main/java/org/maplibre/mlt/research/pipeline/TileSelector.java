@@ -19,7 +19,8 @@ import java.util.stream.IntStream;
  * compresses nothing (a byte-entropy bound), so the tile is compressed only once, after the choice.
  *
  * <p>The candidates are the oracle grid: reorder (none or {@link Reorder#HILBERT_CENTROID_ROT_MP}) x
- * predictor x class streams on or off x terminal, 48 per layer. Nothing is signalled beyond the
+ * predictor x class streams on or off x terminal, 48 per layer, plus the per-layer defaults the grid lacks (the {@code building} ring-frame
+ * row). Nothing is signalled beyond the
  * buffer header: the reorder is not reversed by a decoder, the tile carries the features in the
  * order they were written.
  *
@@ -63,7 +64,16 @@ public final class TileSelector {
         this.backend = backend;
         this.size = size;
         this.restriction = restriction;
-        this.candidates = List.copyOf(Selector.oracleConfigs());
+        // the oracle grid, then the layer defaults it does not contain (the ring-frame predictors are not
+        // in the grid), so every layer can start from its default and is never worse than it
+        final var all = new java.util.ArrayList<>(Selector.oracleConfigs());
+        for (final var layer : PipelineRegistry.fittedLayers()) {
+            final var layerDefault = PipelineRegistry.forLayer(layer);
+            if (!all.contains(layerDefault)) {
+                all.add(layerDefault);
+            }
+        }
+        this.candidates = List.copyOf(all);
     }
 
     public String name() {

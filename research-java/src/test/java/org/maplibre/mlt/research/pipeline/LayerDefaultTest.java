@@ -29,10 +29,17 @@ class LayerDefaultTest {
     for (var layer : PipelineRegistry.fittedLayers()) {
       assertTrue(PipelineRegistry.reorderPays(layer), layer);
       assertEquals(
-          Reorder.HILBERT_CENTROID_ROT_MP,
+          PipelineRegistry.CHAIN_LAYERS.contains(layer) ? Reorder.CHAIN : Reorder.HILBERT_CENTROID_ROT_MP,
           PipelineRegistry.forLayer(layer).reorder(),
           layer);
     }
+  }
+
+  @Test
+  void transportationChainsItsRoadsAndReferencesEarlierJunctions() {
+    var config = PipelineRegistry.forLayer("transportation");
+    assertEquals(Reorder.CHAIN, config.reorder());
+    assertEquals(Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING, config.predictor());
   }
 
   @Test

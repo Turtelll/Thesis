@@ -45,7 +45,21 @@ public final class LineContinuation implements ClassifiedPredictor {
     // exists; 3 verts: +1,13% mean bits; 4-5 verts: -0,2% Munich but +9,7% Chicago) — see
     // docs/results/line-continuation.md. Runs shorter than this fall back to plain delta on every
     // vertex, exactly like a non-line run.
-    private static final int MIN_LINE_RUN_LENGTH = 6;
+    static final int MIN_LINE_RUN_LENGTH = 6;
+
+    private final int minLineRunLength;
+
+    public LineContinuation() {
+        this(MIN_LINE_RUN_LENGTH);
+    }
+
+    /**
+     * A different length gate: road chaining measures it over roads, whose length is not a feature's
+     * ({@code docs/results/road-chain.md}). The default gate is the one every other row uses.
+     */
+    public LineContinuation(int minLineRunLength) {
+        this.minLineRunLength = minLineRunLength;
+    }
 
     @Override
     public String name() {
@@ -83,7 +97,7 @@ public final class LineContinuation implements ClassifiedPredictor {
             if (start < vertexCount) {
                 classes[start] = START;
             }
-            if (isLineRun[r] && end - start >= MIN_LINE_RUN_LENGTH) {
+            if (isLineRun[r] && end - start >= minLineRunLength) {
                 for (var i = start + 2; i < end; i++) {
                     classes[i] = LINE_INTERIOR;
                 }

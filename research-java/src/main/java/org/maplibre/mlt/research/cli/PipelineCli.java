@@ -624,7 +624,7 @@ public final class PipelineCli {
          * {@code --step oracle}, whose rows are the grid it chooses among.
          */
         boolean oracle() {
-            return oracleFlag || step.equals("oracle");
+            return oracleFlag || step.equals("oracle") || step.startsWith("fit");
         }
 
         /** Round trips are checked in every run except the ladder and the oracle, which only size (the tests check them). */

@@ -195,14 +195,10 @@ public final class LineSharedVertexRef implements Encoding {
     }
 
     private Streams streams(BufferContext ctx, Runs runs) {
-        final var original = ctx.vertices();
-        final var n = original.size();
+        final var n = ctx.vertices().size();
         final var classes = predictor.classify(ctx, n);
-        final var out = new ArrayList<Vertex>(n);
-        final var dictionary = new Dictionary(out, new PositionTable(n));
-        final var remaining = table == Table.MARKED ? endOccurrences(original, runs) : null;
-        final var flags = new BitWriter();
-        final var indices = new BitWriter();
+        final var scan = references(ctx.vertices(), runs, table);
+        final var out = scan.vertices();
         final var regions = new ArrayList<List<Integer>>();
         for (var c = 0; c < predictor.classCount(); c++) {
             regions.add(new ArrayList<>());
@@ -210,6 +206,37 @@ public final class LineSharedVertexRef implements Encoding {
 
         var prevX = 0;
         var prevY = 0;
+        for (var i = 0; i < n; i++) {
+            final var vertex = out.get(i);
+            if (!scan.referenced()[i]) {
+                final var predX = predictX(classes[i], i, out, prevX);
+                final var predY = predictY(classes[i], i, out, prevY);
+                final var region = regions.get(classes[i]);
+                region.add(EncodingUtils.encodeZigZag(vertex.x() - predX));
+                region.add(EncodingUtils.encodeZigZag(vertex.y() - predY));
+            }
+            prevX = vertex.x();
+            prevY = vertex.y();
+        }
+        return new Streams(out, scan.flags(), scan.indices(), regions);
+    }
+
+    /**
+     * The references of one buffer: its line parts, reversed where that lets the entry flag catch
+     * the part, which vertices are references, and the flag and index bits.
+     */
+    private record References(List<Vertex> vertices, boolean[] referenced, BitWriter flags, BitWriter indices) {
+    }
+
+    private static References references(List<Vertex> original, Runs runs, Table table) {
+        final var n = original.size();
+        final var out = new ArrayList<Vertex>(n);
+        final var referenced = new boolean[n];
+        final var dictionary = new Dictionary(out, new PositionTable(n));
+        final var remaining = table == Table.MARKED ? endOccurrences(original, runs) : null;
+        final var flags = new BitWriter();
+        final var indices = new BitWriter();
+
         for (var r = 0; r < runs.count(); r++) {
             final var start = runs.starts()[r];
             final var end = runs.end(r);
@@ -226,32 +253,119 @@ public final class LineSharedVertexRef implements Encoding {
             for (var i = start; i < end; i++) {
                 final var vertex = out.get(i);
                 final var partEnd = line && (i == start || i == end - 1);
-                final var referenced = partEnd && reference(dictionary, vertex, flags, indices);
+                referenced[i] = partEnd && reference(dictionary, vertex, flags, indices);
                 if (partEnd && remaining != null) {
                     final var later = remaining.get(vertex) - 1;
                     remaining.put(vertex, later);
-                    if (!referenced) {
+                    if (!referenced[i]) {
                         flags.write(later > 0 ? 1 : 0, 1);
                         if (later > 0) {
                             dictionary.add(i);
                         }
                     }
                 }
-                if (!referenced) {
-                    final var predX = predictX(classes[i], i, out, prevX);
-                    final var predY = predictY(classes[i], i, out, prevY);
-                    final var region = regions.get(classes[i]);
-                    region.add(EncodingUtils.encodeZigZag(vertex.x() - predX));
-                    region.add(EncodingUtils.encodeZigZag(vertex.y() - predY));
-                }
-                prevX = vertex.x();
-                prevY = vertex.y();
             }
             if (line && table == Table.ALL_PARTS) {
                 dictionary.addPart(start, end);
             }
         }
-        return new Streams(out, flags, indices, regions);
+        return new References(out, referenced, flags, indices);
+    }
+
+    /**
+     * The references of {@code ctx} for the pipeline ({@code PipelineEncoding}): its line parts
+     * reversed where that pays, which vertices are references (they carry no residual) and the flag
+     * and index bits {@link #walkForDecoding} reads back. {@code null} when the runs are not
+     * derivable from the topology streams (then no vertex can be a reference).
+     */
+    public static SharedVertexRef.Scan scan(BufferContext ctx, Table table) {
+        final var runs = Runs.of(ctx, ctx.vertices().size());
+        if (runs == null) {
+            return null;
+        }
+        final var scan = references(ctx.vertices(), runs, table);
+        return new SharedVertexRef.Scan(
+                scan.vertices(), scan.referenced(), scan.flags().toBytes(), scan.indices().toBytes());
+    }
+
+    /**
+     * A decoding walk over {@code vertexCount} vertices.
+     *
+     * @param topo topology streams of the emitted buffer; no vertices needed
+     */
+    public static SharedVertexRef.ReferenceWalk walkForDecoding(
+            BufferContext topo, int vertexCount, Table table, byte[] flags, byte[] indices) {
+        final var runs = Runs.of(topo, vertexCount);
+        if (runs == null) {
+            throw new IllegalStateException("the runs of a shared-reference buffer must follow from the topology");
+        }
+        return new Walk(runs, vertexCount, table, new BitReader(flags), new BitReader(indices));
+    }
+
+    /**
+     * The decoder of {@link #references} as a pass over the buffer: reads an entry or exit flag at
+     * every line part end (and the remember bit under {@link Table#MARKED}), and keeps the dictionary
+     * {@link LineSharedVertexRef#decode} keeps.
+     */
+    private static final class Walk implements SharedVertexRef.ReferenceWalk {
+        private final Runs runs;
+        private final int vertexCount;
+        private final Table table;
+        private final BitReader flags;
+        private final BitReader indices;
+        private Dictionary dictionary;
+        private int run;
+        private boolean remember;
+
+        Walk(Runs runs, int vertexCount, Table table, BitReader flags, BitReader indices) {
+            this.runs = runs;
+            this.vertexCount = vertexCount;
+            this.table = table;
+            this.flags = flags;
+            this.indices = indices;
+        }
+
+        private void advance(int i) {
+            while (run + 1 < runs.count() && runs.starts()[run + 1] <= i) {
+                run++;
+            }
+        }
+
+        private Dictionary dictionary(List<Vertex> vertices) {
+            if (dictionary == null) {
+                dictionary = new Dictionary(
+                        vertices, table == Table.ALL_PARTS ? new PositionTable(vertexCount) : null);
+            }
+            return dictionary;
+        }
+
+        @Override
+        public Vertex decode(int i, List<Vertex> vertices) {
+            advance(i);
+            remember = false;
+            final var dictionary = dictionary(vertices);
+            final var partEnd = runs.isLine()[run] && (i == runs.starts()[run] || i == runs.end(run) - 1);
+            if (!partEnd) {
+                return null;
+            }
+            if (dictionary.size() > 0 && flags.read(1) == 1) {
+                return dictionary.get(indices.read(SharedVertexRef.width(dictionary.size())));
+            }
+            remember = table == Table.MARKED && flags.read(1) == 1;
+            return null;
+        }
+
+        @Override
+        public void accept(int i, List<Vertex> vertices) {
+            advance(i);
+            if (remember) {
+                dictionary(vertices).add(i);
+                remember = false;
+            }
+            if (table == Table.ALL_PARTS && runs.isLine()[run] && i == runs.end(run) - 1) {
+                dictionary(vertices).addPart(runs.starts()[run], runs.end(run));
+            }
+        }
     }
 
     /**

@@ -12,6 +12,7 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
 import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.encoding.research.SegmentQuadCorner;
+import org.maplibre.mlt.research.pipeline.PipelineRegistry;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 
@@ -121,6 +122,10 @@ public final class DecodeTimeCli {
                         new PredictedTransform(new SegmentQuadCorner(), Layout.INTERLEAVED), IntCodec.FASTPFOR),
                 new VertexBufferCodec(
                         new PredictedTransform(new SegmentQuadCorner(), Layout.SEGMENTED), IntCodec.FASTPFOR))) {
+            byName.putIfAbsent(encoding.name(), encoding);
+        }
+        // the OpenZL-style pipeline's rows (PIPE_*), measurable by name like any other encoding
+        for (final var encoding : PipelineRegistry.all()) {
             byName.putIfAbsent(encoding.name(), encoding);
         }
         return byName;
