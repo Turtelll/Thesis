@@ -196,7 +196,8 @@ quantised direction would cut it.
 Whole-corpus per-layer default (`--step layer --by-zoom`, Munich, per tile), `LINE_CONTINUATION_FRAME` on
 `transportation` only → both layers on `_FRAME_HEADING`: -8,40% → -8,64% gzip, -14,57% → -14,82% Brotli,
 -10,32% → -10,54% zstd; the `transportation` layer by itself -6,20% → -6,89% and `transportation_name` -4,49% →
--6,76%.
+-6,76%. (These before/after pairs are history of each decision; the whole-corpus per-layer default today, with
+the later shared-reference predictors, is -11,36% gzip / -17,18% Brotli / -13,03% zstd.)
 
 A trap to remember when changing a layer's predictor: `transportation` alone on `_FRAME_HEADING` made the
 whole-corpus number *worse* (-8,40% → -8,17% gzip) while the layer got better (-6,20% → -6,89%), although the raw

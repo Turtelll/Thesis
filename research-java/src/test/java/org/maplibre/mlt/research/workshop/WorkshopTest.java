@@ -21,7 +21,6 @@ import org.maplibre.mlt.research.pipeline.PredictionTransform;
 import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.pipeline.mechanism.QuadCornerLine;
 import org.maplibre.mlt.research.pipeline.mechanism.SegmentQuadCorner;
-import org.maplibre.mlt.research.pipeline.mechanism.TurnScalar;
 
 /**
  * Pins the workshop's plumbing: the {@code DELTA} rule is the baseline transform, the
@@ -135,16 +134,6 @@ class WorkshopTest {
     }).transform();
 
     assertNotEquals(ctx.vertices(), cheat.invert(cheat.apply(ctx), ctx));
-  }
-
-  /** Each vertex's {@code (x, y)} residual as one long, sorted: equal iff the same pairs, permuted. */
-  private static long[] sortedPairs(int[] values) {
-    var pairs = new long[values.length / 2];
-    for (var i = 0; i < pairs.length; i++) {
-      pairs[i] = (long) values[2 * i] << 32 | (values[2 * i + 1] & 0xFFFFFFFFL);
-    }
-    Arrays.sort(pairs);
-    return pairs;
   }
 
   private static BufferContext topologyOnly(BufferContext ctx) {

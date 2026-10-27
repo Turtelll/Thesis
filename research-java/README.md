@@ -3,7 +3,7 @@
 A lightweight harness for testing VertexBuffer encoding ideas against the baseline. Everything runs
 through one entry point, `./gradlew research --args="<command> ..."` (`./gradlew research` lists the
 commands); the encoder is the modular `pipeline/`, the only encoder stack.
-It extracts geometries from `data/MVT/munich-de.mbtiles` into MLT-compatible
+It extracts geometries from `data/MVT/munich-plantiler.mbtiles` into MLT-compatible
 `VertexBuffer`s (exactly as `maplibre-tile-spec`'s `GeometryEncoder` would, one buffer
 per MVT layer per tile), then measures the pipeline's rows against the baseline
 encodings from the repo root `README.md` — overall, and **per layer**.
@@ -37,10 +37,10 @@ no `publishToMavenLocal`, and the submodule is never modified.
 ### 1. Extract (once)
 
 ```
-./gradlew research --args="extract --mbtiles ../data/MVT/munich-de.mbtiles --out ../data/extracted"
+./gradlew research --args="extract --mbtiles ../data/MVT/munich-plantiler.mbtiles --out ../data/extracted"
 ```
 
-`munich-de.mbtiles` is the Munich area cut out of the full-Germany tileset
+`munich-plantiler.mbtiles` (358 tiles, 4.368 buffers, the corpus every figure in `docs/results/` and the golden dump are measured on) is a Munich cut made with planetiler; the older `munich-de.mbtiles` (4.272 buffers, 5.244.123 vertices) is the Munich area cut out of the full-Germany tileset
 `data/MVT/germany.mbtiles` (275.735 tiles, far too large to extract whole). `ExtractCli`
 has no bbox filter, so the cut happens first, with `analysis-python/cut_aoi.py`:
 

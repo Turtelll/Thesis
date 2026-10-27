@@ -47,38 +47,21 @@ public final class GeometryEquivalence {
             return false;
         }
 
-        return sameParts(original, before, reordered, after, false);
-    }
-
-    /**
-     * Whether both contexts hold the same multiset of polygon rings (each up to rotation and
-     * reversal), ignoring line parts.
-     */
-    public static boolean holdsRings(BufferContext original, BufferContext other) {
-        final var before = parts(original);
-        final var after = parts(other);
-        return before != null && after != null && sameParts(original, before, other, after, true);
+        return sameParts(original, before, reordered, after);
     }
 
     private static boolean sameParts(
             BufferContext original,
             List<List<Vertex>> before,
             BufferContext reordered,
-            List<List<Vertex>> after,
-            boolean ringsOnly) {
+            List<List<Vertex>> after) {
         final var ringsBefore = ringRuns(original, before.size());
         final var ringsAfter = ringRuns(reordered, after.size());
         final var counts = new HashMap<List<Vertex>, Integer>();
         for (var i = 0; i < before.size(); i++) {
-            if (ringsOnly && !ringsBefore[i]) {
-                continue;
-            }
             counts.merge(canonical(before.get(i), ringsBefore[i]), 1, Integer::sum);
         }
         for (var i = 0; i < after.size(); i++) {
-            if (ringsOnly && !ringsAfter[i]) {
-                continue;
-            }
             final var key = canonical(after.get(i), ringsAfter[i]);
             final var remaining = counts.get(key);
             if (remaining == null) {

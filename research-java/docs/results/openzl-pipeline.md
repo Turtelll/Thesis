@@ -492,6 +492,14 @@ trialled on the concatenation) is what could still pay and was not built.
 
 ## Per-layer default
 
+> **Current figures (D9).** `PipelineRegistry.forLayer` today (shared-reference predictors on
+> `building`, `landcover`, `landuse`, `water`; the heading-frame line row on `transportation` and
+> `transportation_name`) gives, over the whole corpus (4.368 buffers, per tile, every column against
+> `DELTA_ZIGZAG_VARINT` gzip): **9.960.430 B gzip (-11,36%), 9.306.400 B Brotli (-17,18%), 9.773.069 B zstd
+> (-13,03%)** (`research measure --step layer`, equal to the `PIPE_PER_LAYER` row of the golden dump). The
+> -7,45% / -13,66% / -9,29% and -7,36% / -13,55% / -9,16% below are the figures of the earlier rows and
+> stay in the text as the history of how the table grew.
+
 The oracle's choice follows the layer (above), so the pipeline's default is a fixed composition per
 layer, `PipelineRegistry.forLayer(layer)`, with `DEFAULT` (the single S8 row) as the fallback for an
 unknown layer. The table is the per-layer winner under gzip from `--step oracle` (summed isolated

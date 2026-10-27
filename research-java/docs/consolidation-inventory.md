@@ -311,3 +311,35 @@ Phase 2 (picocli harness, mechanisms ported, bit-stream spec, ArchUnit, jqwik) s
   (Munich: about 1,5 h).
 - **D9, the drifted per-layer numbers (section 6, item 4).** Update the cited figures to the current run, or pin
   the old composition as a named row so the old figure reproduces?
+
+## 8. Resolution of the decisions (consolidation steps 1-2)
+
+| # | Decision | Done |
+|---|---|---|
+| D1 | one harness | `research measure` (`PipelineCli`) is the only baselines-vs-rows harness; `BenchmarkCli` and `Baselines.research()`/`retired()` are gone |
+| D2 | README best row becomes the current best | `docs/results/README.md` names the pipeline row (-9,95% gzip / -15,97% Brotli / -11,68% zstd); the old `QUAD_CORNER_SHARED_FRAME_RING_CANONICAL_REORDER` figures stay as history |
+| D3 | delete road chain and merge | deleted (step 1); `road-chain.md` is a history file, code at tag `pre-consolidation` |
+| D4 | remove rANS and its probes | deleted (step 1) |
+| D5 | remove failed mechanisms and dead probes | deleted (step 1) except `TurnScalar`, which survives as a static helper of the pipeline's class partition |
+| D6 | rebase the workshop on pipeline `Prediction` | `PredictionTransform(Prediction)` replaces `PredictedTransform`/`Layout`; parity checked on 4.368 buffers before deletion |
+| D7 | selector machinery opt-in | `--step selector/tile`, `--trials`, `--features` stay as opt-in reports of `measure` |
+| D8 | golden dump Munich only | `research dump` on `munich-plantiler`, manifest `golden/pre-consolidation.manifest.tsv` |
+| D9 | update cited per-layer figures to the current run | -11,36% / -17,18% / -13,03% in `results/README.md`, `openzl-pipeline.md`, `orientation-prior.md`, `line-frame-prior.md`; the earlier figures remain as history |
+
+**Golden-dump verification.** Step 1 (`smoke-A` against `smoke-par`, 60 tiles) and step 2 (`smoke-B` against
+`smoke-par`): every `PIPE_*` row and both baselines byte-identical; the only differences are the 16 old-stack rows
+(`LINE_CONTINUATION[_REORDER|_ROAD_*|_SHARED_*]`, `QUAD_CORNER[_LINE_SHARED|_SHARED|_SHARED_FRAME|...]`) that
+no longer exist, each an intended removal.
+
+**Deviations from the plan.**
+- `research` is a hand-rolled dispatcher (`Research`), not picocli: one `Command` per entry and a usage list were
+  enough; adding picocli would add a dependency for no behaviour.
+- `tile-size` stays a separate command, not a `measure` step: it reads `.mbtiles`, not an extraction.
+- Workshop rows `TURN_SCALAR` and `QUAD_CORNER_SHARED` are retired (side-valued predictors have no bijective
+  residual array); the workshop's remaining rows are the five pipeline `Prediction`s plus the delta row.
+- `IntCodec` anchors (`FASTPFOR`, `VARINT`, ...) stay in `encoding/`: the baselines and `decode-time` use them.
+- `Table.MARKED` (the marked-dictionary variant) was dropped with the `_SHARED_MARKED` rows.
+- `GeometryReorder` keeps `FEATURE_REV` and the reversal machinery (the `CHAIN` rows use them); only `RING_ROTATE` was removed.
+- `ClassRegions` was deleted; its job is done by the pipeline's own class partition (`ClassSegmented` in tests).
+- `ArchitectureTest` allows `extraction` to depend on the `encoding` contract (`ExtractionReader` fills `BufferContext`).
+- There is no `figure <id>` command: the figure map (§2) stays the registry of which command reproduces which cited figure, and each results file names its command; a machine-checked registry would have to re-run hours of measurements to be of use.

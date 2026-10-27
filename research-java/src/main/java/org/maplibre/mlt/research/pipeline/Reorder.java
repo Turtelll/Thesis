@@ -23,8 +23,8 @@ import java.util.List;
  * MultiPoints is reordered too, per feature; a buffer whose features cannot be located (points
  * mixed with lines or polygons, topology that does not line up) is returned unchanged.
  *
- * <p>{@link #CHAIN} and {@link #CANON_CHAIN} are the old pipeline's greedy nearest-endpoint rows
- * ({@link GeometryReorder}), here only as references.
+ * <p>{@link #CHAIN} and {@link #CANON_CHAIN} are the greedy nearest-endpoint chain rows
+ * ({@link GeometryReorder}), kept as the references the Hilbert and Morton rows are measured against.
  */
 public enum Reorder {
 

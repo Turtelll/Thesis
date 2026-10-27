@@ -103,7 +103,8 @@ Decode time (`decodeTime --layer building --encoding PIPE_..._QUAD_CORNER_FRAME_
 112 ns/value), against 127 ms (1,52x) for the same row with `QUAD_CORNER`. `forLayer("building")` takes the
 frame: the 1,5x budget does not apply to this target
 ([general-purpose-compression.md](general-purpose-compression.md)), and the whole-corpus per-layer default
-goes to -7,36% gzip / -13,55% Brotli / -9,16% zstd ([openzl-pipeline.md](openzl-pipeline.md#per-layer-default)).
+goes to -7,36% gzip / -13,55% Brotli / -9,16% zstd at the time (today's whole-corpus default, with the shared-reference
+predictors: -11,36% / -17,18% / -13,03%) ([openzl-pipeline.md](openzl-pipeline.md#per-layer-default)).
 
 Other layers (`./gradlew research --args="measure --step framelayers --layer <name>"`, each layer's own terminal,
 plain → framed, gzip / Brotli / zstd): `landcover` -4,70% → -5,15% / -7,38% → -7,92% / -5,64% → -6,21%,
@@ -114,7 +115,7 @@ worth far less outside `building` (likely because those layers' polygons are les
 measured), and `poi` and the other non-ring layers are untouched by it. `transportation` was untouched too,
 until the same prior was applied to line parts: [line-frame-prior.md](line-frame-prior.md)
 (`LINE_CONTINUATION_FRAME`, -5,23% → -6,20% gzip on Munich). Whole-corpus
-per-layer default: -7,45% gzip / -13,66% Brotli / -9,29% zstd. Decode on those layers is cheaper than on
+per-layer default: -7,45% gzip / -13,66% Brotli / -9,29% zstd (at the time; today -11,36% / -17,18% / -13,03%). Decode on those layers is cheaper than on
 `building`: `landcover` 2,41x FastPFOR (plain 0,56x), `landuse` 1,55x (plain 0,46x).
 
 ## Decode time (old encoding set)
