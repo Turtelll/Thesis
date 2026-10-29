@@ -196,9 +196,11 @@ public final class PipelineEncoding implements Encoding {
      * The configuration stream {@code s} is written with. A side stream is not {@code x, y} pairs and
      * can be of odd length, so the transposes that separate the components fall back to byte planes.
      */
-    private static PipelineConfig streamConfig(PipelineConfig c, Segmentation.Layout layout, int s) {
+    private static StreamCodec.Format streamConfig(PipelineConfig c, Segmentation.Layout layout, int s) {
         final var separatesComponents = c.transpose() != Transpose.NONE && c.transpose() != Transpose.INTERLEAVED_PLANES;
-        return s == layout.sideStream() && separatesComponents ? c.withTranspose(Transpose.INTERLEAVED_PLANES) : c;
+        return s == layout.sideStream() && separatesComponents
+                ? c.stream().withTranspose(Transpose.INTERLEAVED_PLANES)
+                : c.stream();
     }
 
     /**

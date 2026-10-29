@@ -27,14 +27,14 @@ class WidthMechanismTest {
 
   private static byte[] encode(int[] signed, PipelineConfig config) {
     var out = new ByteArrayOutputStream();
-    StreamCodec.encode(out, signed, config, true);
+    StreamCodec.encode(out, signed, config.stream(), true);
     return out.toByteArray();
   }
 
   private static int[] roundTrip(int[] signed, PipelineConfig config) {
     var bytes = encode(signed, config);
     var in = new Bytes.Reader(bytes, 0);
-    var decoded = StreamCodec.decode(in, signed.length, config, true);
+    var decoded = StreamCodec.decode(in, signed.length, config.stream(), true);
     assertEquals(0, in.remaining(), "the decoder consumes exactly what was written");
     return decoded;
   }

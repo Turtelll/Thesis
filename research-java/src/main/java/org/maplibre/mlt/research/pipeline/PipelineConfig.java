@@ -28,6 +28,11 @@ public record PipelineConfig(
                 + "_" + width + transpose.suffix();
     }
 
+    /** The choices a stream is written with: residual map, byte width and transpose. */
+    public StreamCodec.Format stream() {
+        return new StreamCodec.Format(map, width, transpose);
+    }
+
     public PipelineConfig withReorder(Reorder value) {
         return new PipelineConfig(value, predictor, segmentation, map, width, transpose);
     }

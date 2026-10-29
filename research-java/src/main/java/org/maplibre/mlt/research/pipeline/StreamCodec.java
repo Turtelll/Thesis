@@ -20,6 +20,14 @@ final class StreamCodec {
     private StreamCodec() {
     }
 
+    /** What one stream is written with: the residual map, the byte width and the transpose. */
+    record Format(ResidualMap map, ByteWidth width, Transpose transpose) {
+
+        Format withTranspose(Transpose value) {
+            return new Format(map, width, value);
+        }
+    }
+
     /** Unsigned range of a mapped stream, and how many values an escape stream would split out. */
     private record Span(long max, int exceptions, long maxException) {
     }
@@ -30,7 +38,7 @@ final class StreamCodec {
      * @param last whether no non-empty stream follows; a stream whose byte length depends on its
      *             values signals it, except the last, which takes the rest of the payload
      */
-    static void encode(ByteArrayOutputStream out, int[] signed, PipelineConfig config, boolean last) {
+    static void encode(ByteArrayOutputStream out, int[] signed, Format config, boolean last) {
         final var side = config.map().side(signed);
         for (final var value : side) {
             Bytes.putVarint(out, EncodingUtils.encodeZigZag(value));
@@ -48,7 +56,7 @@ final class StreamCodec {
     }
 
     /** One fixed-width stream: descriptor, main stream, exceptions (see {@link ByteWidth}). */
-    private static void writeFixed(ByteArrayOutputStream out, int[] mapped, PipelineConfig config) {
+    private static void writeFixed(ByteArrayOutputStream out, int[] mapped, Format config) {
         final var transpose = config.transpose();
         if (config.width() == ByteWidth.FORCE_4) {
             out.writeBytes(transpose.write(mapped, 4));
@@ -82,7 +90,7 @@ final class StreamCodec {
 
     /** Escape is smaller than a plain fixed width only when a 1-byte main plus exceptions beats it. */
     private static boolean escapePays(
-            PipelineConfig config, int n, int width, int exceptionWidth, int exceptions) {
+            Format config, int n, int width, int exceptionWidth, int exceptions) {
         return config.width() == ByteWidth.ESCAPE
                 && width > 1
                 && (long) n + (long) exceptions * exceptionWidth < (long) n * width;
@@ -107,7 +115,7 @@ final class StreamCodec {
         out.writeBytes(Transpose.INTERLEAVED_PLANES.write(tail, exceptionWidth));
     }
 
-    private static int[] readFixed(Bytes.Reader in, int n, PipelineConfig config) {
+    private static int[] readFixed(Bytes.Reader in, int n, Format config) {
         final var transpose = config.transpose();
         if (config.width() == ByteWidth.FORCE_4) {
             return transpose.read(in.readBytes(n * 4), n, 4);
@@ -137,7 +145,7 @@ final class StreamCodec {
     }
 
     /** The inverse of {@link #encode}: the signed residuals of a stream of {@code valueCount} values. */
-    static int[] decode(Bytes.Reader in, int valueCount, PipelineConfig config, boolean last) {
+    static int[] decode(Bytes.Reader in, int valueCount, Format config, boolean last) {
         final var side = new int[config.map().sideValues()];
         for (var i = 0; i < side.length; i++) {
             side[i] = DecodingUtils.decodeZigZag(in.readVarint());
