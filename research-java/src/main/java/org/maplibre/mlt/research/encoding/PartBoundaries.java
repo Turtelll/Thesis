@@ -1,6 +1,6 @@
 package org.maplibre.mlt.research.encoding;
 
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
 
 import java.util.List;
 

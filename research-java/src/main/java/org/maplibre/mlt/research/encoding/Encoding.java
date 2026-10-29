@@ -1,8 +1,6 @@
 package org.maplibre.mlt.research.encoding;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
 
 import java.util.List;
 
@@ -13,6 +11,43 @@ import java.util.List;
  * lossless, so {@code BenchmarkCli} round-trips every encoding over the real corpus on every run.
  */
 public interface Encoding {
+
+    /**
+     * Everything a codec may condition on: the vertex buffer plus the topology streams that describe
+     * how it is partitioned into features, parts and rings.
+     *
+     * <p>Predictors with structural reset points (see {@code ideen.md}) need the part/ring boundaries,
+     * which are derivable from {@code numParts}/{@code numRings}. These are the same streams {@link
+     * org.maplibre.mlt.research.extraction.VertexBufferExtractor.ExtractedColumn} produces and the
+     * {@code .json} sidecar persists, so a context is reconstructable from an existing extraction
+     * without re-extracting.
+     */
+    record BufferContext(
+            List<Vertex> vertices,
+            List<Integer> geometryTypes,
+            List<Integer> numGeometries,
+            List<Integer> numParts,
+            List<Integer> numRings) {
+
+        /**
+         * Context for a bare vertex buffer with no topology — for tests and point-only columns.
+         */
+        public static BufferContext of(List<Vertex> vertices) {
+            return new BufferContext(vertices, List.of(), List.of(), List.of(), List.of());
+        }
+    }
+
+    /**
+     * One encoding's result: the payload plus the stream-metadata bytes MLT would write alongside it.
+     * The benchmark compares {@link #totalBytes()}, since that is what lands in the tile — an encoding
+     * that shrinks the payload but needs a longer header has not necessarily won.
+     */
+    record EncodedBuffer(byte[] payload, int metadataBytes) {
+
+        public int totalBytes() {
+            return payload.length + metadataBytes;
+        }
+    }
 
     String name();
 

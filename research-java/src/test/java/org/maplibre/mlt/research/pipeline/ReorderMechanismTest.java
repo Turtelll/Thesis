@@ -12,7 +12,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
 
 /**
  * Pins what makes a measured S1 result meaningful: the curve keys really are space-filling, the

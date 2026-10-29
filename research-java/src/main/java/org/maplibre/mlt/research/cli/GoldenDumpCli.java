@@ -3,7 +3,7 @@ package org.maplibre.mlt.research.cli;
 import com.aayushatharva.brotli4j.encoder.Encoder;
 import org.maplibre.mlt.research.encoding.Baselines;
 import org.maplibre.mlt.research.encoding.Encoding;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.pipeline.PipelineEncoding;

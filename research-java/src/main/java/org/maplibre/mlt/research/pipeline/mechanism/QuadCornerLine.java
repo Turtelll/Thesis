@@ -3,7 +3,7 @@ package org.maplibre.mlt.research.pipeline.mechanism;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.ClassifiedPredictor;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
 
 import java.util.List;
 

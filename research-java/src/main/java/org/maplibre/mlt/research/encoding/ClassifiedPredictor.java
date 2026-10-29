@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.encoding;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
 
 /**
  * The logical content of a structural predictor, with no opinion on how its residuals are laid

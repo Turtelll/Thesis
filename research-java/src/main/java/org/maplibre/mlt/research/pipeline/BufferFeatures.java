@@ -2,7 +2,7 @@ package org.maplibre.mlt.research.pipeline;
 
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.research.encoding.PartBoundaries;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
 
 import java.util.HashMap;
 import java.util.List;

@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
 
 /**
  * Pins what the shared-reference mechanisms decide, on small fixtures: which vertices are

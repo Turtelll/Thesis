@@ -14,7 +14,7 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LinearRing;
 import org.locationtech.jts.geom.Polygon;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.workshop.Workshop;
 
@@ -96,7 +96,7 @@ class VertexBufferCodecTest {
    * fail on a correct reordering encoding or, if loosened for all, stop catching a lossy one.
    */
   private static void assertReconstructs(
-      Encoding encoding, BufferContext ctx, VertexBufferCodec.EncodedBuffer encoded) {
+      Encoding encoding, BufferContext ctx, Encoding.EncodedBuffer encoded) {
     var decoded = encoding.decode(encoded, ctx, ctx.vertices().size());
     if (encoding.reordersGeometries()) {
       var emitted = encoding.emitted(ctx);

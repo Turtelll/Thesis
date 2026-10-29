@@ -14,7 +14,7 @@ import org.maplibre.mlt.research.pipeline.Selector;
 import org.maplibre.mlt.research.pipeline.StageRules;
 import org.maplibre.mlt.research.pipeline.TileSelector;
 import org.maplibre.mlt.research.pipeline.Verification;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -340,7 +340,7 @@ public final class PipelineCli {
             OracleReport oracle,
             String layer,
             List<Encoding> rows,
-            org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext ctx,
+            org.maplibre.mlt.research.encoding.Encoding.BufferContext ctx,
             List<Compressor> compressors,
             TileCompression perTile,
             StringBuilder line) {

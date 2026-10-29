@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.pipeline.mechanism;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
 import org.maplibre.mlt.research.pipeline.mechanism.SharedVertexRef.BitReader;
 import org.maplibre.mlt.research.pipeline.mechanism.SharedVertexRef.BitWriter;
 import org.maplibre.mlt.research.pipeline.mechanism.SharedVertexRef.PositionTable;

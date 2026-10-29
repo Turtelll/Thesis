@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.workshop;
 
 import org.maplibre.mlt.research.encoding.PartBoundaries;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
 
 /**
  * Per-vertex view of a buffer's vertex runs (rings or line parts), derived from the topology

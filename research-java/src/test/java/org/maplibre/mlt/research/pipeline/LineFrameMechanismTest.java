@@ -9,7 +9,7 @@ import java.util.Random;
 import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
 
 /**
  * {@code LINE_CONTINUATION_FRAME}: the plain-delta edges of line parts (the 2nd vertex of every run

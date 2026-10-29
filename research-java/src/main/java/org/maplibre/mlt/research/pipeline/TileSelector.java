@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.pipeline;
 
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.EncodedBuffer;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;

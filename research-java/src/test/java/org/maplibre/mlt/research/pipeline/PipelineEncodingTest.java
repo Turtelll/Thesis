@@ -17,8 +17,8 @@ import org.locationtech.jts.geom.Polygon;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.Encoding;
 import org.maplibre.mlt.research.encoding.IntCodec;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.EncodedBuffer;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 

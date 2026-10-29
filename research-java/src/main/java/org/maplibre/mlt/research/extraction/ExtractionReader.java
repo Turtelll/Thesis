@@ -3,7 +3,7 @@ package org.maplibre.mlt.research.extraction;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec.BufferContext;
+import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.Sidecar;
 
