@@ -405,7 +405,7 @@ public final class PipelineRegistry {
      */
     public static List<Encoding> oracle() {
         final var rows = new ArrayList<Encoding>();
-        for (final var config : Selector.oracleConfigs()) {
+        for (final var config : oracleConfigs()) {
             rows.add(row(config));
         }
         return rows;
@@ -439,6 +439,39 @@ public final class PipelineRegistry {
         return Arrays.stream(Reorder.values())
                 .filter(order -> order != Reorder.CLASS_HILBERT_CENTROID_ROT)
                 .toList();
+    }
+
+    /** The trial set, the default pipeline's choices first. */
+    public static List<PipelineConfig> candidateConfigs(Reorder reorder) {
+        final var base = DEFAULT.withReorder(reorder);
+        final var predictors = List.of(
+                Prediction.QUAD_CORNER_LINE, Prediction.QUAD_CORNER, Prediction.LINE_CONTINUATION, Prediction.DELTA);
+        final var segmentations = List.of(Segmentation.CLASS, Segmentation.FLAT);
+        final var terminals = List.of(
+                base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.INTERLEAVED_PLANES),
+                base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.NONE),
+                base.withWidth(ByteWidth.VARINT_SPLIT).withTranspose(Transpose.NONE));
+        final var configs = new ArrayList<PipelineConfig>();
+        for (final var predictor : predictors) {
+            for (final var segmentation : segmentations) {
+                for (final var terminal : terminals) {
+                    configs.add(terminal.withPredictor(predictor).withSegmentation(segmentation));
+                }
+            }
+        }
+        return configs;
+    }
+
+    /**
+     * The oracle grid: {@link Reorder#NONE} and {@link Reorder#HILBERT_CENTROID_ROT_MP}, each times
+     * {@link #candidateConfigs}. The first row is {@link #DEFAULT}.
+     */
+    public static List<PipelineConfig> oracleConfigs() {
+        final var configs = new ArrayList<PipelineConfig>();
+        for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
+            configs.addAll(candidateConfigs(reorder));
+        }
+        return configs;
     }
 
     /** The rows measured by one step. */

@@ -136,7 +136,7 @@ public final class TileSelector {
      * in the grid), so every layer can start from its default and is never worse than it.
      */
     private static List<PipelineConfig> defaultCandidates() {
-        final var all = new ArrayList<>(Selector.oracleConfigs());
+        final var all = new ArrayList<>(PipelineRegistry.oracleConfigs());
         for (final var layer : PipelineRegistry.fittedLayers()) {
             final var layerDefault = PipelineRegistry.forLayer(layer);
             if (!all.contains(layerDefault)) {

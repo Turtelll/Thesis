@@ -47,42 +47,9 @@ public final class Selector implements Encoding {
         this.reorder = reorder;
         this.backend = backend;
         this.size = size;
-        for (final var config : candidateConfigs(reorder)) {
+        for (final var config : PipelineRegistry.candidateConfigs(reorder)) {
             candidates.add(new PipelineEncoding(config));
         }
-    }
-
-    /** The trial set, the default pipeline's choices first. */
-    static List<PipelineConfig> candidateConfigs(Reorder reorder) {
-        final var base = PipelineRegistry.DEFAULT.withReorder(reorder);
-        final var predictors = List.of(
-                Prediction.QUAD_CORNER_LINE, Prediction.QUAD_CORNER, Prediction.LINE_CONTINUATION, Prediction.DELTA);
-        final var segmentations = List.of(Segmentation.CLASS, Segmentation.FLAT);
-        final var terminals = List.of(
-                base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.INTERLEAVED_PLANES),
-                base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.NONE),
-                base.withWidth(ByteWidth.VARINT_SPLIT).withTranspose(Transpose.NONE));
-        final var configs = new ArrayList<PipelineConfig>();
-        for (final var predictor : predictors) {
-            for (final var segmentation : segmentations) {
-                for (final var terminal : terminals) {
-                    configs.add(terminal.withPredictor(predictor).withSegmentation(segmentation));
-                }
-            }
-        }
-        return configs;
-    }
-
-    /**
-     * The oracle grid: {@link Reorder#NONE} and {@link Reorder#HILBERT_CENTROID_ROT_MP}, each times
-     * {@link #candidateConfigs}. The first row is {@link PipelineRegistry#DEFAULT}.
-     */
-    static List<PipelineConfig> oracleConfigs() {
-        final var configs = new ArrayList<PipelineConfig>();
-        for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
-            configs.addAll(candidateConfigs(reorder));
-        }
-        return configs;
     }
 
     /** What a selected buffer was written with: the choices in its header (the reorder is {@code NONE} here). */
