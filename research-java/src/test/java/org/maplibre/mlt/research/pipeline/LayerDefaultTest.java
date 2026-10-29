@@ -43,6 +43,17 @@ class LayerDefaultTest {
   }
 
   @Test
+  void theOracleGridHoldsEveryLayerDefault() {
+    var grid = PipelineRegistry.bestGrid();
+    assertEquals(252, grid.size());
+    assertEquals(grid.size(), new java.util.HashSet<>(grid).size(), "the grid has duplicates");
+    assertTrue(grid.contains(PipelineRegistry.DEFAULT));
+    for (var layer : PipelineRegistry.fittedLayers()) {
+      assertTrue(grid.contains(PipelineRegistry.forLayer(layer)), layer);
+    }
+  }
+
+  @Test
   void unknownLayerFallsBackToDefault() {
     assertEquals(PipelineRegistry.DEFAULT, PipelineRegistry.forLayer("no-such-layer"));
   }

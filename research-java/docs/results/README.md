@@ -172,6 +172,9 @@ Names below are the **new** ones; the bodies of the linked files still use the o
   biggest late win; role streams, the bias map and the GCD do not pay. The per-buffer selection by trial
   compression gains 0,3 to 0,65% isolated but loses 0,0 to 0,3% per tile, and is discarded.
 
+- [tile-oracle.md](tile-oracle.md) — the real per-(tile, layer) oracle (`measure --step best`): the
+  best of 252 compositions (every predictor x streams x terminal x reorder) per buffer, chosen alone and
+  on the compressed tile, against the fixed per-layer default.
 - [general-purpose-compression.md](general-purpose-compression.md) — the delivery size:
   per-tile gzip/Brotli/zstd, why FastPFOR loses there, and which predictor and byte layout
   survive it.

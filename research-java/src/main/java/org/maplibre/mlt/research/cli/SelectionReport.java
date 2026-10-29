@@ -14,17 +14,19 @@ import java.util.TreeMap;
 /**
  * What the {@link org.maplibre.mlt.research.pipeline.Selector} and the {@link
  * org.maplibre.mlt.research.pipeline.TileSelector} chose, per selector row (one per backend and
- * reorder), per layer and per zoom: the share of buffers that took the reorder, each predictor, the
- * class streams, and each terminal. A share is of buffers, not of bytes.
+ * reorder, and the per-(tile, layer) oracles), per layer and per zoom: the share of buffers that took
+ * a curve reorder (Hilbert) or the greedy chain, each predictor, the class streams, and each terminal.
+ * A share is of buffers, not of bytes.
  */
 final class SelectionReport {
 
     private static final Prediction[] PREDICTORS = Prediction.values();
 
-    /** buffers, reorder, then one slot per predictor, class streams, planes, escape without planes, split varint. */
+    /** buffers, curve reorder, chain reorder, then one slot per predictor, class streams, planes, escape without planes, split varint. */
     private static final int BUFFERS = 0;
-    private static final int REORDER = 1;
-    private static final int FIRST_PREDICTOR = 2;
+    private static final int CURVE = 1;
+    private static final int CHAIN = 2;
+    private static final int FIRST_PREDICTOR = 3;
     private static final int CLASS = FIRST_PREDICTOR + PREDICTORS.length;
     private static final int PLANES = CLASS + 1;
     private static final int ESCAPE = PLANES + 1;
@@ -46,8 +48,10 @@ final class SelectionReport {
     private static void tally(Map<String, Map<String, long[]>> table, String row, String group, PipelineConfig c) {
         final var slots = table.computeIfAbsent(row, k -> new TreeMap<>()).computeIfAbsent(group, k -> new long[SLOTS]);
         slots[BUFFERS]++;
-        if (c.reorder().reorders()) {
-            slots[REORDER]++;
+        if (c.reorder().keyed()) {
+            slots[CURVE]++;
+        } else if (c.reorder().reorders()) {
+            slots[CHAIN]++;
         }
         slots[FIRST_PREDICTOR + c.predictor().ordinal()]++;
         if (c.segmentation() == Segmentation.CLASS) {
@@ -72,7 +76,7 @@ final class SelectionReport {
     }
 
     private static void printTable(String label, Map<String, long[]> groups) {
-        final var header = new StringBuilder(String.format("  %-22s %8s %8s", label, "buffers", "reorder"));
+        final var header = new StringBuilder(String.format("  %-22s %8s %8s %8s", label, "buffers", "curve", "chain"));
         for (final var predictor : PREDICTORS) {
             header.append(String.format(" %8s", abbreviation(predictor)));
         }

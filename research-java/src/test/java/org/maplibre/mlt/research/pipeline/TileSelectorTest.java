@@ -93,6 +93,44 @@ class TileSelectorTest {
   }
 
   @Test
+  void theOracleRoundTripsAndBeatsBothStartsOnTheTile() {
+    var buffers = tile();
+    var oracle = TileSelector.oracle("gzip", SelectorTest::gzipSize, PipelineRegistry.bestGrid());
+    var search = oracle.search(LAYERS, oracle.encode(buffers));
+    assertEquals(buffers.size(), search.tile().size());
+    assertEquals(buffers.size(), search.alone().size());
+    var fixed = new ArrayList<byte[]>();
+    for (var b = 0; b < buffers.size(); b++) {
+      for (var choice : List.of(search.tile().get(b), search.alone().get(b))) {
+        PipelineEncodingTest.assertReconstructs(
+            new PipelineEncoding(choice.config()), buffers.get(b), choice.encoded());
+      }
+      // the alone-best is the smallest candidate alone
+      var aloneSize = SelectorTest.gzipSize(search.alone().get(b).encoded().payload());
+      for (var size : search.aloneSizes()[b]) {
+        assertTrue(aloneSize <= size);
+      }
+      fixed.add(
+          new PipelineEncoding(PipelineRegistry.forLayer(LAYERS.get(b)))
+              .encode(buffers.get(b))
+              .payload());
+    }
+    var tile = tileSize(search.tile().stream().map(choice -> choice.encoded().payload()).toList());
+    var alone = tileSize(search.alone().stream().map(choice -> choice.encoded().payload()).toList());
+    assertTrue(tile <= tileSize(fixed), "never larger than the per-layer default");
+    assertTrue(tile <= alone, "never larger than the alone-best tile");
+  }
+
+  @Test
+  void aSearchRejectsATrialOfOtherCandidates() {
+    var buffers = tile();
+    var oracle = TileSelector.oracle("gzip", SelectorTest::gzipSize, PipelineRegistry.bestGrid());
+    var trial = new TileSelector("gzip", SelectorTest::gzipSize).encode(buffers);
+    org.junit.jupiter.api.Assertions.assertThrows(
+        IllegalArgumentException.class, () -> oracle.search(LAYERS, trial));
+  }
+
+  @Test
   void aRestrictionFixesTheRuledStages() {
     var buffers = tile();
     var choices = new TileSelector("gzip", SelectorTest::gzipSize, StageRules::restrict).select(LAYERS, buffers);

@@ -122,7 +122,7 @@ the bytes a row writes: [docs/bitstream.md](docs/bitstream.md).
 | Flag | Required | Description |
 |---|---|---|
 | `[extractionDir]` | no | Must contain `manifest.json`; defaults to `../data/extractedBaseline` |
-| `--step <name>` | no | `s0` (default), `s1` to `s4`, `s6` to `s8`, `selector`, `ladder` (the pipeline built up decision by decision), `oracle` (the grid the oracle chooses among), `layer` (the per-layer default `PipelineRegistry.forLayer` beside the single `DEFAULT` row), `tile` (one composition per tile and layer), or `all` |
+| `--step <name>` | no | `layer` (default: the per-layer default `PipelineRegistry.forLayer` beside the single `DEFAULT` row), `s0` to `s4`, `s6` to `s8`, `selector`, `ladder` (the pipeline built up decision by decision), `oracle` (the grid the oracle chooses among), `tile` (one composition per tile and layer), `best` (the per-(tile, layer) oracle over 252 compositions, see below), or `all` |
 | `--rows a,b` | no | Run only these row names (from any step) |
 | `--oracle` | no | Replace the per-row tables by the per-buffer best of the step's rows: what was chosen and how often, then the result against `ref`. Implied by `--step oracle` (48 compositions); the oracle chooses per backend, charges nothing for the choice and so is an upper bound |
 | `--layer <name>` | no | Restrict the run to one layer |
@@ -134,7 +134,21 @@ the bytes a row writes: [docs/bitstream.md](docs/bitstream.md).
 | `--brotli-quality <0-11>` | no | Brotli quality (default 11; 9 is much faster for development runs) |
 | `--limit-tiles <n>` | no | Only the first `n` tiles, for quick runs |
 | `--no-verify` | no | Skip the round-trip check; always skipped for `ladder`, `layer` and the oracle (`PipelineEncodingTest` round-trips `PipelineRegistry.all()`, including the ladder stages and the oracle grid) |
-| `--trials`, `--features <file>` | no | The opt-in selector report: compression-free selectors (entropy estimates) and how well cheap buffer features predict each stage's choice |
+| `--trials`, `--features <file>` | no | The opt-in selector report: compression-free selectors (entropy estimates) and how well cheap buffer features predict each stage's choice. |
+| `--search <list>`, `--size-all` | no | `--step best` only. `--search` is the backends the oracles search under, from `gzip` (always, the default), `brotli`, `zstd`, e.g. `gzip,zstd` (the search runs the compressor on every candidate, so Brotli 11 is many hours; a search on raw bytes or entropy estimates loses, [docs/results/failed/raw-search.md](docs/results/failed/raw-search.md)). `--size-all` sizes every row, the chosen compositions included, under gzip, Brotli and zstd |
+
+`--step best` is the best compression the pipeline's mechanisms reach when encoding time and
+complexity do not count. Every (tile, layer) buffer chooses among `PipelineRegistry.bestGrid()`:
+every predictor x flat or class streams x the three byte terminals x no reorder, Hilbert or chain
+(252 compositions, all signalled by the buffer header but the reorder, which needs no signal).
+Per backend it reports two oracles: `ORACLE <backend>`, the composition smallest on the buffer compressed
+alone, and `ORACLE TILE <backend>`, a coordinate descent on the compressed tile that starts from the
+smaller of the per-layer default and the alone-best tile and runs until a pass changes nothing (never
+larger than either). Beside them: `PER LAYER` (`forLayer`), the best single composition of the grid,
+the best fixed composition per layer on the grid, and the choices per layer and zoom. gzip only by
+default (about 1 to 2 hours on Munich); only the baselines and the chosen buffers are round-tripped in
+the run, `PipelineEncodingTest` round-trips the whole grid. Results:
+[docs/results/tile-oracle.md](docs/results/tile-oracle.md).
 
 The old `benchmark` rows (the per-idea encodings of `Baselines.research()`, FastPFOR/rANS rows and
 the `--with-old` references) no longer exist; their results are history in `docs/results/`, their

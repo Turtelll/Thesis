@@ -31,8 +31,12 @@ class PipelineEncodingTest {
 
   private static final GeometryFactory GF = new GeometryFactory();
 
+  /** Every registered row, then the rows of the {@code --step best} grid that no step registers. */
   static List<Encoding> everyRow() {
-    return PipelineRegistry.all();
+    var byName = new java.util.LinkedHashMap<String, Encoding>();
+    PipelineRegistry.all().forEach(row -> byName.putIfAbsent(row.name(), row));
+    PipelineRegistry.step("best").forEach(row -> byName.putIfAbsent(row.name(), row));
+    return List.copyOf(byName.values());
   }
 
   static BufferContext contextOf(VertexBufferExtractor.ExtractedColumn column) {

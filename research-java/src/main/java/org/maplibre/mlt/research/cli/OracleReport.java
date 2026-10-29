@@ -171,6 +171,16 @@ final class OracleReport {
      * differs between backends is printed as it is.
      */
     void printBestFixedPerLayer(java.util.function.BiPredicate<String, Encoding> allowed) {
+        printBestFixedPerLayer(allowed, layer -> 0, "first row");
+    }
+
+    /**
+     * {@link #printBestFixedPerLayer(java.util.function.BiPredicate)} against the candidate
+     * {@code reference} names per layer (e.g. the layer's own fixed composition), labelled {@code
+     * referenceLabel}; a winner equal to it is marked {@code (=)}.
+     */
+    void printBestFixedPerLayer(java.util.function.BiPredicate<String, Encoding> allowed,
+                                java.util.function.ToIntFunction<String> reference, String referenceLabel) {
         for (var c = 0; c < compressors.size(); c++) {
             System.out.printf("%n--- best fixed composition per layer under %s (layer's buffers compressed alone;"
                     + " reorder only where it is allowed) ---%n", compressors.get(c).label());
@@ -187,14 +197,16 @@ final class OracleReport {
                         best = i;
                     }
                 }
+                final var first = reference.applyAsInt(layer);
                 sumBest += totals[best][c];
-                sumFirst += totals[0][c];
-                System.out.printf("%-20s %5d buffers  %,12d vs %,12d first row %+7.2f%%  %s%n", layer,
-                        layerBuffers.get(layer), totals[best][c], totals[0][c],
-                        100.0 * (totals[best][c] - totals[0][c]) / totals[0][c], candidates.get(best).name());
+                sumFirst += totals[first][c];
+                System.out.printf("%-20s %5d buffers  %,12d vs %,12d %s %+7.2f%%  %s%s%n", layer,
+                        layerBuffers.get(layer), totals[best][c], totals[first][c], referenceLabel,
+                        100.0 * (totals[best][c] - totals[first][c]) / totals[first][c], candidates.get(best).name(),
+                        best == first ? " (=)" : "");
             }
-            System.out.printf("%-20s %5d buffers  %,12d vs %,12d first row %+7.2f%%%n", "all layers", buffers,
-                    sumBest, sumFirst, 100.0 * (sumBest - sumFirst) / sumFirst);
+            System.out.printf("%-20s %5d buffers  %,12d vs %,12d %s %+7.2f%%%n", "all layers", buffers,
+                    sumBest, sumFirst, referenceLabel, 100.0 * (sumBest - sumFirst) / sumFirst);
         }
     }
 
@@ -203,6 +215,16 @@ final class OracleReport {
      * composition (the row with the smallest total under that backend) and the oracle of that backend.
      */
     void printComparison(TileCompression perTile, long reference, List<String> baselineNames) {
+        printComparison(perTile, reference, baselineNames, List.of());
+    }
+
+    /**
+     * {@link #printComparison(TileCompression, long, List)} plus the per-(tile, layer) oracles chosen on the
+     * compressed tile, {@code tileOracles} holding one row name per compressor ({@code --step best}), and
+     * each oracle's change against the fixed composition per layer.
+     */
+    void printComparison(TileCompression perTile, long reference, List<String> baselineNames,
+                         List<String> tileOracles) {
         final var totals = perTile.totals();
         System.out.printf("%n--- oracle vs ref, per tile (payload bytes; each of %d tiles compressed on its own) ---%n",
                 perTile.tiles());
@@ -235,14 +257,28 @@ final class OracleReport {
         }
         row("ORACLE (best of " + candidates.size() + " per buffer)", width, reference,
                 c -> totals.get(label(c))[TileCompression.GZIP + c]);
-
-        final var gain = new StringBuilder(String.format("%-" + width + "s", "oracle over best single composition"));
-        for (var c = 0; c < compressors.size(); c++) {
-            final var single = totals.get(candidates.get(best[c]).name())[TileCompression.GZIP + c];
-            final var oracle = totals.get(label(c))[TileCompression.GZIP + c];
-            gain.append(String.format(" %14s %+8.2f%%", "", 100.0 * (oracle - single) / single));
+        if (!tileOracles.isEmpty()) {
+            row("ORACLE TILE (descent on the tile)", width, reference,
+                    c -> totals.get(tileOracles.get(c))[TileCompression.GZIP + c]);
         }
-        System.out.println(gain);
+
+        gainLine("oracle over best single composition", width,
+                c -> totals.get(label(c))[TileCompression.GZIP + c],
+                c -> totals.get(candidates.get(best[c]).name())[TileCompression.GZIP + c]);
+        if (totals.containsKey(PER_LAYER)) {
+            gainLine("oracle over per layer", width, c -> totals.get(label(c))[TileCompression.GZIP + c],
+                    c -> totals.get(PER_LAYER)[TileCompression.GZIP + c]);
+        }
+        if (!tileOracles.isEmpty()) {
+            gainLine("oracle tile over best single", width,
+                    c -> totals.get(tileOracles.get(c))[TileCompression.GZIP + c],
+                    c -> totals.get(candidates.get(best[c]).name())[TileCompression.GZIP + c]);
+            if (totals.containsKey(PER_LAYER)) {
+                gainLine("oracle tile over per layer", width,
+                        c -> totals.get(tileOracles.get(c))[TileCompression.GZIP + c],
+                        c -> totals.get(PER_LAYER)[TileCompression.GZIP + c]);
+            }
+        }
 
         System.out.printf("%nbest single composition per backend:%n");
         for (var c = 0; c < best.length; c++) {
@@ -252,6 +288,16 @@ final class OracleReport {
                 + "The oracle picks on each buffer compressed alone and is charged nothing for the choice, so it is an%n"
                 + "upper bound. The per-tile figure is the one delivered: a tile compresses the concatenation of its%n"
                 + "buffers, so the chosen payloads can compress worse together than the choice assumed.%n", reference);
+    }
+
+    private void gainLine(String label, int width, java.util.function.IntToLongFunction bytes,
+                          java.util.function.IntToLongFunction against) {
+        final var line = new StringBuilder(String.format("%-" + width + "s", label));
+        for (var c = 0; c < compressors.size(); c++) {
+            final var base = against.applyAsLong(c);
+            line.append(String.format(" %14s %+8.2f%%", "", 100.0 * (bytes.applyAsLong(c) - base) / base));
+        }
+        System.out.println(line);
     }
 
     private void row(String label, int width, long reference, java.util.function.IntToLongFunction bytes) {

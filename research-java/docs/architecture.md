@@ -42,8 +42,9 @@ Under `org.maplibre.mlt.research`:
   `PipelineConfig` is one row, `PipelineEncoding` its `Encoding`; every choice except the reorder is
   in a two-byte header and stream lengths follow from the topology
   ([bitstream.md](bitstream.md)). `PipelineRegistry` lists the rows per step (`DEFAULT` = the
-  end-to-end choice, `forLayer` = the per-layer default); `Selector` / `TileSelector` are the opt-in
-  selection reports; `PipelineStats` holds each step's probes; `Verification` checks round trips
+  end-to-end choice, `forLayer` = the per-layer default, `bestGrid` = the 252 compositions of the
+  per-(tile, layer) oracle); `Selector` / `TileSelector` are the opt-in selection reports
+  (`TileSelector.oracle` is the `--step best` oracle over `bestGrid`); `PipelineStats` holds each step's probes; `Verification` checks round trips
   that reorder (also point columns); `PredictionTransform` reads a predictor's residual pairs
   through the `FLAT` split for the workshop and the probes.
 - **`pipeline/mechanism/`** — the mechanisms the stages are built from, each a self-contained idea

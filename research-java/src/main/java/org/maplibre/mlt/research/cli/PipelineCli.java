@@ -46,7 +46,15 @@ import java.util.stream.IntStream;
  * <p>{@code --step tile} adds one {@link TileSelector} per backend: a composition per (tile, layer),
  * chosen on the compressed tile, beside the fixed per-layer default.
  *
- * <p>Usage: {@code [extractionDir] [--step s0|s1|...|tile|ladder|oracle|all] [--oracle] [--rows a,b]
+ * <p>{@code --step best} is the per-(tile, layer) oracle over {@link PipelineRegistry#bestGrid} (every
+ * predictor x flat/class streams x three terminals x three reorders): per backend named by {@code --search}
+ * (default gzip only) the per-buffer-alone oracle and the tile-trialled one ({@link TileSelector#oracle}),
+ * beside the fixed per-layer default and the best single composition of the grid.
+ *
+ * <p>Without {@code --step} the run is {@code --step layer}: the per-layer default beside the single {@code
+ * DEFAULT} row and the baselines.
+ *
+ * <p>Usage: {@code [extractionDir] [--step layer|s0|s1|...|tile|best|ladder|oracle|all] [--oracle] [--rows a,b]
  * [--layer <name>] [--by-zoom] [--by-geometry] [--stats] [--csv <file>] [--brotli-quality <0-11>]
  * [--limit-tiles <n>]}.
  */
@@ -70,19 +78,36 @@ public final class PipelineCli {
         if (opts.step.equals("selector") && opts.rows == null) {
             rows.addAll(selectors(opts.brotliQuality));
         }
+        // --step best: the per-(tile, layer) oracles over the 252-row grid; the grid is encoded once per tile
+        // by the search, so it is not among the rows encoded per buffer
+        final var bestStep = opts.step.equals("best") && opts.rows == null;
         final var encodings = new ArrayList<Encoding>(baselines);
-        encodings.addAll(rows);
-        final var compressors = Compressor.all(opts.brotliQuality);
+        if (!bestStep) {
+            encodings.addAll(rows);
+        }
+        // --step best searches under the --search backends (gzip by default); --size-all additionally sizes every
+        // row, the chosen compositions included, under every backend (gzip first, so the columns line up)
+        final var compressors = bestStep
+                ? bestCompressors(opts.brotliQuality, opts.search)
+                : Compressor.all(opts.brotliQuality);
+        final var sizing = bestStep && opts.sizeAll ? Compressor.all(opts.brotliQuality) : compressors;
         // --step layer: the previous default (one row for all layers) beside the per-layer default
         final var layerStep = opts.step.equals("layer");
         // --step tile: the per-layer default beside one choice per (tile, layer), trialled on the tile
         final var tileStep = opts.step.equals("tile");
         final var tileSelectors = tileStep ? tileSelectors(compressors, opts.trials) : List.<TileSelector>of();
+        final var tileOracles = bestStep
+                ? compressors.stream()
+                        .map(compressor -> TileSelector.oracle(compressor.label(), compressor::size,
+                                PipelineRegistry.bestGrid()))
+                        .toList()
+                : List.<TileSelector>of();
+        final var aloneOracle = bestStep ? new OracleReport(rows, compressors) : null;
         // what the first tile selector (trial compression under gzip unless --trials says otherwise) chose,
         // against what cheap rules and the compression-free selectors would have chosen
         final var correlation = tileSelectors.isEmpty() ? null : new ChoiceCorrelation(tileSelectors.get(0).name());
         final var names = new ArrayList<>(encodings.stream().map(Encoding::name).toList());
-        if (layerStep || tileStep) {
+        if (layerStep || tileStep || bestStep) {
             names.add(OracleReport.PER_LAYER);
         }
         // a tile selection is only known once the tile is complete, so it has no per-buffer CSV column
@@ -90,7 +115,7 @@ public final class PipelineCli {
         tileSelectors.forEach(selector -> names.add(selector.name()));
 
         final var probes = opts.stats ? PipelineStats.probes(opts.step) : List.<PipelineStats.Probe>of();
-        final var perTile = new TileCompression(compressors);
+        final var perTile = new TileCompression(sizing);
         final var breakdown = new Breakdown();
         final var isolated = new LinkedHashMap<String, long[]>();
         final var selection = new SelectionReport();
@@ -127,6 +152,10 @@ public final class PipelineCli {
                 if (!tileKey.equals(currentTile)) {
                     selectOnTile(tileSelectors, tileEntries, tileContexts, opts.verify(), perTile, breakdown, selection,
                             correlation);
+                    bestOnTile(tileOracles, rows, aloneOracle, tileEntries, tileContexts, opts.verify(), perTile,
+                            breakdown, selection);
+                    tileEntries.clear();
+                    tileContexts.clear();
                     perTile.endTile(currentZoom);
                     currentTile = tileKey;
                     currentZoom = entry.z();
@@ -159,11 +188,11 @@ public final class PipelineCli {
                     }
                     line.append(',').append(gzip);
                 }
-                if (tileStep) {
+                if (tileStep || bestStep) {
                     tileEntries.add(entry);
                     tileContexts.add(ctx);
                 }
-                if (layerStep || tileStep) {
+                if (layerStep || tileStep || bestStep) {
                     final var payload = new PipelineEncoding(PipelineRegistry.forLayer(entry.layerName()))
                             .encode(ctx).payload();
                     perTile.add(OracleReport.PER_LAYER, payload);
@@ -182,6 +211,10 @@ public final class PipelineCli {
             }
             selectOnTile(tileSelectors, tileEntries, tileContexts, opts.verify(), perTile, breakdown, selection,
                     correlation);
+            bestOnTile(tileOracles, rows, aloneOracle, tileEntries, tileContexts, opts.verify(), perTile,
+                    breakdown, selection);
+            tileEntries.clear();
+            tileContexts.clear();
             perTile.endTile(currentZoom);
         } finally {
             if (csv != null) {
@@ -195,13 +228,52 @@ public final class PipelineCli {
         }
         System.out.printf("%d buffers in %d tiles, %s raw bytes; step %s, %s%n",
                 buffers, perTile.tiles(), String.format("%,d", rawTotal), opts.step,
-                opts.verify() ? "all buffers round-tripped"
+                opts.verify() && bestStep ? "baselines and every chosen buffer round-tripped"
+                        : opts.verify() ? "all buffers round-tripped"
                         : "NOT round-tripped here (sizes only; run ./gradlew test for the lossless check)");
 
         final var reference = baselineNames.stream()
                 .mapToLong(name -> perTile.totals().get(name)[TileCompression.GZIP])
                 .min().orElse(0);
-        if (oracle != null) {
+        if (bestStep) {
+            aloneOracle.printCompositions();
+            aloneOracle.printByLayer();
+            final var gridNames = rows.stream().map(Encoding::name).toList();
+            aloneOracle.printBestFixedPerLayer((layer, candidate) -> true,
+                    layer -> gridNames.indexOf(new PipelineEncoding(PipelineRegistry.forLayer(layer)).name()),
+                    "per layer");
+            final var shown = new ArrayList<>(baselineNames);
+            shown.add(OracleReport.PER_LAYER);
+            final var tileOracleNames = tileOracles.stream().map(TileSelector::name).toList();
+            for (var c = 0; c < compressors.size(); c++) {
+                shown.add(aloneOracle.label(c));
+                shown.add(tileOracleNames.get(c));
+            }
+            perEncoding(shown, perTile, reference);
+            if (sizing.size() > compressors.size()) {
+                // the compositions chosen under gzip, sized under the other backends too: what is the best
+                // single composition of the grid under each backend, and how far is the gzip oracle from it
+                System.out.printf("%n--- best single composition of the grid per backend (the oracles chose under %s) ---%n",
+                        compressors.stream().map(Compressor::label).toList());
+                for (var c = 0; c < sizing.size(); c++) {
+                    final var column = TileCompression.GZIP + c;
+                    final var best = rows.stream().map(Encoding::name)
+                            .min(Comparator.comparingLong(name -> perTile.totals().get(name)[column])).orElseThrow();
+                    final var bytes = perTile.totals().get(best)[column];
+                    System.out.printf("  %-9s %,12d %9s  %s%n", sizing.get(c).label(), bytes, change(bytes, reference),
+                            best);
+                }
+            }
+            groupTable("by layer", shown, baselineNames, breakdown.byLayer, breakdown.layerBuffers, Integer.MAX_VALUE);
+            if (opts.byGeometry) {
+                groupTable("by dominant geometry type", shown, baselineNames, breakdown.byGeometry,
+                        breakdown.geometryBuffers, Integer.MAX_VALUE);
+            }
+            aloneOracle.printComparison(perTile, reference, baselineNames, tileOracleNames);
+            if (opts.byZoom) {
+                zoomTable(shown, baselineNames, perTile);
+            }
+        } else if (oracle != null) {
             // what combination compresses best, not what each composition does to the tileset: no
             // per-encoding, per-layer or ladder table
             oracle.printCompositions();
@@ -337,8 +409,87 @@ public final class PipelineCli {
                 correlation.record(entries.get(b), BufferFeatures.of(contexts.get(b)), chosen.get(b));
             }
         }
-        entries.clear();
-        contexts.clear();
+    }
+
+    /**
+     * Runs the per-(tile, layer) oracles over the tile collected since the last call ({@code --step best}):
+     * the grid is encoded once, every backend's oracle searches it. Per buffer, the grid rows go into the
+     * per-tile totals (for the best single composition), the alone sizes to the per-buffer oracle report,
+     * and both chosen buffers (alone-best and tile choice) are round-tripped and added under their rows.
+     */
+    private static void bestOnTile(
+            List<TileSelector> oracles,
+            List<Encoding> rows,
+            OracleReport alone,
+            List<ManifestEntry> entries,
+            List<BufferContext> contexts,
+            boolean verify,
+            TileCompression perTile,
+            Breakdown breakdown,
+            SelectionReport selection) {
+        if (oracles.isEmpty() || entries.isEmpty()) {
+            return;
+        }
+        final var layers = entries.stream().map(ManifestEntry::layerName).toList();
+        final var trial = oracles.get(0).encode(contexts);
+        final var searches = oracles.stream().map(oracle -> oracle.search(layers, trial)).toList();
+        for (var b = 0; b < entries.size(); b++) {
+            final var entry = entries.get(b);
+            final var ctx = contexts.get(b);
+            final var geometry = dominantGeometryType(ctx.geometryTypes());
+            final var where = entry.z() + "/" + entry.x() + "/" + entry.y() + " " + entry.layerName();
+            final var sizes = new long[rows.size()][oracles.size()];
+            for (var i = 0; i < rows.size(); i++) {
+                perTile.add(rows.get(i).name(), trial.payload(b, i));
+                for (var c = 0; c < oracles.size(); c++) {
+                    sizes[i][c] = searches.get(c).aloneSizes()[b][i];
+                }
+            }
+            final var chosen = alone.offer(entry.layerName(), sizes);
+            for (var c = 0; c < oracles.size(); c++) {
+                final var search = searches.get(c);
+                final var aloneChoice = search.alone().get(b);
+                final var tileChoice = search.tile().get(b);
+                if (!aloneChoice.config().equals(oracles.get(c).candidates().get(chosen[c]))) {
+                    throw new IllegalStateException(where + ": the oracle report and the search disagree on the"
+                            + " alone-best composition");
+                }
+                for (final var choice : List.of(aloneChoice, tileChoice)) {
+                    if (verify) {
+                        Verification.roundTrip(where, ctx, new PipelineEncoding(choice.config()), choice.encoded());
+                    }
+                }
+                for (final var named : List.of(Map.entry(alone.label(c), aloneChoice),
+                        Map.entry(oracles.get(c).name(), tileChoice))) {
+                    final var payload = named.getValue().encoded().payload();
+                    perTile.add(named.getKey(), payload);
+                    breakdown.add(entry.layerName(), geometry, named.getKey(), Compressor.GZIP.size(payload));
+                    selection.record(named.getKey(), entry, named.getValue().config());
+                }
+            }
+        }
+    }
+
+    /**
+     * The compressors {@code --step best} searches under ({@code --search}, comma-separated {@code
+     * gzip}, {@code brotli}, {@code zstd}; default {@code gzip}). gzip is always searched and listed
+     * first, since it is the reference metric and {@link TileCompression#GZIP} its column; the oracle
+     * has to search under the compressor it is judged under (searching on raw or entropy-estimated
+     * sizes lost, see docs/results/failed/raw-search.md).
+     */
+    private static List<Compressor> bestCompressors(int brotliQuality, String search) {
+        final var wanted = List.of((search == null ? "gzip" : search).split(","));
+        final var all = Compressor.all(brotliQuality);
+        for (final var name : wanted) {
+            if (all.stream().noneMatch(compressor -> compressor.label().startsWith(name))) {
+                throw new IllegalArgumentException("--search " + name + " matches none of "
+                        + all.stream().map(Compressor::label).toList());
+            }
+        }
+        return all.stream()
+                .filter(compressor -> compressor == Compressor.GZIP
+                        || wanted.stream().anyMatch(name -> compressor.label().startsWith(name)))
+                .toList();
     }
 
     /**
@@ -621,12 +772,15 @@ public final class PipelineCli {
             boolean skipVerification,
             boolean oracleFlag,
             String trials,
-            String featuresCsv) {
+            String featuresCsv,
+            boolean sizeAll,
+            String search) {
 
-        private static final String USAGE = "Usage: [extractionDir] [--step s0|s1|...|selector|tile|ladder|oracle|all]"
+        private static final String USAGE = "Usage: [extractionDir] [--step layer|s0|s1|...|selector|tile|best|ladder|oracle|all]"
                 + " [--rows a,b] [--layer <name>] [--by-zoom] [--by-geometry] [--stats] [--csv <file>]"
                 + " [--brotli-quality <0-11>] [--limit-tiles <n>] [--isolated] [--no-verify] [--oracle]"
-                + " [--trials gzip,brotli,zstd,order0,order1] [--features <file>]";
+                + " [--trials gzip,brotli,zstd,order0,order1] [--features <file>]"
+                + " [--search gzip,brotli,zstd] [--size-all]";
 
         /**
          * The per-buffer best of the step's rows instead of a table row per composition; always on for
@@ -643,7 +797,7 @@ public final class PipelineCli {
 
         static Options parse(String[] args) {
             String in = null;
-            var step = "s0";
+            var step = "layer";
             String rows = null;
             String layer = null;
             var byZoom = false;
@@ -657,8 +811,12 @@ public final class PipelineCli {
             var oracle = false;
             String trials = null;
             String features = null;
+            var sizeAll = false;
+            String search = null;
             for (var i = 0; i < args.length; i++) {
                 switch (args[i]) {
+                    case "--size-all" -> sizeAll = true;
+                    case "--search" -> search = args[++i];
                     case "--oracle" -> oracle = true;
                     case "--trials" -> trials = args[++i];
                     case "--features" -> features = args[++i];
@@ -683,7 +841,7 @@ public final class PipelineCli {
                 }
             }
             return new Options(in == null ? DEFAULT_IN_DIR : in, step, rows, layer, byZoom, byGeometry, stats, csv,
-                    brotliQuality, limitTiles, isolated, skipVerification, oracle, trials, features);
+                    brotliQuality, limitTiles, isolated, skipVerification, oracle, trials, features, sizeAll, search);
         }
     }
 }

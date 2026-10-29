@@ -411,6 +411,29 @@ public final class PipelineRegistry {
         return rows;
     }
 
+    /**
+     * The grid the per-(tile, layer) oracle of {@code --step best} chooses among: every predictor
+     * ({@code TURN_SCALAR} included) x flat or class streams x the three byte terminals (escape with
+     * planes, escape, split varint) x the three reorders the registry uses ({@link Reorder#NONE},
+     * {@link Reorder#HILBERT_CENTROID_ROT_MP}, {@link Reorder#CHAIN}) = 252 compositions, each on {@link
+     * #DEFAULT}'s residual map. It holds {@link #DEFAULT} and every {@link #forLayer} composition. Not part
+     * of {@link #all()}, so the golden dump does not grow; {@code PipelineEncodingTest} round-trips it.
+     */
+    public static List<PipelineConfig> bestGrid() {
+        final var configs = new ArrayList<PipelineConfig>();
+        for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP, Reorder.CHAIN)) {
+            for (final var predictor : Prediction.values()) {
+                for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
+                    final var base = DEFAULT.withReorder(reorder).withPredictor(predictor).withSegmentation(segmentation);
+                    configs.add(base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.INTERLEAVED_PLANES));
+                    configs.add(base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.NONE));
+                    configs.add(base.withWidth(ByteWidth.VARINT_SPLIT).withTranspose(Transpose.NONE));
+                }
+            }
+        }
+        return configs;
+    }
+
     /** The reorder variants S1 measures, the identity first. */
     static List<Reorder> s1Orders() {
         return Arrays.stream(Reorder.values())
@@ -460,6 +483,9 @@ public final class PipelineRegistry {
             // the fixed rows the tile selection is measured against; the TileSelectors need a
             // compressor and are built by PipelineCli
             case "tile" -> List.of(row(DEFAULT));
+            // the grid of the per-(tile, layer) oracle; the oracles themselves need a compressor and are
+            // built by PipelineCli. Not in steps(), so all() does not take the grid
+            case "best" -> bestGrid().stream().map(PipelineRegistry::row).toList();
             default -> throw new IllegalArgumentException("unknown step: " + name + " (known: " + steps() + ")");
         };
     }
