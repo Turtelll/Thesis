@@ -86,7 +86,7 @@ class LineSharedMechanismTest {
 
   /** The predictor a payload was written under, read back from its header. */
   private static Prediction predictorOf(byte[] payload) {
-    return PipelineEncoding.parseHeader(payload[0] & 0xFF, payload[1] & 0xFF, Reorder.NONE)
+    return PayloadHeader.parse(payload[0] & 0xFF, payload[1] & 0xFF, Reorder.NONE)
         .predictor();
   }
 

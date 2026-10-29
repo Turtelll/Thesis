@@ -25,20 +25,6 @@ import java.util.function.IntPredicate;
  */
 public final class PipelineEncoding implements Encoding {
 
-    /** Header size in bytes; the anchor tests compare the body after it. */
-    public static final int HEADER_BYTES = 2;
-
-    private static final int PREDICTOR_BITS = 3;
-    private static final int PREDICTOR_MASK = 0b111;
-    private static final int PREDICTOR_HIGH_SHIFT = 4;
-    private static final int WIDTH_MASK = 0b1111;
-    private static final int SEGMENTATION_SHIFT = 3;
-    private static final int SEGMENTATION_MASK = 0b11;
-    private static final int MAP_SHIFT = 5;
-    private static final int MAP_MASK = 0b1;
-    private static final int TRANSPOSE_SHIFT = 6;
-    private static final int TRANSPOSE_MASK = 0b11;
-
     private final PipelineConfig config;
 
     public PipelineEncoding(PipelineConfig config) {
@@ -118,7 +104,7 @@ public final class PipelineEncoding implements Encoding {
         final var layout = c.segmentation().layout(emitted, predictor, emitted.vertices().size());
         final var streams = Segmentation.split(layout, predictor, emitted.vertices());
         final var out = new ByteArrayOutputStream();
-        out.writeBytes(header(c));
+        out.writeBytes(PayloadHeader.write(c));
         writeStreams(out, c, layout, streams);
         return out.toByteArray();
     }
@@ -135,7 +121,7 @@ public final class PipelineEncoding implements Encoding {
                 .withoutReferenced(scan.referenced());
         final var streams = Segmentation.split(layout, predictor, rotated.vertices(), scan.referenced());
         final var out = new ByteArrayOutputStream();
-        out.writeBytes(header(config));
+        out.writeBytes(PayloadHeader.write(config));
         Bytes.putVarint(out, scan.flags().length);
         out.writeBytes(scan.flags());
         Bytes.putVarint(out, scan.indices().length);
@@ -159,7 +145,7 @@ public final class PipelineEncoding implements Encoding {
     @Override
     public List<Vertex> decode(EncodedBuffer encoded, BufferContext ctx, int vertexCount) {
         final var in = new Bytes.Reader(encoded.payload(), 0);
-        final var decoded = parseHeader(in.readByte(), in.readByte(), config.reorder());
+        final var decoded = PayloadHeader.parse(in.readByte(), in.readByte(), config.reorder());
         final var topo = decoded.reorder().topology(ctx);
         final var predictor = decoded.predictor().predictor();
         var layout = decoded.segmentation().layout(topo, predictor, vertexCount);
@@ -201,32 +187,6 @@ public final class PipelineEncoding implements Encoding {
         return s == layout.sideStream() && separatesComponents
                 ? c.stream().withTranspose(Transpose.INTERLEAVED_PLANES)
                 : c.stream();
-    }
-
-    /**
-     * Predictor (low 3 bits), segmentation, map and transpose in byte 0 (3 bits, 2 bits, 1 bit, 2 bits),
-     * the byte-width terminal in byte 1 (low 4 bits) with the predictor's fourth bit above it: the
-     * predictors outgrew the three bits byte 0 has for them.
-     */
-    static byte[] header(PipelineConfig c) {
-        final var predictor = c.predictor().ordinal();
-        final var first = (predictor & PREDICTOR_MASK)
-                | c.segmentation().ordinal() << SEGMENTATION_SHIFT
-                | c.map().ordinal() << MAP_SHIFT
-                | c.transpose().ordinal() << TRANSPOSE_SHIFT;
-        final var second = c.width().ordinal() | (predictor >> PREDICTOR_BITS) << PREDICTOR_HIGH_SHIFT;
-        return new byte[]{(byte) first, (byte) second};
-    }
-
-    /** The inverse of {@link #header}; the reorder is not in it, so the caller supplies it. */
-    static PipelineConfig parseHeader(int first, int second, Reorder reorder) {
-        return new PipelineConfig(
-                reorder,
-                Prediction.values()[(first & PREDICTOR_MASK) | (second >> PREDICTOR_HIGH_SHIFT) << PREDICTOR_BITS],
-                Segmentation.values()[(first >> SEGMENTATION_SHIFT) & SEGMENTATION_MASK],
-                ResidualMap.values()[(first >> MAP_SHIFT) & MAP_MASK],
-                ByteWidth.values()[second & WIDTH_MASK],
-                Transpose.values()[(first >> TRANSPOSE_SHIFT) & TRANSPOSE_MASK]);
     }
 
     /** Highest index for which {@code occupied} holds, or -1 when none does. */

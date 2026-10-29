@@ -152,8 +152,8 @@ class PredictionMechanismTest {
   @EnumSource(Prediction.class)
   void headerCarriesThePredictor(Prediction prediction) {
     var config = PipelineConfig.IDENTITY.withPredictor(prediction).withWidth(ByteWidth.VARINT_SPLIT);
-    var header = PipelineEncoding.header(config);
+    var header = PayloadHeader.write(config);
     assertEquals(
-        config, PipelineEncoding.parseHeader(header[0] & 0xFF, header[1] & 0xFF, config.reorder()));
+        config, PayloadHeader.parse(header[0] & 0xFF, header[1] & 0xFF, config.reorder()));
   }
 }

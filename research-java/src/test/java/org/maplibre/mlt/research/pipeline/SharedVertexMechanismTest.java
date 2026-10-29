@@ -75,7 +75,7 @@ class SharedVertexMechanismTest {
 
   /** The predictor a payload was written under, read back from its header. */
   private static Prediction predictorOf(byte[] payload) {
-    return PipelineEncoding.parseHeader(payload[0] & 0xFF, payload[1] & 0xFF, Reorder.NONE).predictor();
+    return PayloadHeader.parse(payload[0] & 0xFF, payload[1] & 0xFF, Reorder.NONE).predictor();
   }
 
   @ParameterizedTest
@@ -132,10 +132,10 @@ class SharedVertexMechanismTest {
   void theHeaderRoundTripsEveryPredictor() {
     for (var prediction : Prediction.values()) {
       var config = PipelineRegistry.DEFAULT.withPredictor(prediction);
-      var header = PipelineEncoding.header(config);
+      var header = PayloadHeader.write(config);
       assertEquals(
           config,
-          PipelineEncoding.parseHeader(header[0] & 0xFF, header[1] & 0xFF, config.reorder()));
+          PayloadHeader.parse(header[0] & 0xFF, header[1] & 0xFF, config.reorder()));
     }
   }
 }

@@ -54,7 +54,7 @@ public final class Selector implements Encoding {
 
     /** What a selected buffer was written with: the choices in its header (the reorder is {@code NONE} here). */
     public static PipelineConfig choiceOf(byte[] payload) {
-        return PipelineEncoding.parseHeader(payload[0] & 0xFF, payload[1] & 0xFF, Reorder.NONE);
+        return PayloadHeader.parse(payload[0] & 0xFF, payload[1] & 0xFF, Reorder.NONE);
     }
 
     @Override

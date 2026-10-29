@@ -144,7 +144,7 @@ class SegmentationMechanismTest {
     for (var ctx : List.of(buildings(), roads(), points())) {
       var encoded = encoding.encode(ctx);
       assertEquals(ctx.vertices(), encoding.decode(encoded, ctx, ctx.vertices().size()));
-      assertTrue(encoded.payload().length > PipelineEncoding.HEADER_BYTES);
+      assertTrue(encoded.payload().length > PayloadHeader.HEADER_BYTES);
     }
   }
 

@@ -131,7 +131,7 @@ class PipelineEncodingTest {
     var ctx = contextOf(column);
 
     var payload = new PipelineEncoding(PipelineConfig.IDENTITY).encode(ctx).payload();
-    var body = Arrays.copyOfRange(payload, PipelineEncoding.HEADER_BYTES, payload.length);
+    var body = Arrays.copyOfRange(payload, PayloadHeader.HEADER_BYTES, payload.length);
 
     assertArrayEquals(
         IntCodec.VARINT.encode(new VertexTransform.ZigZagDelta().apply(ctx)),
@@ -148,7 +148,7 @@ class PipelineEncodingTest {
         new PipelineEncoding(PipelineConfig.IDENTITY.withWidth(ByteWidth.VARINT_SPLIT))
             .encode(ctx)
             .payload();
-    var body = Arrays.copyOfRange(payload, PipelineEncoding.HEADER_BYTES, payload.length);
+    var body = Arrays.copyOfRange(payload, PayloadHeader.HEADER_BYTES, payload.length);
 
     assertArrayEquals(
         IntCodec.VARINT_SPLIT.encode(new VertexTransform.ZigZagDelta().apply(ctx)), body);
@@ -157,10 +157,10 @@ class PipelineEncodingTest {
   @Test
   void headerRoundTripsEveryChoice() {
     var config = PipelineConfig.IDENTITY.withWidth(ByteWidth.VARINT_SPLIT);
-    var header = PipelineEncoding.header(config);
+    var header = PayloadHeader.write(config);
     assertEquals(
         config,
-        PipelineEncoding.parseHeader(header[0] & 0xFF, header[1] & 0xFF, config.reorder()));
+        PayloadHeader.parse(header[0] & 0xFF, header[1] & 0xFF, config.reorder()));
   }
 
   private static Polygon square(double originX, double originY, double size) {

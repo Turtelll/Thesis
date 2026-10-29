@@ -34,7 +34,7 @@ class TransposeMechanismTest {
 
   private static byte[] body(PipelineConfig config, BufferContext ctx) {
     var payload = new PipelineEncoding(config).encode(ctx).payload();
-    return Arrays.copyOfRange(payload, PipelineEncoding.HEADER_BYTES, payload.length);
+    return Arrays.copyOfRange(payload, PayloadHeader.HEADER_BYTES, payload.length);
   }
 
   private static PipelineConfig plain(ByteWidth width, Transpose transpose) {
