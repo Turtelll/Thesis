@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.pipeline;
+package org.maplibre.mlt.research.encoder.reference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -12,6 +12,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
+import org.maplibre.mlt.research.pipeline.PayloadHeader;
+import org.maplibre.mlt.research.pipeline.PipelineConfig;
+import org.maplibre.mlt.research.pipeline.PipelineEncoding;
+import org.maplibre.mlt.research.pipeline.PipelineRegistry;
+import org.maplibre.mlt.research.pipeline.Prediction;
+import org.maplibre.mlt.research.pipeline.Reorder;
+import org.maplibre.mlt.research.pipeline.Segmentation;
+import org.maplibre.mlt.research.pipeline.Verification;
 
 /**
  * {@code QUAD_CORNER_SHARED} and {@code QUAD_CORNER_SHARED_FRAME} in the pipeline: a terrace of

@@ -1,11 +1,11 @@
-package org.maplibre.mlt.research.pipeline.mechanism;
+package org.maplibre.mlt.research.encoder.reference;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
-import org.maplibre.mlt.research.pipeline.mechanism.SharedVertexRef.BitReader;
-import org.maplibre.mlt.research.pipeline.mechanism.SharedVertexRef.BitWriter;
-import org.maplibre.mlt.research.pipeline.mechanism.SharedVertexRef.PositionTable;
-import org.maplibre.mlt.research.pipeline.mechanism.SharedVertexRef.Runs;
+import org.maplibre.mlt.research.encoder.reference.SharedVertexRef.BitReader;
+import org.maplibre.mlt.research.encoder.reference.SharedVertexRef.BitWriter;
+import org.maplibre.mlt.research.encoder.reference.SharedVertexRef.PositionTable;
+import org.maplibre.mlt.research.encoder.reference.SharedVertexRef.Runs;
 
 import java.util.ArrayList;
 import java.util.Arrays;

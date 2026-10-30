@@ -5,11 +5,11 @@ import org.maplibre.mlt.research.encoding.ClassifiedPredictor;
 import org.maplibre.mlt.research.buffer.PartBoundaries;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.pipeline.mechanism.LineContinuation;
-import org.maplibre.mlt.research.pipeline.mechanism.LineSharedVertexRef;
+import org.maplibre.mlt.research.encoder.reference.LineSharedVertexRef;
 import org.maplibre.mlt.research.pipeline.mechanism.QuadCornerLine;
 import org.maplibre.mlt.research.pipeline.mechanism.RingFramePrior;
 import org.maplibre.mlt.research.pipeline.mechanism.SegmentQuadCorner;
-import org.maplibre.mlt.research.pipeline.mechanism.SharedVertexRef;
+import org.maplibre.mlt.research.encoder.reference.SharedVertexRef;
 import org.maplibre.mlt.research.pipeline.mechanism.TurnScalar;
 
 import java.util.List;
