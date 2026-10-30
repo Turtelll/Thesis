@@ -17,9 +17,9 @@ import java.util.List;
  * Point/MultiPoint column is compared as the multiset of its features instead (the points of a\n * MultiPoint as a set, their order has no meaning); every other column
  * is delegated to {@link GeometryEquivalence} unchanged.
  */
-public final class Verification {
+public final class RoundTrip {
 
-    private Verification() {
+    private RoundTrip() {
     }
 
     private static final int POINT = 0;

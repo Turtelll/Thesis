@@ -13,7 +13,7 @@ import java.util.function.Predicate;
  * 77,2% of the buffers, fitted on one half of the Munich tiles and scored on the other; the
  * thresholds are the fit on all of them). Predictor and terminal are left to the search.
  */
-public final class StageRules {
+public final class FeatureRules {
 
     /** Reorder when the Hilbert order shortens the mean jump between runs below this share. */
     static final double JUMP_RATIO = 0.996;
@@ -21,7 +21,7 @@ public final class StageRules {
     /** Class streams when the share of point geometries is below this, i.e. the buffer has none. */
     static final double POINT_SHARE = 0.0025;
 
-    private StageRules() {
+    private FeatureRules() {
     }
 
     /** The reorder for this buffer; one whose runs cannot be located is not reordered. */

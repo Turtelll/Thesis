@@ -16,7 +16,7 @@ import java.util.stream.IntStream;
 
 /**
  * The selection loop on the tile: one composition per (tile, layer), chosen by the compressed size of
- * the whole tile, not of the buffer alone. {@link Selector} sized each buffer on its own and lost per
+ * the whole tile, not of the buffer alone. {@link BufferSelector} sized each buffer on its own and lost per
  * tile, since buffers in different formats share fewer matches in the tile's window; here every trial
  * is the tile's concatenated buffers, sized with the target backend or with an estimate that
  * compresses nothing (a byte-entropy bound), so the tile is compressed only once, after the choice.
@@ -106,7 +106,7 @@ public final class TileSelector {
     }
 
     /**
-     * @param restriction per buffer, which candidates it may choose among (e.g. {@link StageRules}
+     * @param restriction per buffer, which candidates it may choose among (e.g. {@link FeatureRules}
      *                    fixing some stages from the buffer's features); at least one must remain
      */
     public TileSelector(String backend, ToLongFunction<byte[]> size,

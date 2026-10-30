@@ -8,7 +8,7 @@ import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
-import org.maplibre.mlt.research.measurement.verification.Verification;
+import org.maplibre.mlt.research.measurement.verification.RoundTrip;
 import org.maplibre.mlt.research.extraction.Corpus;
 import org.maplibre.mlt.research.measurement.compression.Compressor;
 import org.maplibre.mlt.research.measurement.compression.TileCompression;
@@ -287,7 +287,7 @@ public final class GoldenDumpCli {
             List<Compressor> compressors) {
         final var encoding = row.encoding() == null ? layerEncoding : row.encoding();
         final var encoded = encoding.encode(ctx);
-        Verification.roundTrip(where, ctx, encoding, encoded);
+        RoundTrip.roundTrip(where, ctx, encoding, encoded);
         var emitted = "-";
         if (encoding.reordersGeometries()) {
             emitted = topologySha(encoding.emitted(ctx));

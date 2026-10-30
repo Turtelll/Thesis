@@ -23,7 +23,7 @@ import org.maplibre.mlt.research.baseline.VertexTransform;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
-import org.maplibre.mlt.research.measurement.verification.Verification;
+import org.maplibre.mlt.research.measurement.verification.RoundTrip;
 
 /**
  * Round-trips every registered pipeline row over the same hand-built buffers as {@code
@@ -57,8 +57,8 @@ public class PipelineEncodingTest {
       var emitted = encoding.emitted(ctx);
       assertEquals(emitted.vertices(), decoded, "must decode to the buffer it emitted");
       assertTrue(
-          Verification.holds(ctx, emitted),
-          "reordering must preserve every geometry: " + Verification.describe(ctx, emitted));
+          RoundTrip.holds(ctx, emitted),
+          "reordering must preserve every geometry: " + RoundTrip.describe(ctx, emitted));
     } else {
       assertEquals(ctx.vertices(), decoded);
     }

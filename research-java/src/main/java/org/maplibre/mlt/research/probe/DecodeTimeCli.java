@@ -8,7 +8,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.baseline.VertexTransform;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
-import org.maplibre.mlt.research.measurement.verification.Verification;
+import org.maplibre.mlt.research.measurement.verification.RoundTrip;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.extraction.Corpus;
@@ -269,7 +269,7 @@ public final class DecodeTimeCli {
                 final var ctx = buffers.get(b);
                 final var encoded = row.encoding().encode(ctx);
                 payloads[r][b] = encoded;
-                Verification.roundTrip(Corpus.tileKey(entries.get(b)) + " " + entries.get(b).layerName(), ctx, row.encoding(), encoded);
+                RoundTrip.roundTrip(Corpus.tileKey(entries.get(b)) + " " + entries.get(b).layerName(), ctx, row.encoding(), encoded);
             }
         }
 

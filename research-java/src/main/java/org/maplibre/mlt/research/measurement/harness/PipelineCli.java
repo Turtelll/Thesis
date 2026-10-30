@@ -8,12 +8,12 @@ import org.maplibre.mlt.research.measurement.selection.BufferFeatures;
 import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
-import org.maplibre.mlt.research.measurement.stats.PipelineStats;
+import org.maplibre.mlt.research.measurement.stats.StepProbes;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
-import org.maplibre.mlt.research.measurement.selection.Selector;
-import org.maplibre.mlt.research.measurement.selection.StageRules;
+import org.maplibre.mlt.research.measurement.selection.BufferSelector;
+import org.maplibre.mlt.research.measurement.selection.FeatureRules;
 import org.maplibre.mlt.research.measurement.selection.TileSelector;
-import org.maplibre.mlt.research.measurement.verification.Verification;
+import org.maplibre.mlt.research.measurement.verification.RoundTrip;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.Corpus;
 import org.maplibre.mlt.research.measurement.compression.Compressor;
@@ -120,7 +120,7 @@ public final class PipelineCli {
         final var csvNames = List.copyOf(names);
         tileSelectors.forEach(selector -> names.add(selector.name()));
 
-        final var probes = opts.stats ? PipelineStats.probes(opts.step) : List.<PipelineStats.Probe>of();
+        final var probes = opts.stats ? StepProbes.probes(opts.step) : List.<StepProbes.Probe>of();
         final var perTile = new TileCompression(sizing);
         final var breakdown = new Breakdown();
         final var isolated = new LinkedHashMap<String, long[]>();
@@ -178,11 +178,11 @@ public final class PipelineCli {
                 for (final var encoding : plain) {
                     final var encoded = encoding.encode(ctx);
                     if (opts.verify()) {
-                        Verification.roundTrip(entry.z() + "/" + entry.x() + "/" + entry.y() + " " + entry.layerName(), ctx, encoding, encoded);
+                        RoundTrip.roundTrip(entry.z() + "/" + entry.x() + "/" + entry.y() + " " + entry.layerName(), ctx, encoding, encoded);
                     }
                     perTile.add(encoding.name(), encoded.payload());
-                    if (encoding instanceof Selector) {
-                        selection.record(encoding.name(), entry, Selector.choiceOf(encoded.payload()));
+                    if (encoding instanceof BufferSelector) {
+                        selection.record(encoding.name(), entry, BufferSelector.choiceOf(encoded.payload()));
                     }
                     final var gzip = Compressor.GZIP.size(encoded.payload());
                     breakdown.add(entry.layerName(), geometry, encoding.name(), gzip);
@@ -400,7 +400,7 @@ public final class PipelineCli {
                 final var entry = entries.get(b);
                 final var choice = choices.get(b);
                 if (verify) {
-                    Verification.roundTrip(entry.z() + "/" + entry.x() + "/" + entry.y() + " " + entry.layerName(),
+                    RoundTrip.roundTrip(entry.z() + "/" + entry.x() + "/" + entry.y() + " " + entry.layerName(),
                             contexts.get(b), new PipelineEncoding(choice.config()), choice.encoded());
                 }
                 final var payload = choice.encoded().payload();
@@ -462,7 +462,7 @@ public final class PipelineCli {
                 }
                 for (final var choice : List.of(aloneChoice, tileChoice)) {
                     if (verify) {
-                        Verification.roundTrip(where, ctx, new PipelineEncoding(choice.config()), choice.encoded());
+                        RoundTrip.roundTrip(where, ctx, new PipelineEncoding(choice.config()), choice.encoded());
                     }
                 }
                 for (final var named : List.of(Map.entry(alone.label(c), aloneChoice),
@@ -512,8 +512,8 @@ public final class PipelineCli {
         all.add(new TileSelector("order0", TileCompression::order0Bytes));
         all.add(new TileSelector("order1", TileCompression::order1Bytes));
         // reorder and class streams fixed by rule, predictor x terminal (12) searched
-        all.add(new TileSelector("rules_order1", TileCompression::order1Bytes, StageRules::restrict));
-        all.add(new TileSelector("rules_gzip", Compressor.GZIP::size, StageRules::restrict));
+        all.add(new TileSelector("rules_order1", TileCompression::order1Bytes, FeatureRules::restrict));
+        all.add(new TileSelector("rules_gzip", Compressor.GZIP::size, FeatureRules::restrict));
         if (trials == null) {
             return all;
         }
@@ -530,13 +530,13 @@ public final class PipelineCli {
 
     /**
      * The per-buffer selection, once per backend it trial-compresses with, without and with the
-     * reorder; its trial sizes the buffer alone ({@link Selector}).
+     * reorder; its trial sizes the buffer alone ({@link BufferSelector}).
      */
     private static List<Encoding> selectors(int brotliQuality) {
         final var rows = new ArrayList<Encoding>();
         for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT)) {
             for (final var compressor : Compressor.all(brotliQuality)) {
-                rows.add(new Selector(reorder, compressor.label(), compressor::size));
+                rows.add(new BufferSelector(reorder, compressor.label(), compressor::size));
             }
         }
         return rows;

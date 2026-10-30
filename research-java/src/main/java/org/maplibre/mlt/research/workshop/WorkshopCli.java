@@ -5,7 +5,7 @@ import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
-import org.maplibre.mlt.research.measurement.verification.Verification;
+import org.maplibre.mlt.research.measurement.verification.RoundTrip;
 import org.maplibre.mlt.research.extraction.Corpus;
 import org.maplibre.mlt.research.measurement.compression.Compressor;
 import org.maplibre.mlt.research.measurement.compression.TileCompression;
@@ -243,7 +243,7 @@ public final class WorkshopCli {
                 EncodedBuffer encoded = encoding.encode(ctx);
                 // The pipeline's gate, not BenchmarkCli's: it also compares reordered Point/MultiPoint
                 // columns, which GeometryEquivalence (parts only) would reject.
-                Verification.roundTrip(
+                RoundTrip.roundTrip(
                         String.format("%d/%d/%d %s", entry.z(), entry.x(), entry.y(), entry.layerName()),
                         ctx, encoding, encoded);
                 var residuals = r < baselines.size()

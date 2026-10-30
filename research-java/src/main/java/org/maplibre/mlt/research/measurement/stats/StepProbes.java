@@ -24,9 +24,9 @@ import java.util.stream.IntStream;
  * original, unreordered context) and prints its table at the end; it encodes nothing and writes no
  * bytes. {@code ./gradlew research --args="measure --step sN --stats"} runs the probes of step N.
  */
-public final class PipelineStats {
+public final class StepProbes {
 
-    private PipelineStats() {
+    private StepProbes() {
     }
 
     /** One measurement over the corpus. */

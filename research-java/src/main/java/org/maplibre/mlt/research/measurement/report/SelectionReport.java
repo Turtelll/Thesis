@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * What the {@link org.maplibre.mlt.research.measurement.selection.Selector} and the {@link
+ * What the {@link org.maplibre.mlt.research.measurement.selection.BufferSelector} and the {@link
  * org.maplibre.mlt.research.measurement.selection.TileSelector} chose, per selector row (one per backend and
  * reorder, and the per-(tile, layer) oracles), per layer and per zoom: the share of buffers that took
  * a curve reorder (Hilbert) or the greedy chain, each predictor, the class streams, and each terminal.

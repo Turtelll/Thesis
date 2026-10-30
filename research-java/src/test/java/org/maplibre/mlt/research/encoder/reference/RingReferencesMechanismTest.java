@@ -19,7 +19,7 @@ import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
-import org.maplibre.mlt.research.measurement.verification.Verification;
+import org.maplibre.mlt.research.measurement.verification.RoundTrip;
 
 /**
  * {@code QUAD_CORNER_SHARED} and {@code QUAD_CORNER_SHARED_FRAME} in the pipeline: a terrace of
@@ -116,7 +116,7 @@ class RingReferencesMechanismTest {
           var encoded = encoding.encode(ctx);
           var decoded = encoding.decode(encoded, topologyOf(ctx), ctx.vertices().size());
           assertEquals(encoding.emitted(ctx).vertices(), decoded, encoding.name());
-          assertTrue(Verification.holds(ctx, encoding.emitted(ctx)), encoding.name());
+          assertTrue(RoundTrip.holds(ctx, encoding.emitted(ctx)), encoding.name());
         }
       }
     }

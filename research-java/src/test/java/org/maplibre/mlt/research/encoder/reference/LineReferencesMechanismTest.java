@@ -19,7 +19,7 @@ import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
-import org.maplibre.mlt.research.measurement.verification.Verification;
+import org.maplibre.mlt.research.measurement.verification.RoundTrip;
 
 /**
  * {@code LINE_CONTINUATION_SHARED} and {@code LINE_CONTINUATION_SHARED_FRAME_HEADING} in the
@@ -131,7 +131,7 @@ class LineReferencesMechanismTest {
           var topology = topologyOf(reorder.apply(ctx));
           var decoded = encoding.decode(encoded, topology, ctx.vertices().size());
           assertEquals(encoding.emitted(ctx).vertices(), decoded, encoding.name());
-          assertTrue(Verification.holds(ctx, encoding.emitted(ctx)), encoding.name());
+          assertTrue(RoundTrip.holds(ctx, encoding.emitted(ctx)), encoding.name());
         }
       }
     }

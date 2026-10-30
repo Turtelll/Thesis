@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
-import org.maplibre.mlt.research.measurement.verification.Verification;
+import org.maplibre.mlt.research.measurement.verification.RoundTrip;
 
 /**
  * Pins what makes a measured S1 result meaningful: the curve keys really are space-filling, the
@@ -92,7 +92,7 @@ class ReorderMechanismTest {
             Reorder.HILBERT_START_VC)) {
       var reordered = mode.apply(ctx);
       assertNotEquals(ctx.vertices(), reordered.vertices(), mode + " should change the order");
-      assertTrue(Verification.holds(ctx, reordered), mode + " must preserve every geometry");
+      assertTrue(RoundTrip.holds(ctx, reordered), mode + " must preserve every geometry");
       // The far square must not sit between the two near ones.
       assertEquals(new Vertex(3000, 3000), reordered.vertices().get(8), mode.name());
     }
@@ -175,7 +175,7 @@ class ReorderMechanismTest {
         new BufferContext(vertices, List.of(1, 4, 1), List.of(2), List.of(2, 2, 2, 2), List.of());
     var reordered = Reorder.HILBERT_START.apply(ctx);
 
-    assertTrue(Verification.holds(ctx, reordered));
+    assertTrue(RoundTrip.holds(ctx, reordered));
     var out = reordered.vertices();
     var a = out.indexOf(new Vertex(10, 10));
     assertEquals(new Vertex(2000, 2000), out.get(a + 2), "part b directly follows part a");
@@ -197,11 +197,11 @@ class ReorderMechanismTest {
     var reordered = Reorder.HILBERT_START.apply(ctx);
 
     assertNotEquals(vertices, reordered.vertices());
-    assertTrue(Verification.holds(ctx, reordered));
+    assertTrue(RoundTrip.holds(ctx, reordered));
     var at = reordered.vertices().indexOf(new Vertex(902, 903));
     assertEquals(new Vertex(900, 902), reordered.vertices().get(at + 1), "multipoint keeps its two points together");
     assertFalse(
-        Verification.holds(
+        RoundTrip.holds(
             ctx,
             new BufferContext(
                 List.of(new Vertex(900, 900), new Vertex(1, 1), new Vertex(902, 903), new Vertex(900, 902), new Vertex(4, 2)),
@@ -223,8 +223,8 @@ class ReorderMechanismTest {
     var sorted = Reorder.HILBERT_CENTROID_ROT_MP.apply(ctx);
     var kept = Reorder.HILBERT_CENTROID_ROT.apply(ctx);
 
-    assertTrue(Verification.holds(ctx, sorted));
-    assertTrue(Verification.holds(ctx, kept));
+    assertTrue(RoundTrip.holds(ctx, sorted));
+    assertTrue(RoundTrip.holds(ctx, kept));
     var at = sorted.vertices().indexOf(new Vertex(5, 5));
     assertEquals(new Vertex(3000, 3000), sorted.vertices().get(at + 1), "the near point leads its MultiPoint");
     var keptAt = kept.vertices().indexOf(new Vertex(3000, 3000));

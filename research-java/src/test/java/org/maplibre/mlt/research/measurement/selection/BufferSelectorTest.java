@@ -28,7 +28,7 @@ import org.maplibre.mlt.research.registry.PipelineRegistry;
  * The selection loop: it round-trips, it is never larger than the default pipeline under the
  * compressor it trials with, and it does choose by content (a straight line takes a line predictor).
  */
-class SelectorTest {
+class BufferSelectorTest {
 
   private static final GeometryFactory GF = new GeometryFactory();
 
@@ -74,7 +74,7 @@ class SelectorTest {
       value = Reorder.class,
       names = {"NONE", "HILBERT_CENTROID_ROT"})
   void roundTripsEveryBufferShape(Reorder reorder) {
-    var selector = new Selector(reorder, "gzip", SelectorTest::gzipSize);
+    var selector = new BufferSelector(reorder, "gzip", BufferSelectorTest::gzipSize);
     for (var ctx : List.of(polygons(), smoothLine())) {
       PipelineEncodingTest.assertReconstructs(selector, ctx, selector.encode(ctx));
     }
@@ -91,7 +91,7 @@ class SelectorTest {
 
   @Test
   void isNeverLargerThanTheDefaultUnderItsOwnCompressor() {
-    var selector = new Selector(Reorder.NONE, "gzip", SelectorTest::gzipSize);
+    var selector = new BufferSelector(Reorder.NONE, "gzip", BufferSelectorTest::gzipSize);
     var fixed = new PipelineEncoding(PipelineRegistry.DEFAULT);
     for (var ctx : List.of(polygons(), smoothLine())) {
       assertTrue(gzipSize(selector.encode(ctx).payload()) <= gzipSize(fixed.encode(ctx).payload()));
@@ -100,9 +100,9 @@ class SelectorTest {
 
   @Test
   void choosesByContent() {
-    var selector = new Selector(Reorder.NONE, "gzip", SelectorTest::gzipSize);
+    var selector = new BufferSelector(Reorder.NONE, "gzip", BufferSelectorTest::gzipSize);
     var line = smoothLine();
-    var choice = Selector.choiceOf(selector.encode(line).payload());
+    var choice = BufferSelector.choiceOf(selector.encode(line).payload());
     assertNotEquals(Prediction.DELTA, choice.predictor(), "a smooth curve has second differences near zero");
     assertTrue(
         gzipSize(selector.encode(line).payload())

@@ -36,7 +36,7 @@ import java.util.function.ToLongFunction;
  * <p>Measured and not kept: -0,3 to -0,65% isolated, +0,0 to +0,3% per tile, see {@code
  * docs/results/openzl-pipeline.md}. It stays as the record of that result and for the composition report.
  */
-public final class Selector implements Encoding {
+public final class BufferSelector implements Encoding {
 
     private final Reorder reorder;
     private final String backend;
@@ -48,7 +48,7 @@ public final class Selector implements Encoding {
      * @param backend label of the compressor in the name, e.g. {@code gzip}
      * @param size    the compressed size of the given bytes under that compressor
      */
-    public Selector(Reorder reorder, String backend, ToLongFunction<byte[]> size) {
+    public BufferSelector(Reorder reorder, String backend, ToLongFunction<byte[]> size) {
         this.reorder = reorder;
         this.backend = backend;
         this.size = size;

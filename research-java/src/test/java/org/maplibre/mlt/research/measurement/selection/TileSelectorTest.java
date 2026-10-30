@@ -62,13 +62,13 @@ class TileSelectorTest {
   private static long tileSize(List<byte[]> payloads) {
     var out = new ByteArrayOutputStream();
     payloads.forEach(out::writeBytes);
-    return SelectorTest.gzipSize(out.toByteArray());
+    return BufferSelectorTest.gzipSize(out.toByteArray());
   }
 
   @Test
   void everyChosenBufferRoundTrips() {
     var buffers = tile();
-    var choices = new TileSelector("gzip", SelectorTest::gzipSize).select(LAYERS, buffers);
+    var choices = new TileSelector("gzip", BufferSelectorTest::gzipSize).select(LAYERS, buffers);
     assertEquals(buffers.size(), choices.size());
     for (var b = 0; b < buffers.size(); b++) {
       var choice = choices.get(b);
@@ -81,7 +81,7 @@ class TileSelectorTest {
   void isNeverLargerThanThePerLayerDefaultOnTheTile() {
     var buffers = tile();
     var selected =
-        new TileSelector("gzip", SelectorTest::gzipSize)
+        new TileSelector("gzip", BufferSelectorTest::gzipSize)
             .select(LAYERS, buffers).stream()
                 .map(choice -> choice.encoded().payload())
                 .toList();
@@ -98,7 +98,7 @@ class TileSelectorTest {
   @Test
   void theOracleRoundTripsAndBeatsBothStartsOnTheTile() {
     var buffers = tile();
-    var oracle = TileSelector.oracle("gzip", SelectorTest::gzipSize, PipelineRegistry.bestGrid());
+    var oracle = TileSelector.oracle("gzip", BufferSelectorTest::gzipSize, PipelineRegistry.bestGrid());
     var search = oracle.search(LAYERS, oracle.encode(buffers));
     assertEquals(buffers.size(), search.tile().size());
     assertEquals(buffers.size(), search.alone().size());
@@ -109,7 +109,7 @@ class TileSelectorTest {
             new PipelineEncoding(choice.config()), buffers.get(b), choice.encoded());
       }
       // the alone-best is the smallest candidate alone
-      var aloneSize = SelectorTest.gzipSize(search.alone().get(b).encoded().payload());
+      var aloneSize = BufferSelectorTest.gzipSize(search.alone().get(b).encoded().payload());
       for (var size : search.aloneSizes()[b]) {
         assertTrue(aloneSize <= size);
       }
@@ -127,8 +127,8 @@ class TileSelectorTest {
   @Test
   void aSearchRejectsATrialOfOtherCandidates() {
     var buffers = tile();
-    var oracle = TileSelector.oracle("gzip", SelectorTest::gzipSize, PipelineRegistry.bestGrid());
-    var trial = new TileSelector("gzip", SelectorTest::gzipSize).encode(buffers);
+    var oracle = TileSelector.oracle("gzip", BufferSelectorTest::gzipSize, PipelineRegistry.bestGrid());
+    var trial = new TileSelector("gzip", BufferSelectorTest::gzipSize).encode(buffers);
     org.junit.jupiter.api.Assertions.assertThrows(
         IllegalArgumentException.class, () -> oracle.search(LAYERS, trial));
   }
@@ -136,12 +136,12 @@ class TileSelectorTest {
   @Test
   void aRestrictionFixesTheRuledStages() {
     var buffers = tile();
-    var choices = new TileSelector("gzip", SelectorTest::gzipSize, StageRules::restrict).select(LAYERS, buffers);
+    var choices = new TileSelector("gzip", BufferSelectorTest::gzipSize, FeatureRules::restrict).select(LAYERS, buffers);
     for (var b = 0; b < buffers.size(); b++) {
       var features = BufferFeatures.of(buffers.get(b));
       var config = choices.get(b).config();
-      assertEquals(StageRules.reorder(features), config.reorder());
-      assertEquals(StageRules.segmentation(features), config.segmentation());
+      assertEquals(FeatureRules.reorder(features), config.reorder());
+      assertEquals(FeatureRules.segmentation(features), config.segmentation());
       PipelineEncodingTest.assertReconstructs(
           new PipelineEncoding(config), buffers.get(b), choices.get(b).encoded());
     }
@@ -149,7 +149,7 @@ class TileSelectorTest {
 
   @Test
   void startsFromThePerLayerDefault() {
-    var candidates = new TileSelector("gzip", SelectorTest::gzipSize).candidates();
+    var candidates = new TileSelector("gzip", BufferSelectorTest::gzipSize).candidates();
     // the 48-row oracle grid first, then each distinct layer default it lacks (the ring-frame rows)
     var grid = PipelineRegistry.oracleConfigs();
     assertEquals(48, grid.size());

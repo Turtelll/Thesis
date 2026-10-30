@@ -20,7 +20,7 @@ import org.maplibre.mlt.research.encoder.format.PayloadHeader;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.encoder.format.PipelineEncodingTest;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
-import org.maplibre.mlt.research.measurement.verification.Verification;
+import org.maplibre.mlt.research.measurement.verification.RoundTrip;
 
 /**
  * S3 verification: stream layouts are a pure function of the topology streams, the lengths a
@@ -171,6 +171,6 @@ class SegmentationMechanismTest {
     for (var i = 1; i < counts.size(); i++) {
       assertTrue(counts.get(i) >= counts.get(i - 1), "ring sizes ascend: " + counts);
     }
-    assertTrue(Verification.holds(ctx, sorted), Verification.describe(ctx, sorted));
+    assertTrue(RoundTrip.holds(ctx, sorted), RoundTrip.describe(ctx, sorted));
   }
 }
