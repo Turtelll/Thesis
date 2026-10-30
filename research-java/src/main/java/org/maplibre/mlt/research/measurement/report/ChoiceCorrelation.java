@@ -1,7 +1,7 @@
-package org.maplibre.mlt.research.cli;
+package org.maplibre.mlt.research.measurement.report;
 
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
-import org.maplibre.mlt.research.pipeline.BufferFeatures;
+import org.maplibre.mlt.research.measurement.selection.BufferFeatures;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 import org.maplibre.mlt.research.encoder.format.PipelineConfig;
 import org.maplibre.mlt.research.registry.PipelineRegistry;

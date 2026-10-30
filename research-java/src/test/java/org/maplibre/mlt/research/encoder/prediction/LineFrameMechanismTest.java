@@ -15,7 +15,7 @@ import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
-import org.maplibre.mlt.research.pipeline.Verification;
+import org.maplibre.mlt.research.measurement.verification.Verification;
 
 /**
  * {@code LINE_CONTINUATION_FRAME}: the plain-delta edges of line parts (the 2nd vertex of every run

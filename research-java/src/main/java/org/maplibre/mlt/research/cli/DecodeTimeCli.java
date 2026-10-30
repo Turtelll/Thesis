@@ -8,9 +8,10 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.baseline.VertexTransform;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
-import org.maplibre.mlt.research.pipeline.Verification;
+import org.maplibre.mlt.research.measurement.verification.Verification;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
+import org.maplibre.mlt.research.extraction.Corpus;
 
 import java.io.IOException;
 import java.io.Writer;

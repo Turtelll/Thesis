@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.pipeline;
+package org.maplibre.mlt.research.measurement.stats;
 
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.research.buffer.PartBoundaries;

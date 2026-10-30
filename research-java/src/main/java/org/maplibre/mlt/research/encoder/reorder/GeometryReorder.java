@@ -25,7 +25,7 @@ import java.util.Map;
  * and {@code docs/results/reordering.md} for the earlier experiments that assumed otherwise). The
  * decoder does not reconstruct the original layout and is not asked to — it emits the order it
  * reads. What must be preserved is the <em>set</em> of geometries, which {@link
- * org.maplibre.mlt.research.encoding.GeometryEquivalence} checks.
+ * org.maplibre.mlt.research.measurement.verification.GeometryEquivalence} checks.
  *
  * <p>Two constraints the greedy chain respects:
  *

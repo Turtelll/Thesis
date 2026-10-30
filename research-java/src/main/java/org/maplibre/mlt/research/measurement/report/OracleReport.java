@@ -1,8 +1,10 @@
-package org.maplibre.mlt.research.cli;
+package org.maplibre.mlt.research.measurement.report;
 
 import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.encoder.stream.Transpose;
+import org.maplibre.mlt.research.measurement.compression.Compressor;
+import org.maplibre.mlt.research.measurement.compression.TileCompression;
 
 import java.util.ArrayList;
 import java.util.Comparator;

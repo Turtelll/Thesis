@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.cli;
+package org.maplibre.mlt.research.measurement.report;
 
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
@@ -12,8 +12,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * What the {@link org.maplibre.mlt.research.pipeline.Selector} and the {@link
- * org.maplibre.mlt.research.pipeline.TileSelector} chose, per selector row (one per backend and
+ * What the {@link org.maplibre.mlt.research.measurement.selection.Selector} and the {@link
+ * org.maplibre.mlt.research.measurement.selection.TileSelector} chose, per selector row (one per backend and
  * reorder, and the per-(tile, layer) oracles), per layer and per zoom: the share of buffers that took
  * a curve reorder (Hilbert) or the greedy chain, each predictor, the class streams, and each terminal.
  * A share is of buffers, not of bytes.

@@ -23,7 +23,7 @@ import org.maplibre.mlt.research.baseline.VertexTransform;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
-import org.maplibre.mlt.research.pipeline.Verification;
+import org.maplibre.mlt.research.measurement.verification.Verification;
 
 /**
  * Round-trips every registered pipeline row over the same hand-built buffers as {@code

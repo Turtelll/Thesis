@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.cli;
+package org.maplibre.mlt.research.extraction;
 
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 

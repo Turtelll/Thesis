@@ -21,6 +21,7 @@ import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
+import org.maplibre.mlt.research.measurement.compression.Compressor;
 
 import java.io.File;
 import java.util.ArrayList;

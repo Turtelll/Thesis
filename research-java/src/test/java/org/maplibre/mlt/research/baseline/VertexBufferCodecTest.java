@@ -18,7 +18,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.workshop.Workshop;
 import org.maplibre.mlt.research.buffer.Encoding;
-import org.maplibre.mlt.research.encoding.GeometryEquivalence;
+import org.maplibre.mlt.research.measurement.verification.GeometryEquivalence;
 
 /**
  * Round-trips real extracted vertex buffers through every registered encoding and compares against

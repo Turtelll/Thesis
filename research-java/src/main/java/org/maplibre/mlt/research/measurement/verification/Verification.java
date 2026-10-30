@@ -1,8 +1,7 @@
-package org.maplibre.mlt.research.pipeline;
+package org.maplibre.mlt.research.measurement.verification;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding;
-import org.maplibre.mlt.research.encoding.GeometryEquivalence;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 

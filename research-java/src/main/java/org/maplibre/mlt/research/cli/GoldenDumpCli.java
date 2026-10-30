@@ -8,7 +8,10 @@ import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
-import org.maplibre.mlt.research.pipeline.Verification;
+import org.maplibre.mlt.research.measurement.verification.Verification;
+import org.maplibre.mlt.research.extraction.Corpus;
+import org.maplibre.mlt.research.measurement.compression.Compressor;
+import org.maplibre.mlt.research.measurement.compression.TileCompression;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;

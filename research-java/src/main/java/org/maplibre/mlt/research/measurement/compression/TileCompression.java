@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.cli;
+package org.maplibre.mlt.research.measurement.compression;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;

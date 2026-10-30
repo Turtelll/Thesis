@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.cli;
+package org.maplibre.mlt.research.measurement.report;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
+import org.maplibre.mlt.research.measurement.compression.Compressor;
 
 /**
  * The per-buffer oracle of {@code pipeline --oracle}: it picks the smallest candidate per backend,
