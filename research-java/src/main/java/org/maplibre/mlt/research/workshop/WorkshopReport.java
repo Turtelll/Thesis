@@ -39,8 +39,8 @@ import java.util.stream.IntStream;
  * name (default {@code HILBERT_CENTROID_ROT_MP}). {@code extractionDir} defaults to
  * {@code ../data/extractedBaseline}.
  */
-public final class WorkshopCli {
-    private WorkshopCli() {
+public final class WorkshopReport {
+    private WorkshopReport() {
     }
 
     /** Layers shown under {@code --by-layer}, the ones with the most vertices. */

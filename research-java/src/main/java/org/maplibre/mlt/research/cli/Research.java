@@ -1,8 +1,8 @@
 package org.maplibre.mlt.research.cli;
 
-import org.maplibre.mlt.research.extraction.ExtractCli;
-import org.maplibre.mlt.research.measurement.golden.GoldenDumpCli;
-import org.maplibre.mlt.research.measurement.harness.PipelineCli;
+import org.maplibre.mlt.research.extraction.MbtilesExtraction;
+import org.maplibre.mlt.research.measurement.golden.GoldenDump;
+import org.maplibre.mlt.research.measurement.harness.MeasureHarness;
 import org.maplibre.mlt.research.probe.BufferPointProbe;
 import org.maplibre.mlt.research.probe.DecodeTimeProbe;
 import org.maplibre.mlt.research.probe.LineFramePriorProbe;
@@ -11,7 +11,7 @@ import org.maplibre.mlt.research.probe.TileSizeProbe;
 import org.maplibre.mlt.research.probe.ResidualBitsProbe;
 import org.maplibre.mlt.research.probe.SharedVertexProbe;
 import org.maplibre.mlt.research.probe.TurnRadiusProbe;
-import org.maplibre.mlt.research.workshop.WorkshopCli;
+import org.maplibre.mlt.research.workshop.WorkshopReport;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -43,17 +43,17 @@ public final class Research {
     private static final Map<String, Entry> COMMANDS = new LinkedHashMap<>();
 
     static {
-        COMMANDS.put("extract", new Entry(".mbtiles -> VertexBuffer extraction", ExtractCli::main));
+        COMMANDS.put("extract", new Entry(".mbtiles -> VertexBuffer extraction", MbtilesExtraction::main));
         COMMANDS.put("measure", new Entry(
                 "baselines vs the pipeline's rows per tile: gzip/Brotli/zstd, round-tripped, oracle, breakdowns",
-                PipelineCli::main));
+                MeasureHarness::main));
         COMMANDS.put("tile-size", new Entry(
                 "whole-tile MLT bytes (property columns and ids included) of the pipeline reorders",
                 TileSizeProbe::main));
         COMMANDS.put("dump", new Entry(
                 "golden master of every row (SHA-256, sizes); --diff <old> <new> compares two dumps",
-                GoldenDumpCli::main));
-        COMMANDS.put("workshop", new Entry("predictor workshop: residual size and bytes of one-line rules", WorkshopCli::main));
+                GoldenDump::main));
+        COMMANDS.put("workshop", new Entry("predictor workshop: residual size and bytes of one-line rules", WorkshopReport::main));
         COMMANDS.put("decode-time", new Entry("decode time against the baseline with the same codec", DecodeTimeProbe::main));
         COMMANDS.put("residual-bits", new Entry("probe: residual bits and per-vertex change per transform", ResidualBitsProbe::main));
         COMMANDS.put("shared-vertex", new Entry("probe: vertices repeating a position within a buffer, per zoom", SharedVertexProbe::main));

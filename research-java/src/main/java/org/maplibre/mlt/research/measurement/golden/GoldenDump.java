@@ -55,7 +55,7 @@ import java.util.zip.GZIPOutputStream;
  * dumps; {@code --diff <oldDir> <newDir> [--rows a,b] [--allow-removed a,b] [--max-buffers <n>]}
  * compares two dumps (exit code 1 when a compared row differs).
  */
-public final class GoldenDumpCli {
+public final class GoldenDump {
 
     static final String BUFFERS = "buffers.tsv.gz";
     static final String TILES = "tiles.tsv.gz";
@@ -69,7 +69,7 @@ public final class GoldenDumpCli {
             "row\tz\tx\ty\tlayer\tsha256\tpayload_bytes\temitted_topology_sha256\tgzip\tbrotli11\tzstd19";
     private static final String TILE_COLUMNS = "row\tz\tx\ty\tpayload_bytes\torder0\tgzip\tbrotli11\tzstd19";
 
-    private GoldenDumpCli() {
+    private GoldenDump() {
     }
 
     /** One row of the dump; {@code encoding} is {@code null} for the per-layer default. */

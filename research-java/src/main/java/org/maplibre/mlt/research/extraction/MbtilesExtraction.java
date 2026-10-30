@@ -20,8 +20,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>Usage: {@code --mbtiles <path> --out <dir> [--zoom minZ-maxZ] [--layer name[,name...]]
  * [--limit N]}
  */
-public final class ExtractCli {
-    private ExtractCli() {
+public final class MbtilesExtraction {
+    private MbtilesExtraction() {
     }
 
     public static void main(String[] args) throws Exception {

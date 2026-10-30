@@ -64,9 +64,9 @@ import java.util.stream.IntStream;
  * [--layer <name>] [--by-zoom] [--by-geometry] [--stats] [--csv <file>] [--brotli-quality <0-11>]
  * [--limit-tiles <n>]}.
  */
-public final class PipelineCli {
+public final class MeasureHarness {
 
-    private PipelineCli() {
+    private MeasureHarness() {
     }
 
     private static final String DEFAULT_IN_DIR = "../data/extractedBaseline";
