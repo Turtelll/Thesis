@@ -1,6 +1,7 @@
 package org.maplibre.mlt.research.pipeline;
 
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
+import org.maplibre.mlt.research.encoder.reorder.Reorder;
 
 import java.util.function.Predicate;
 

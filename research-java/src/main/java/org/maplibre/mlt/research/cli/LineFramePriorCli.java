@@ -5,7 +5,7 @@ import org.maplibre.mlt.research.buffer.PartBoundaries;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.LineContinuation;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
-import org.maplibre.mlt.research.pipeline.Reorder;
+import org.maplibre.mlt.research.encoder.reorder.Reorder;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

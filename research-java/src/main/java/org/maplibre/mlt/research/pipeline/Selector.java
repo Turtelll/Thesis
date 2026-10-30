@@ -4,6 +4,7 @@ import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
+import org.maplibre.mlt.research.encoder.reorder.Reorder;
 
 import java.util.ArrayList;
 import java.util.List;

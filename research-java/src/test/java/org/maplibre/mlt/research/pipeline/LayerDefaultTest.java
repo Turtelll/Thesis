@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
+import org.maplibre.mlt.research.encoder.reorder.Reorder;
 
 /**
  * The per-layer default ({@link PipelineRegistry#forLayer}) is a fixed table, so what it must hold

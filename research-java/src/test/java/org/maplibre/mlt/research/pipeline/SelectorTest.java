@@ -19,6 +19,7 @@ import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
+import org.maplibre.mlt.research.encoder.reorder.Reorder;
 
 /**
  * The selection loop: it round-trips, it is never larger than the default pipeline under the

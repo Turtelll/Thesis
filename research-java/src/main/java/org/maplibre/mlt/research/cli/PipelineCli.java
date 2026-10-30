@@ -9,7 +9,7 @@ import org.maplibre.mlt.research.pipeline.PipelineConfig;
 import org.maplibre.mlt.research.pipeline.PipelineEncoding;
 import org.maplibre.mlt.research.pipeline.PipelineRegistry;
 import org.maplibre.mlt.research.pipeline.PipelineStats;
-import org.maplibre.mlt.research.pipeline.Reorder;
+import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.pipeline.Selector;
 import org.maplibre.mlt.research.pipeline.StageRules;
 import org.maplibre.mlt.research.pipeline.TileSelector;

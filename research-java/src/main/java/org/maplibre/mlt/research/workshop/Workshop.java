@@ -9,8 +9,8 @@ import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.pipeline.PredictionTransform;
-import org.maplibre.mlt.research.pipeline.Reorder;
-import org.maplibre.mlt.research.pipeline.mechanism.GeometryReorder;
+import org.maplibre.mlt.research.encoder.reorder.Reorder;
+import org.maplibre.mlt.research.encoder.reorder.GeometryReorder;
 
 import java.util.ArrayList;
 import java.util.Arrays;

@@ -4,7 +4,7 @@ import org.maplibre.mlt.research.encoding.Baselines;
 import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
-import org.maplibre.mlt.research.pipeline.Reorder;
+import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.pipeline.Verification;
 import org.maplibre.mlt.research.workshop.Workshop;
 

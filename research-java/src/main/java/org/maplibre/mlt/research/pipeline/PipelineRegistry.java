@@ -4,6 +4,7 @@ import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 import org.maplibre.mlt.research.encoder.stream.Transpose;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
+import org.maplibre.mlt.research.encoder.reorder.Reorder;
 
 import java.util.ArrayList;
 import java.util.Arrays;

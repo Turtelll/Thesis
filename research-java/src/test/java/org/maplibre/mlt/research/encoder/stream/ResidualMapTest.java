@@ -9,7 +9,7 @@ import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.pipeline.PipelineEncoding;
 import org.maplibre.mlt.research.pipeline.PipelineRegistry;
-import org.maplibre.mlt.research.pipeline.Reorder;
+import org.maplibre.mlt.research.encoder.reorder.Reorder;
 
 /** S4 verification: zigzag is a bijection over the whole int range. */
 class ResidualMapTest {

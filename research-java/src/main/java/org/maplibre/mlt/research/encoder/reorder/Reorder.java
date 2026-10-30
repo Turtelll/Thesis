@@ -1,9 +1,8 @@
-package org.maplibre.mlt.research.pipeline;
+package org.maplibre.mlt.research.encoder.reorder;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.PartBoundaries;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
-import org.maplibre.mlt.research.pipeline.mechanism.GeometryReorder;
 
 import java.util.ArrayList;
 import java.util.Arrays;
