@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.pipeline;
+package org.maplibre.mlt.research.encoder.stream;
 
 /**
  * S7: byte layout of a fixed-width stream of {@code n} values ({@code x, y} interleaved, so value

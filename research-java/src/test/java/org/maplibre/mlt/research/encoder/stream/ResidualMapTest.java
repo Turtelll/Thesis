@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.pipeline;
+package org.maplibre.mlt.research.encoder.stream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -7,6 +7,9 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
+import org.maplibre.mlt.research.pipeline.PipelineEncoding;
+import org.maplibre.mlt.research.pipeline.PipelineRegistry;
+import org.maplibre.mlt.research.pipeline.Reorder;
 
 /** S4 verification: zigzag is a bijection over the whole int range. */
 class ResidualMapTest {

@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.IntCodec;
+import org.maplibre.mlt.research.encoder.stream.IntCodec;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.pipeline.Prediction;
 import org.maplibre.mlt.research.pipeline.PredictionTransform;

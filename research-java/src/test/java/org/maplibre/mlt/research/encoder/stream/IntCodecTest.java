@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoding;
+package org.maplibre.mlt.research.encoder.stream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;

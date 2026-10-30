@@ -1,5 +1,9 @@
 package org.maplibre.mlt.research.pipeline;
 
+import org.maplibre.mlt.research.encoder.stream.ByteWidth;
+import org.maplibre.mlt.research.encoder.stream.ResidualMap;
+import org.maplibre.mlt.research.encoder.stream.Transpose;
+
 /**
  * The two-byte header every pipeline payload starts with: the format's self-description. It carries
  * every choice of a {@link PipelineConfig} but the reorder, which the caller supplies when reading.

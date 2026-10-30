@@ -1,5 +1,10 @@
 package org.maplibre.mlt.research.pipeline;
 
+import org.maplibre.mlt.research.encoder.stream.ByteWidth;
+import org.maplibre.mlt.research.encoder.stream.ResidualMap;
+import org.maplibre.mlt.research.encoder.stream.StreamCodec;
+import org.maplibre.mlt.research.encoder.stream.Transpose;
+
 /**
  * The per-stage choices of one pipeline row. Everything except {@link #reorder()} is written to the
  * buffer header, so a decoder needs nothing but the bytes and the topology streams; the reorder is

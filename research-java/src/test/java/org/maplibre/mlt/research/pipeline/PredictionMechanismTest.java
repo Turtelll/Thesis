@@ -15,6 +15,7 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
+import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 
 /**
  * S2 verification: the residuals the pipeline's predictors produce are the ones of the old

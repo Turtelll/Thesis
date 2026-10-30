@@ -4,6 +4,7 @@ import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.research.buffer.PartBoundaries;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
+import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 
 import java.util.ArrayList;
 import java.util.Arrays;

@@ -2,7 +2,7 @@ package org.maplibre.mlt.research.cli;
 
 import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.pipeline.PipelineEncoding;
-import org.maplibre.mlt.research.pipeline.Transpose;
+import org.maplibre.mlt.research.encoder.stream.Transpose;
 
 import java.util.ArrayList;
 import java.util.Comparator;

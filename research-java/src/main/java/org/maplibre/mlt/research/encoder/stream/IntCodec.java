@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoding;
+package org.maplibre.mlt.research.encoder.stream;
 
 import me.lemire.integercompression.IntWrapper;
 import org.maplibre.mlt.converter.encodings.EncodingUtils;

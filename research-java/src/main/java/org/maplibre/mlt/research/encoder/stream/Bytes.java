@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.pipeline;
+package org.maplibre.mlt.research.encoder.stream;
 
 import java.io.ByteArrayOutputStream;
 import java.util.Arrays;

@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.pipeline;
+package org.maplibre.mlt.research.encoder.stream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -12,9 +12,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.IntCodec;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexTransform;
+import org.maplibre.mlt.research.pipeline.PayloadHeader;
+import org.maplibre.mlt.research.pipeline.PipelineConfig;
+import org.maplibre.mlt.research.pipeline.PipelineEncoding;
 
 /** S7 verification: every layout is a permutation of the bytes, and the anchors equal the old codecs. */
 class TransposeMechanismTest {

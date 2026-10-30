@@ -16,11 +16,12 @@ import org.locationtech.jts.geom.LinearRing;
 import org.locationtech.jts.geom.Polygon;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding;
-import org.maplibre.mlt.research.encoding.IntCodec;
+import org.maplibre.mlt.research.encoder.stream.IntCodec;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
+import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 
 /**
  * Round-trips every registered pipeline row over the same hand-built buffers as {@code

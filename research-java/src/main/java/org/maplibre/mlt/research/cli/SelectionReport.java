@@ -1,11 +1,11 @@
 package org.maplibre.mlt.research.cli;
 
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
-import org.maplibre.mlt.research.pipeline.ByteWidth;
+import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 import org.maplibre.mlt.research.pipeline.PipelineConfig;
 import org.maplibre.mlt.research.pipeline.Prediction;
 import org.maplibre.mlt.research.pipeline.Segmentation;
-import org.maplibre.mlt.research.pipeline.Transpose;
+import org.maplibre.mlt.research.encoder.stream.Transpose;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

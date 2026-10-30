@@ -1,6 +1,5 @@
-package org.maplibre.mlt.research.pipeline;
+package org.maplibre.mlt.research.encoder.stream;
 
-import org.maplibre.mlt.research.encoding.IntCodec;
 
 /**
  * S6: how a stream's unsigned values become bytes. The fixed-width choices replace the varint

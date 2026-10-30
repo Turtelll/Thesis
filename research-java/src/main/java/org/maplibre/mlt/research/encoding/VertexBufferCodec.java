@@ -2,6 +2,7 @@ package org.maplibre.mlt.research.encoding;
 
 import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.buffer.StreamMetadata;
+import org.maplibre.mlt.research.encoder.stream.IntCodec;
 import org.maplibre.mlt.converter.geometry.Vertex;
 
 import java.util.List;
