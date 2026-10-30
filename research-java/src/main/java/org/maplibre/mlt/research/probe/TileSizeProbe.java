@@ -47,12 +47,12 @@ import java.util.List;
  * alone, as the pipeline does. Prints raw/gzip/brotli/zstd per mode with the change against the
  * unreordered tile. Measurement only, no bytes written.
  *
- * <p>Usage: {@code PipelineTileSizeCli <tileset.mbtiles> [--modes A,B,..] [--brotli-quality N]
+ * <p>Usage: {@code TileSizeProbe <tileset.mbtiles> [--modes A,B,..] [--brotli-quality N]
  * [--limit-tiles N] [--by-layer] [--runs] [--ids keep|sequential|drop] [--joint <layer>]}.
  * {@code --joint} compresses a layer's pipeline geometry payload and its property tile together,
  * once, per tile.
  */
-public final class PipelineTileSizeCli {
+public final class TileSizeProbe {
 
     private static final List<Reorder> DEFAULT_MODES = List.of(
             Reorder.HILBERT_START, Reorder.HILBERT_CENTROID, Reorder.MORTON_START, Reorder.MORTON_CENTROID);
@@ -531,6 +531,6 @@ public final class PipelineTileSizeCli {
             id[5 + which] += Math.log(Math.abs((double) step) + 1) / Math.log(2);
         }
     }
-    private PipelineTileSizeCli() {
+    private TileSizeProbe() {
     }
 }

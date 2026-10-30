@@ -19,13 +19,13 @@ import java.util.Map;
 
 /**
  * Evaluation-protocol Stage 0 probe: does the ring frame prior ({@code RingFramePrior}, {@code
- * OrientationPriorCli}) carry over to line parts, i.e. to the {@code transportation} layer? Nothing
+ * OrientationPriorProbe}) carry over to line parts, i.e. to the {@code transportation} layer? Nothing
  * is kept; the streams below exist only to be sized.
  *
  * <p>The population is what {@code LINE_CONTINUATION} leaves to plain delta on line runs: every
  * non-start vertex that the predictor does not continue (the 2nd vertex of every run and all of the
  * runs shorter than its gate). Each such edge is re-expressed in a predicted frame by the same
- * integer rotation the ring prior uses ({@link OrientationPriorCli#rotate}, exactly invertible, two
+ * integer rotation the ring prior uses ({@link OrientationPriorProbe#rotate}, exactly invertible, two
  * integers out, nothing signalled). The start vertex of a run and every continued vertex keep their
  * residual, as in the pipeline.
  *
@@ -55,8 +55,8 @@ import java.util.Map;
  * <p>Usage: {@code ./gradlew research --args="line-frame-prior ../data/extractedBaseline [more dirs] --layer
  * transportation"}
  */
-public final class LineFramePriorCli {
-    private LineFramePriorCli() {
+public final class LineFramePriorProbe {
+    private LineFramePriorProbe() {
     }
 
     /** Weight of the prior against the run's own decoded edges, as an edge length (as in the ring prior). */
@@ -222,7 +222,7 @@ public final class LineFramePriorCli {
                     if (row.heading()) {
                         final var incoming = v.get(i - 1);
                         final var before = v.get(i - 2);
-                        final var rotated = OrientationPriorCli.rotate(
+                        final var rotated = OrientationPriorProbe.rotate(
                                 rx, ry, own(incoming.x() - before.x(), incoming.y() - before.y()));
                         rx = rotated[0];
                         ry = rotated[1];
@@ -239,7 +239,7 @@ public final class LineFramePriorCli {
                         case NEAREST_EDGE_REFINED ->
                                 quantize(fold(Math.toDegrees(Math.atan2(sumS, sumC)) / 4));
                     };
-                    final var rotated = OrientationPriorCli.rotate(dx, dy, frame);
+                    final var rotated = OrientationPriorProbe.rotate(dx, dy, frame);
                     write(interleaved, rotated[0], rotated[1]);
                     write(framed, rotated[0], rotated[1]);
                     final var cost = bits(rotated[0]) + bits(rotated[1]);

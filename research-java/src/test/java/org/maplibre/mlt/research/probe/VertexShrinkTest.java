@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins how {@code ResidualBitsCli}'s per-vertex table pairs a transform against {@code DELTA_ZIGZAG}:
+ * Pins how {@code ResidualBitsProbe}'s per-vertex table pairs a transform against {@code DELTA_ZIGZAG}:
  * per vertex (x and y together), with gains and losses summed separately so a mixed result cannot
  * cancel out into "no change".
  */
@@ -19,23 +19,23 @@ class VertexShrinkTest {
     var candidate = new int[] {0, 1, 0, 0, 15, 7, 7, 1};
 
     // {vertices, smaller, larger, bitsSaved, bitsAdded}
-    assertArrayEquals(new long[] {4, 1, 1, 2, 1}, ResidualBitsCli.VertexShrink.compare(reference, candidate));
+    assertArrayEquals(new long[] {4, 1, 1, 2, 1}, ResidualBitsProbe.VertexShrink.compare(reference, candidate));
   }
 
   @Test
   void aVertexWhoseXShrinksAsMuchAsItsYGrowsIsEqual() {
     assertArrayEquals(
         new long[] {1, 0, 0, 0, 0},
-        ResidualBitsCli.VertexShrink.compare(new int[] {1, 7}, new int[] {7, 1}));
+        ResidualBitsProbe.VertexShrink.compare(new int[] {1, 7}, new int[] {7, 1}));
   }
 
   @Test
   void rejectsStreamsThatAreNotVertexAligned() {
     assertThrows(
         IllegalArgumentException.class,
-        () -> ResidualBitsCli.VertexShrink.compare(new int[] {1, 2}, new int[] {1, 2, 3, 4}));
+        () -> ResidualBitsProbe.VertexShrink.compare(new int[] {1, 2}, new int[] {1, 2, 3, 4}));
     assertThrows(
         IllegalArgumentException.class,
-        () -> ResidualBitsCli.VertexShrink.compare(new int[] {1, 2, 3}, new int[] {1, 2, 3}));
+        () -> ResidualBitsProbe.VertexShrink.compare(new int[] {1, 2, 3}, new int[] {1, 2, 3}));
   }
 }

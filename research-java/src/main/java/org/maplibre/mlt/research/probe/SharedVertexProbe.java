@@ -43,8 +43,8 @@ import java.util.TreeMap;
  *
  * <p>Usage: {@code ./gradlew research --args="shared-vertex ../data/extractedBaseline [--layer <name>]"}
  */
-public final class SharedVertexCli {
-    private SharedVertexCli() {
+public final class SharedVertexProbe {
+    private SharedVertexProbe() {
     }
 
     public static void main(String[] args) throws IOException {

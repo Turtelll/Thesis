@@ -23,7 +23,7 @@ import java.util.TreeMap;
  * them. Encoding as in {@link TileSizeCli}. Prints per-zoom totals and per-layer bytes (each layer
  * encoded as a single-layer tile). Measurement only, no bytes written.
  */
-public final class BufferPointCli {
+public final class BufferPointProbe {
 
     public static void main(String[] args) throws Exception {
         var config = ConversionConfig.builder().useFastPFOR(true).build();

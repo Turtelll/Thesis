@@ -54,8 +54,8 @@ import java.util.TreeMap;
  *
  * <p>Usage: {@code ./gradlew research --args="turn-radius ../data/extractedBaseline --layer transportation"}
  */
-public final class TurnRadiusCli {
-    private TurnRadiusCli() {
+public final class TurnRadiusProbe {
+    private TurnRadiusProbe() {
     }
 
     // Below this many columns, a zoom bucket is too thin to read as anything but anecdote (see

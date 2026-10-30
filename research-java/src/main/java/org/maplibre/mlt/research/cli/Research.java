@@ -3,14 +3,14 @@ package org.maplibre.mlt.research.cli;
 import org.maplibre.mlt.research.extraction.ExtractCli;
 import org.maplibre.mlt.research.measurement.golden.GoldenDumpCli;
 import org.maplibre.mlt.research.measurement.harness.PipelineCli;
-import org.maplibre.mlt.research.probe.BufferPointCli;
-import org.maplibre.mlt.research.probe.DecodeTimeCli;
-import org.maplibre.mlt.research.probe.LineFramePriorCli;
-import org.maplibre.mlt.research.probe.OrientationPriorCli;
-import org.maplibre.mlt.research.probe.PipelineTileSizeCli;
-import org.maplibre.mlt.research.probe.ResidualBitsCli;
-import org.maplibre.mlt.research.probe.SharedVertexCli;
-import org.maplibre.mlt.research.probe.TurnRadiusCli;
+import org.maplibre.mlt.research.probe.BufferPointProbe;
+import org.maplibre.mlt.research.probe.DecodeTimeProbe;
+import org.maplibre.mlt.research.probe.LineFramePriorProbe;
+import org.maplibre.mlt.research.probe.OrientationPriorProbe;
+import org.maplibre.mlt.research.probe.TileSizeProbe;
+import org.maplibre.mlt.research.probe.ResidualBitsProbe;
+import org.maplibre.mlt.research.probe.SharedVertexProbe;
+import org.maplibre.mlt.research.probe.TurnRadiusProbe;
 import org.maplibre.mlt.research.workshop.WorkshopCli;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -49,18 +49,18 @@ public final class Research {
                 PipelineCli::main));
         COMMANDS.put("tile-size", new Entry(
                 "whole-tile MLT bytes (property columns and ids included) of the pipeline reorders",
-                PipelineTileSizeCli::main));
+                TileSizeProbe::main));
         COMMANDS.put("dump", new Entry(
                 "golden master of every row (SHA-256, sizes); --diff <old> <new> compares two dumps",
                 GoldenDumpCli::main));
         COMMANDS.put("workshop", new Entry("predictor workshop: residual size and bytes of one-line rules", WorkshopCli::main));
-        COMMANDS.put("decode-time", new Entry("decode time against the baseline with the same codec", DecodeTimeCli::main));
-        COMMANDS.put("residual-bits", new Entry("probe: residual bits and per-vertex change per transform", ResidualBitsCli::main));
-        COMMANDS.put("shared-vertex", new Entry("probe: vertices repeating a position within a buffer, per zoom", SharedVertexCli::main));
-        COMMANDS.put("turn-radius", new Entry("probe: per-zoom turn radius and curvature", TurnRadiusCli::main));
-        COMMANDS.put("orientation-prior", new Entry("probe: ring frame predicted from decoded neighbours", OrientationPriorCli::main));
-        COMMANDS.put("line-frame-prior", new Entry("probe: line-run edges in a predicted frame", LineFramePriorCli::main));
-        COMMANDS.put("buffer-point", new Entry("MLT bytes with vs without buffer points", BufferPointCli::main));
+        COMMANDS.put("decode-time", new Entry("decode time against the baseline with the same codec", DecodeTimeProbe::main));
+        COMMANDS.put("residual-bits", new Entry("probe: residual bits and per-vertex change per transform", ResidualBitsProbe::main));
+        COMMANDS.put("shared-vertex", new Entry("probe: vertices repeating a position within a buffer, per zoom", SharedVertexProbe::main));
+        COMMANDS.put("turn-radius", new Entry("probe: per-zoom turn radius and curvature", TurnRadiusProbe::main));
+        COMMANDS.put("orientation-prior", new Entry("probe: ring frame predicted from decoded neighbours", OrientationPriorProbe::main));
+        COMMANDS.put("line-frame-prior", new Entry("probe: line-run edges in a predicted frame", LineFramePriorProbe::main));
+        COMMANDS.put("buffer-point", new Entry("MLT bytes with vs without buffer points", BufferPointProbe::main));
     }
 
     public static void main(String[] args) throws Exception {

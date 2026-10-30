@@ -24,8 +24,8 @@ import java.util.stream.Stream;
  * <p>Usage: {@code [extractionDir] [--layer <name>] [--by-zoom]}. {@code extractionDir} defaults
  * to {@code ../data/extractedBaseline}.
  */
-public final class ResidualBitsCli {
-    private ResidualBitsCli() {
+public final class ResidualBitsProbe {
+    private ResidualBitsProbe() {
     }
 
     /**

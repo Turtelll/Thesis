@@ -55,8 +55,8 @@ import java.util.Map;
  *
  * <p>Usage: {@code ./gradlew research --args="orientation-prior ../data/extractedBaseline --layer building"}
  */
-public final class OrientationPriorCli {
-    private OrientationPriorCli() {
+public final class OrientationPriorProbe {
+    private OrientationPriorProbe() {
     }
 
     private static final int POLYGON = 2;

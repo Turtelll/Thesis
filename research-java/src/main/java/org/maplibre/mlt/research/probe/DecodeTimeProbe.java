@@ -46,8 +46,8 @@ import java.util.TreeMap;
  * <p>Usage: {@code ./gradlew research --args="decode-time ../data/extractedBaseline --encoding
  * PIPE_S8 --layer transportation --reps 5 --warmup 2 --max-ratio 1.5"}
  */
-public final class DecodeTimeCli {
-    private DecodeTimeCli() {
+public final class DecodeTimeProbe {
+    private DecodeTimeProbe() {
     }
 
     private static final int[] BUCKET_BOUNDARIES = {50, 200, 1000, 5000};
@@ -123,7 +123,7 @@ public final class DecodeTimeCli {
             for (final var name : requested) {
                 // A row on a serializer neither baseline uses is timed against DELTA_ZIGZAG on that serializer.
                 final var sameCodecReference = Optional.ofNullable(byName.get(name))
-                        .flatMap(DecodeTimeCli::codecOf)
+                        .flatMap(DecodeTimeProbe::codecOf)
                         .map(codec -> REFERENCE_TRANSFORM + codec.name())
                         .filter(byName::containsKey);
                 if (sameCodecReference.isPresent() && !names.contains(sameCodecReference.get())) {
