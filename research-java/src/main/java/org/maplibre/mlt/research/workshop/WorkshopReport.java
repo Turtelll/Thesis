@@ -47,60 +47,11 @@ public final class WorkshopReport {
     private static final int TOP_LAYERS = 6;
 
     /** The reordering {@code --reorder} applies when no variant is named: the pipeline's own choice. */
-    private static final Reorder DEFAULT_REORDER = Reorder.HILBERT_CENTROID_ROT_MP;
+    public static final Reorder DEFAULT_REORDER = Reorder.HILBERT_CENTROID_ROT_MP;
 
-    private record Options(
+    public record Options(
             String inDir, String layer, Integer zoom, Set<String> only, boolean byLayer, boolean byZoom,
             int maxTiles, Reorder reorder) {
-
-        static Options parse(String[] args) {
-            var inDir = "../data/extractedBaseline";
-            String layer = null;
-            Integer zoom = null;
-            Set<String> only = null;
-            var byLayer = false;
-            var byZoom = false;
-            var maxTiles = Integer.MAX_VALUE;
-            Reorder reorder = null;
-            var positional = 0;
-            for (var i = 0; i < args.length; i++) {
-                switch (args[i]) {
-                    case "--layer" -> layer = args[++i];
-                    case "--zoom" -> zoom = Integer.parseInt(args[++i]);
-                    case "--only" -> only = Set.of(args[++i].split(","));
-                    case "--by-layer" -> byLayer = true;
-                    case "--by-zoom" -> byZoom = true;
-                    case "--max-tiles" -> maxTiles = Integer.parseInt(args[++i]);
-                    case "--reorder" -> {
-                        // The variant is optional: take the next argument only if it names one.
-                        var named = i + 1 < args.length ? reorderNamed(args[i + 1]) : null;
-                        reorder = named != null ? named : DEFAULT_REORDER;
-                        if (named != null) {
-                            i++;
-                        }
-                    }
-                    default -> {
-                        if (args[i].startsWith("-") || positional++ > 0) {
-                            throw new IllegalArgumentException(
-                                    "Usage: [extractionDir] [--layer <name>] [--zoom <z>] [--only A,B] [--by-layer]"
-                                            + " [--by-zoom] [--max-tiles N] [--reorder [VARIANT]]");
-                        }
-                        inDir = args[i];
-                    }
-                }
-            }
-            return new Options(inDir, layer, zoom, only, byLayer, byZoom, maxTiles, reorder);
-        }
-
-        /** The variant called {@code name} (case-insensitive), or {@code null} for any other argument. */
-        private static Reorder reorderNamed(String name) {
-            for (var reorder : Reorder.values()) {
-                if (reorder.reorders() && reorder.name().equalsIgnoreCase(name)) {
-                    return reorder;
-                }
-            }
-            return null;
-        }
     }
 
     /**
@@ -173,8 +124,7 @@ public final class WorkshopReport {
     private record Measured(String name, byte[] payload, Workshop.Residuals residuals) {
     }
 
-    public static void main(String[] args) throws IOException {
-        var opts = Options.parse(args);
+    public static void run(Options opts) throws IOException {
         var inDir = Path.of(opts.inDir);
 
         var baselines = Baselines.baseline();
