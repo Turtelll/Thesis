@@ -3,6 +3,7 @@ package org.maplibre.mlt.research.pipeline;
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.research.buffer.PartBoundaries;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
+import org.maplibre.mlt.research.encoder.prediction.Prediction;
 
 import java.util.HashMap;
 import java.util.List;

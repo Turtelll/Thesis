@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.pipeline;
+package org.maplibre.mlt.research.encoder.prediction;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -10,6 +10,12 @@ import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
+import org.maplibre.mlt.research.pipeline.PipelineConfig;
+import org.maplibre.mlt.research.pipeline.PipelineEncoding;
+import org.maplibre.mlt.research.pipeline.PipelineRegistry;
+import org.maplibre.mlt.research.pipeline.Reorder;
+import org.maplibre.mlt.research.pipeline.Segmentation;
+import org.maplibre.mlt.research.pipeline.Verification;
 
 /**
  * {@code LINE_CONTINUATION_FRAME}: the plain-delta edges of line parts (the 2nd vertex of every run

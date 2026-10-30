@@ -6,7 +6,7 @@ import org.maplibre.mlt.research.encoding.VertexBufferCodec;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
-import org.maplibre.mlt.research.pipeline.Prediction;
+import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.pipeline.PredictionTransform;
 
 import java.io.IOException;

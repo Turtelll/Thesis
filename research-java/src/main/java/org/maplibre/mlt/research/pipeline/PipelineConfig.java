@@ -4,6 +4,7 @@ import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 import org.maplibre.mlt.research.encoder.stream.ResidualMap;
 import org.maplibre.mlt.research.encoder.stream.StreamCodec;
 import org.maplibre.mlt.research.encoder.stream.Transpose;
+import org.maplibre.mlt.research.encoder.prediction.Prediction;
 
 /**
  * The per-stage choices of one pipeline row. Everything except {@link #reorder()} is written to the

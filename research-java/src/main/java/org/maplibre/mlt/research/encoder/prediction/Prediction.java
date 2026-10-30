@@ -1,16 +1,16 @@
-package org.maplibre.mlt.research.pipeline;
+package org.maplibre.mlt.research.encoder.prediction;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.ClassifiedPredictor;
+import org.maplibre.mlt.research.encoder.prediction.mechanism.ClassifiedPredictor;
 import org.maplibre.mlt.research.buffer.PartBoundaries;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
-import org.maplibre.mlt.research.pipeline.mechanism.LineContinuation;
+import org.maplibre.mlt.research.encoder.prediction.mechanism.LineContinuation;
 import org.maplibre.mlt.research.encoder.reference.LineSharedVertexRef;
-import org.maplibre.mlt.research.pipeline.mechanism.QuadCornerLine;
-import org.maplibre.mlt.research.pipeline.mechanism.RingFramePrior;
-import org.maplibre.mlt.research.pipeline.mechanism.SegmentQuadCorner;
+import org.maplibre.mlt.research.encoder.prediction.mechanism.QuadCornerLine;
+import org.maplibre.mlt.research.encoder.prediction.mechanism.RingFramePrior;
+import org.maplibre.mlt.research.encoder.prediction.mechanism.SegmentQuadCorner;
 import org.maplibre.mlt.research.encoder.reference.SharedVertexRef;
-import org.maplibre.mlt.research.pipeline.mechanism.TurnScalar;
+import org.maplibre.mlt.research.encoder.prediction.mechanism.TurnScalar;
 
 import java.util.List;
 

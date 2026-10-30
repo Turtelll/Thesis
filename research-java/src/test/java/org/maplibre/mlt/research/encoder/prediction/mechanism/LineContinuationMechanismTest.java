@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.pipeline.mechanism;
+package org.maplibre.mlt.research.encoder.prediction.mechanism;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.pipeline.Prediction;
+import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.pipeline.PredictionTransform;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexTransform;

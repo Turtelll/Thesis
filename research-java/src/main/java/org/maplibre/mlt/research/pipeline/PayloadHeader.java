@@ -3,6 +3,7 @@ package org.maplibre.mlt.research.pipeline;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 import org.maplibre.mlt.research.encoder.stream.ResidualMap;
 import org.maplibre.mlt.research.encoder.stream.Transpose;
+import org.maplibre.mlt.research.encoder.prediction.Prediction;
 
 /**
  * The two-byte header every pipeline payload starts with: the format's self-description. It carries

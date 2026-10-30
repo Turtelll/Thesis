@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.pipeline.mechanism;
+package org.maplibre.mlt.research.encoder.prediction.mechanism;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;

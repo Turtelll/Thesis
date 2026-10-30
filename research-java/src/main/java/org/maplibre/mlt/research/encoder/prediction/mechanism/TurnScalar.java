@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.pipeline.mechanism;
+package org.maplibre.mlt.research.encoder.prediction.mechanism;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.PartBoundaries;
@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * Winding-fixed 90° turn with one edge-length scalar, composed with {@link
- * org.maplibre.mlt.research.pipeline.mechanism.SegmentQuadCorner}'s
+ * org.maplibre.mlt.research.encoder.prediction.mechanism.SegmentQuadCorner}'s
  * parallelogram corner on four-vertex rings.
  *
  * <p>Per vertex class, all derived from the topology streams on both sides:

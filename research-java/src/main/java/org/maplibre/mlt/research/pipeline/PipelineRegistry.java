@@ -3,6 +3,7 @@ package org.maplibre.mlt.research.pipeline;
 import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 import org.maplibre.mlt.research.encoder.stream.Transpose;
+import org.maplibre.mlt.research.encoder.prediction.Prediction;
 
 import java.util.ArrayList;
 import java.util.Arrays;

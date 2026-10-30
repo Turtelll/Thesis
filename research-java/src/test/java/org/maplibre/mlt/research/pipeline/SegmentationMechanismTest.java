@@ -14,6 +14,7 @@ import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
+import org.maplibre.mlt.research.encoder.prediction.Prediction;
 
 /**
  * S3 verification: stream layouts are a pure function of the topology streams, the lengths a

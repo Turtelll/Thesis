@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.research.buffer.Encoding;
+import org.maplibre.mlt.research.encoder.prediction.Prediction;
 
 /**
  * The per-layer default ({@link PipelineRegistry#forLayer}) is a fixed table, so what it must hold

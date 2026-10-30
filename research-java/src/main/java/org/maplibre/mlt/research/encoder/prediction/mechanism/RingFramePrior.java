@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.pipeline.mechanism;
+package org.maplibre.mlt.research.encoder.prediction.mechanism;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 

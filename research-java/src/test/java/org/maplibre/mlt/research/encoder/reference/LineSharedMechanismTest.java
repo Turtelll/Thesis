@@ -16,7 +16,7 @@ import org.maplibre.mlt.research.pipeline.PayloadHeader;
 import org.maplibre.mlt.research.pipeline.PipelineConfig;
 import org.maplibre.mlt.research.pipeline.PipelineEncoding;
 import org.maplibre.mlt.research.pipeline.PipelineRegistry;
-import org.maplibre.mlt.research.pipeline.Prediction;
+import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.pipeline.Reorder;
 import org.maplibre.mlt.research.pipeline.Segmentation;
 import org.maplibre.mlt.research.pipeline.Verification;
