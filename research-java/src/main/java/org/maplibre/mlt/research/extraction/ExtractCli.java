@@ -1,13 +1,10 @@
-package org.maplibre.mlt.research.cli;
+package org.maplibre.mlt.research.extraction;
 
 import org.locationtech.jts.geom.Geometry;
 import org.maplibre.mlt.converter.encodings.GeometryEncoder;
 import org.maplibre.mlt.converter.mvt.MvtUtils;
 import org.maplibre.mlt.data.Feature;
 import org.maplibre.mlt.data.Layer;
-import org.maplibre.mlt.research.extraction.ExtractionWriter;
-import org.maplibre.mlt.research.extraction.MbtilesSource;
-import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 
 import java.io.File;
 import java.nio.file.Path;

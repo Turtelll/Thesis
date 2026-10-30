@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.cli;
+package org.maplibre.mlt.research.probe;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

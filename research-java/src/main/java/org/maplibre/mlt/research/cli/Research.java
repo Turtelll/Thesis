@@ -1,5 +1,17 @@
 package org.maplibre.mlt.research.cli;
 
+import org.maplibre.mlt.research.extraction.ExtractCli;
+import org.maplibre.mlt.research.measurement.golden.GoldenDumpCli;
+import org.maplibre.mlt.research.measurement.harness.PipelineCli;
+import org.maplibre.mlt.research.probe.BufferPointCli;
+import org.maplibre.mlt.research.probe.DecodeTimeCli;
+import org.maplibre.mlt.research.probe.LineFramePriorCli;
+import org.maplibre.mlt.research.probe.OrientationPriorCli;
+import org.maplibre.mlt.research.probe.PipelineTileSizeCli;
+import org.maplibre.mlt.research.probe.ResidualBitsCli;
+import org.maplibre.mlt.research.probe.SharedVertexCli;
+import org.maplibre.mlt.research.probe.TurnRadiusCli;
+import org.maplibre.mlt.research.workshop.WorkshopCli;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;

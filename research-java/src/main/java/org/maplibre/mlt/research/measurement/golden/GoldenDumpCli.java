@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.cli;
+package org.maplibre.mlt.research.measurement.golden;
 
 import com.aayushatharva.brotli4j.encoder.Encoder;
 import org.maplibre.mlt.research.baseline.Baselines;

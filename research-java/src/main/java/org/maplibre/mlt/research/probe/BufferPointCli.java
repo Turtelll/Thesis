@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.cli;
+package org.maplibre.mlt.research.probe;
 
 import org.locationtech.jts.geom.MultiPoint;
 import org.locationtech.jts.geom.Point;

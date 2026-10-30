@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.cli;
+package org.maplibre.mlt.research.measurement.harness;
 
 import org.maplibre.mlt.research.baseline.Baselines;
 import org.maplibre.mlt.research.buffer.Encoding;

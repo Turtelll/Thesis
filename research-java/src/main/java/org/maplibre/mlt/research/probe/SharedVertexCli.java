@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.cli;
+package org.maplibre.mlt.research.probe;
 
 import org.maplibre.mlt.research.buffer.PartBoundaries;
 import org.maplibre.mlt.research.extraction.ExtractionReader;

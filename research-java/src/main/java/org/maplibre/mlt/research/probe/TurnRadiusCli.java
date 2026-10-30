@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.cli;
+package org.maplibre.mlt.research.probe;
 
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.converter.geometry.Vertex;
