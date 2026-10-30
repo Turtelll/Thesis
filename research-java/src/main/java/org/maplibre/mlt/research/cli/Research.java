@@ -1,6 +1,5 @@
 package org.maplibre.mlt.research.cli;
 
-import org.maplibre.mlt.research.measurement.golden.GoldenDump;
 import org.maplibre.mlt.research.probe.BufferPointProbe;
 import org.maplibre.mlt.research.probe.DecodeTimeProbe;
 import org.maplibre.mlt.research.probe.LineFramePriorProbe;
@@ -49,7 +48,7 @@ public final class Research {
                 TileSizeProbe::main));
         COMMANDS.put("dump", new Entry(
                 "golden master of every row (SHA-256, sizes); --diff <old> <new> compares two dumps",
-                GoldenDump::main));
+                DumpCli::main));
         COMMANDS.put("workshop", new Entry("predictor workshop: residual size and bytes of one-line rules", WorkshopCli::main));
         COMMANDS.put("decode-time", new Entry("decode time against the baseline with the same codec", DecodeTimeProbe::main));
         COMMANDS.put("residual-bits", new Entry("probe: residual bits and per-vertex change per transform", ResidualBitsProbe::main));

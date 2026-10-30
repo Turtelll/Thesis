@@ -57,8 +57,8 @@ import java.util.zip.GZIPOutputStream;
  */
 public final class GoldenDump {
 
-    static final String BUFFERS = "buffers.tsv.gz";
-    static final String TILES = "tiles.tsv.gz";
+    public static final String BUFFERS = "buffers.tsv.gz";
+    public static final String TILES = "tiles.tsv.gz";
     static final String MANIFEST = "manifest.tsv";
     static final String PER_LAYER = "PIPE_PER_LAYER";
     static final int FORMAT = 1;
@@ -74,13 +74,6 @@ public final class GoldenDump {
 
     /** One row of the dump; {@code encoding} is {@code null} for the per-layer default. */
     private record Row(String name, Encoding encoding) {
-    }
-
-    public static void main(String[] args) throws Exception {
-        if (args.length > 0 && args[0].equals("--diff")) {
-            System.exit(Diff.run(args));
-        }
-        dump(Options.parse(args));
     }
 
     // --- dump ---------------------------------------------------------------------------------
@@ -139,7 +132,7 @@ public final class GoldenDump {
         final long[] tile = new long[5];
     }
 
-    static void dump(Options opts) throws Exception {
+    public static void run(Options opts) throws Exception {
         final var inDir = Path.of(opts.in);
         final var rows = rows();
         final var compressors = Compressor.all(BROTLI_QUALITY);
@@ -378,227 +371,7 @@ public final class GoldenDump {
         return HexFormat.of().formatHex(digest().digest(bytes));
     }
 
-    record Options(String in, String out, int limitTiles, String layer, boolean serial) {
-        static Options parse(String[] args) {
-            var in = "../data/extractedBaseline";
-            var out = "../data/golden/pre-consolidation";
-            var limit = 0;
-            String layer = null;
-            var serial = false;
-            for (var i = 0; i < args.length; i++) {
-                switch (args[i]) {
-                    case "--in" -> in = args[++i];
-                    case "--out" -> out = args[++i];
-                    case "--limit-tiles" -> limit = Integer.parseInt(args[++i]);
-                    case "--layer" -> layer = args[++i];
-                    case "--serial" -> serial = true;
-                    default -> throw new IllegalArgumentException("Unknown argument: " + args[i]
-                            + "\nUsage: [--in <dir>] [--out <dir>] [--limit-tiles <n>] [--layer <name>] [--serial]"
-                            + " | --diff <oldDir> <newDir> [--rows a,b] [--allow-removed a,b] [--max-buffers <n>]");
-                }
-            }
-            return new Options(in, out, limit, layer, serial);
-        }
+    public record Options(String in, String out, int limitTiles, String layer, boolean serial) {
     }
 
-    // --- diff ---------------------------------------------------------------------------------
-
-    /** Compares two dumps: which rows, layers and buffers changed, by how many bytes. */
-    static final class Diff {
-
-        private record Buffer(String sha, long payload, String emitted, long gzip, long brotli, long zstd) {
-        }
-
-        private record Tile(long payload, long order0, long gzip, long brotli, long zstd) {
-        }
-
-        /** Per-row differences. */
-        private static final class RowDiff {
-            long changed;
-            long added;
-            long removed;
-            long payload;
-            final long[] iso = new long[3];
-            final Map<String, long[]> layers = new TreeMap<>(); // changed, payload, gzip, brotli, zstd deltas
-            final List<String> samples = new ArrayList<>();
-        }
-
-        static int run(String[] args) throws IOException {
-            if (args.length < 3) {
-                throw new IllegalArgumentException("--diff <oldDir> <newDir> [--rows a,b] [--allow-removed a,b] [--max-buffers <n>]");
-            }
-            final var oldDir = Path.of(args[1]);
-            final var newDir = Path.of(args[2]);
-            Set<String> only = null;
-            Set<String> allowRemoved = Set.of();
-            var maxBuffers = 20;
-            for (var i = 3; i < args.length; i++) {
-                switch (args[i]) {
-                    case "--rows" -> only = Set.of(args[++i].split(","));
-                    case "--allow-removed" -> allowRemoved = Set.of(args[++i].split(","));
-                    case "--max-buffers" -> maxBuffers = Integer.parseInt(args[++i]);
-                    default -> throw new IllegalArgumentException("Unknown argument: " + args[i]);
-                }
-            }
-
-            final var before = new HashMap<String, Buffer>();
-            final var oldRows = new TreeSet<String>();
-            read(oldDir.resolve(BUFFERS), fields -> {
-                oldRows.add(fields[0]);
-                before.put(bufferKey(fields), buffer(fields));
-            });
-            final var newRows = new TreeSet<String>();
-            final var diffs = new TreeMap<String, RowDiff>();
-            final var limit = maxBuffers;
-            final var compare = only;
-            read(newDir.resolve(BUFFERS), fields -> {
-                newRows.add(fields[0]);
-                if (compare != null && !compare.contains(fields[0])) {
-                    return;
-                }
-                if (!oldRows.contains(fields[0])) {
-                    return;
-                }
-                final var key = bufferKey(fields);
-                final var now = buffer(fields);
-                final var was = before.remove(key);
-                final var diff = diffs.computeIfAbsent(fields[0], k -> new RowDiff());
-                if (was == null) {
-                    diff.added++;
-                    return;
-                }
-                if (!was.sha().equals(now.sha()) || !was.emitted().equals(now.emitted())) {
-                    diff.changed++;
-                    diff.payload += now.payload() - was.payload();
-                    diff.iso[0] += now.gzip() - was.gzip();
-                    diff.iso[1] += now.brotli() - was.brotli();
-                    diff.iso[2] += now.zstd() - was.zstd();
-                    final var layer = layer(fields);
-                    final var l = diff.layers.computeIfAbsent(layer, k -> new long[5]);
-                    l[0]++;
-                    l[1] += now.payload() - was.payload();
-                    l[2] += now.gzip() - was.gzip();
-                    l[3] += now.brotli() - was.brotli();
-                    l[4] += now.zstd() - was.zstd();
-                    if (diff.samples.size() < limit) {
-                        diff.samples.add(String.format("%s: %d -> %d payload bytes, sha %s -> %s%s",
-                                key.substring(key.indexOf('\t') + 1).replace('\t', ' '), was.payload(),
-                                now.payload(), was.sha().substring(0, 12), now.sha().substring(0, 12),
-                                was.emitted().equals(now.emitted()) ? "" : ", emitted topology changed"));
-                    }
-                }
-            });
-            // what the new dump lacks
-            for (final var key : before.keySet()) {
-                final var row = key.substring(0, key.indexOf('\t'));
-                if (compare == null || compare.contains(row)) {
-                    diffs.computeIfAbsent(row, k -> new RowDiff()).removed++;
-                }
-            }
-
-            final var tileDiff = tileDiff(oldDir, newDir, compare, oldRows);
-
-            var failed = false;
-            System.out.printf("diff %s -> %s%n", oldDir, newDir);
-            for (final var row : oldRows) {
-                if (compare != null && !compare.contains(row)) {
-                    continue;
-                }
-                if (!newRows.contains(row)) {
-                    final var allowed = allowRemoved.contains(row);
-                    System.out.printf("REMOVED %s%s%n", row, allowed ? " (allowed)" : "");
-                    failed |= !allowed;
-                }
-            }
-            for (final var row : newRows) {
-                if (!oldRows.contains(row)) {
-                    System.out.printf("ADDED   %s (not in the old dump)%n", row);
-                }
-            }
-            for (final var entry : diffs.entrySet()) {
-                final var d = entry.getValue();
-                final var tile = tileDiff.get(entry.getKey());
-                if (d.changed == 0 && d.added == 0 && d.removed == 0 && (tile == null || tile[0] == 0)) {
-                    continue;
-                }
-                failed = true;
-                System.out.printf("CHANGED %s: %d buffers differ, %d added, %d removed; payload %+d bytes, "
-                                + "isolated gzip %+d / brotli %+d / zstd %+d%n",
-                        entry.getKey(), d.changed, d.added, d.removed, d.payload, d.iso[0], d.iso[1], d.iso[2]);
-                if (tile != null) {
-                    System.out.printf("    per-tile totals: %d tiles differ; gzip %+d / brotli %+d / zstd %+d%n",
-                            tile[0], tile[1], tile[2], tile[3]);
-                }
-                for (final var layer : d.layers.entrySet()) {
-                    final var l = layer.getValue();
-                    System.out.printf("    layer %-20s %6d buffers, payload %+d, gzip %+d / brotli %+d / zstd %+d%n",
-                            layer.getKey(), l[0], l[1], l[2], l[3], l[4]);
-                }
-                d.samples.forEach(s -> System.out.println("    " + s));
-            }
-            System.out.println(failed ? "DIFFERENCES" : "IDENTICAL: every compared row is byte for byte the same");
-            return failed ? 1 : 0;
-        }
-
-        /** Per row: tiles whose sizes differ, and the per-tile total deltas for gzip, Brotli, zstd. */
-        private static Map<String, long[]> tileDiff(Path oldDir, Path newDir, Set<String> only, Set<String> oldRows)
-                throws IOException {
-            final var before = new HashMap<String, Tile>();
-            read(oldDir.resolve(TILES), f -> before.put(f[0] + "\t" + f[1] + "/" + f[2] + "/" + f[3], tile(f)));
-            final var result = new TreeMap<String, long[]>();
-            read(newDir.resolve(TILES), f -> {
-                if ((only != null && !only.contains(f[0])) || !oldRows.contains(f[0])) {
-                    return;
-                }
-                final var was = before.remove(f[0] + "\t" + f[1] + "/" + f[2] + "/" + f[3]);
-                final var now = tile(f);
-                final var d = result.computeIfAbsent(f[0], k -> new long[4]);
-                if (was == null) {
-                    d[0]++;
-                } else if (!was.equals(now)) {
-                    d[0]++;
-                    d[1] += now.gzip() - was.gzip();
-                    d[2] += now.brotli() - was.brotli();
-                    d[3] += now.zstd() - was.zstd();
-                }
-            });
-            for (final var key : before.keySet()) {
-                final var row = key.substring(0, key.indexOf('\t'));
-                if (only == null || only.contains(row)) {
-                    result.computeIfAbsent(row, k -> new long[4])[0]++;
-                }
-            }
-            return result;
-        }
-
-        private static String bufferKey(String[] f) {
-            return f[0] + "\t" + f[1] + "/" + f[2] + "/" + f[3] + "\t" + f[4];
-        }
-
-        private static String layer(String[] f) {
-            return f[4];
-        }
-
-        private static Buffer buffer(String[] f) {
-            return new Buffer(f[5], Long.parseLong(f[6]), f[7], Long.parseLong(f[8]), Long.parseLong(f[9]),
-                    Long.parseLong(f[10]));
-        }
-
-        private static Tile tile(String[] f) {
-            return new Tile(Long.parseLong(f[4]), Long.parseLong(f[5]), Long.parseLong(f[6]), Long.parseLong(f[7]),
-                    Long.parseLong(f[8]));
-        }
-
-        private static void read(Path file, java.util.function.Consumer<String[]> lines) throws IOException {
-            try (var in = new BufferedReader(new InputStreamReader(
-                    new GZIPInputStream(Files.newInputStream(file), 1 << 16), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = in.readLine()) != null) {
-                    if (!line.startsWith("#")) {
-                        lines.accept(line.split("\t", -1));
-                    }
-                }
-            }
-        }
-    }
 }
