@@ -23,10 +23,10 @@ import java.util.TreeMap;
  * worse together than the choice predicted; {@link #printComparison} therefore sizes the oracle the
  * way the other rows are sized, per tile, next to the best single composition.
  */
-final class OracleReport {
+public final class OracleReport {
 
     /** The row name of the per-layer fixed composition in {@link TileCompression}. */
-    static final String PER_LAYER = "PER LAYER";
+    public static final String PER_LAYER = "PER LAYER";
 
     private final List<Encoding> candidates;
     private final List<Compressor> compressors;
@@ -43,7 +43,7 @@ final class OracleReport {
     private final long[][] isolated;
     private int buffers;
 
-    OracleReport(List<Encoding> candidates, List<Compressor> compressors) {
+    public OracleReport(List<Encoding> candidates, List<Compressor> compressors) {
         this.candidates = candidates;
         this.compressors = compressors;
         this.isolated = new long[candidates.size()][compressors.size()];
@@ -56,7 +56,7 @@ final class OracleReport {
     }
 
     /** The row name the oracle of compressor {@code c} is recorded under in {@link TileCompression}. */
-    String label(int c) {
+    public String label(int c) {
         return "ORACLE " + compressors.get(c).label();
     }
 
@@ -65,7 +65,7 @@ final class OracleReport {
      * compressor {@code c}; returns, per compressor, the index of the smallest (a tie goes to the
      * candidate listed first).
      */
-    int[] offer(String layer, long[][] sizes) {
+    public int[] offer(String layer, long[][] sizes) {
         buffers++;
         layerBuffers.merge(layer, 1, Integer::sum);
         final var chosen = new int[compressors.size()];
@@ -112,7 +112,7 @@ final class OracleReport {
      * Per compressor and layer, the share of that layer's buffers choosing each value of each decision:
      * whether the oracle really picks the same predictor everywhere or follows the layer.
      */
-    void printByLayer() {
+    public void printByLayer() {
         for (var c = 0; c < compressors.size(); c++) {
             System.out.printf("%n--- oracle choices by layer under %s: share of the layer's buffers per decision ---%n",
                     compressors.get(c).label());
@@ -133,7 +133,7 @@ final class OracleReport {
     }
 
     /** Per compressor: what the oracle chose, how many buffers each, and the decisions it is made of. */
-    void printCompositions() {
+    public void printCompositions() {
         for (var c = 0; c < compressors.size(); c++) {
             final var label = compressors.get(c).label();
             final var total = chosenBytes.get(c).values().stream().mapToLong(Long::longValue).sum();
@@ -170,7 +170,7 @@ final class OracleReport {
      * candidate (the previous default). This is how the per-layer composition is fitted; a table that
      * differs between backends is printed as it is.
      */
-    void printBestFixedPerLayer(java.util.function.BiPredicate<String, Encoding> allowed) {
+    public void printBestFixedPerLayer(java.util.function.BiPredicate<String, Encoding> allowed) {
         printBestFixedPerLayer(allowed, layer -> 0, "first row");
     }
 
@@ -179,7 +179,7 @@ final class OracleReport {
      * {@code reference} names per layer (e.g. the layer's own fixed composition), labelled {@code
      * referenceLabel}; a winner equal to it is marked {@code (=)}.
      */
-    void printBestFixedPerLayer(java.util.function.BiPredicate<String, Encoding> allowed,
+    public void printBestFixedPerLayer(java.util.function.BiPredicate<String, Encoding> allowed,
                                 java.util.function.ToIntFunction<String> reference, String referenceLabel) {
         for (var c = 0; c < compressors.size(); c++) {
             System.out.printf("%n--- best fixed composition per layer under %s (layer's buffers compressed alone;"
@@ -214,7 +214,7 @@ final class OracleReport {
      * The oracle against the reference, per tile under each backend: both baselines, the best single
      * composition (the row with the smallest total under that backend) and the oracle of that backend.
      */
-    void printComparison(TileCompression perTile, long reference, List<String> baselineNames) {
+    public void printComparison(TileCompression perTile, long reference, List<String> baselineNames) {
         printComparison(perTile, reference, baselineNames, List.of());
     }
 
@@ -223,7 +223,7 @@ final class OracleReport {
      * compressed tile, {@code tileOracles} holding one row name per compressor ({@code --step best}), and
      * each oracle's change against the fixed composition per layer.
      */
-    void printComparison(TileCompression perTile, long reference, List<String> baselineNames,
+    public void printComparison(TileCompression perTile, long reference, List<String> baselineNames,
                          List<String> tileOracles) {
         final var totals = perTile.totals();
         System.out.printf("%n--- oracle vs ref, per tile (payload bytes; each of %d tiles compressed on its own) ---%n",

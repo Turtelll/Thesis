@@ -8,13 +8,13 @@ import java.util.LinkedHashSet;
 import java.util.List;
 
 /** Reads an extraction's manifest the way every measurement walks it: grouped by tile, optionally limited. */
-final class Corpus {
+public final class Corpus {
 
     private Corpus() {
     }
 
     /** The manifest entries reordered so every tile's layers are adjacent, tiles in first-seen order. */
-    static List<ManifestEntry> groupedByTile(List<ManifestEntry> manifest) {
+    public static List<ManifestEntry> groupedByTile(List<ManifestEntry> manifest) {
         final var byTile = new LinkedHashMap<String, List<ManifestEntry>>();
         for (final var entry : manifest) {
             byTile.computeIfAbsent(tileKey(entry), k -> new ArrayList<>()).add(entry);
@@ -23,7 +23,7 @@ final class Corpus {
     }
 
     /** The first {@code limit} tiles (all of them when {@code limit <= 0}); for quick development runs. */
-    static List<ManifestEntry> tileLimited(List<ManifestEntry> manifest, int limit) {
+    public static List<ManifestEntry> tileLimited(List<ManifestEntry> manifest, int limit) {
         if (limit <= 0) {
             return manifest;
         }
@@ -39,7 +39,7 @@ final class Corpus {
         return kept;
     }
 
-    static String tileKey(ManifestEntry entry) {
+    public static String tileKey(ManifestEntry entry) {
         return entry.z() + "/" + entry.x() + "/" + entry.y();
     }
 }

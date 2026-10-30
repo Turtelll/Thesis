@@ -16,10 +16,10 @@ import java.util.zip.GZIPOutputStream;
  * the given bytes, one-shot, so zstd and Brotli size their window and tables to the input the way a
  * server compressing one response would.
  */
-record Compressor(String label, ToLongFunction<byte[]> size) {
+public record Compressor(String label, ToLongFunction<byte[]> size) {
 
     /** Default level 6. */
-    static final Compressor GZIP = new Compressor("gzip", Compressor::gzip);
+    public static final Compressor GZIP = new Compressor("gzip", Compressor::gzip);
 
     /** Level 19, zstd's highest outside the memory-hungry {@code --ultra} range. */
     private static final int ZSTD_LEVEL = 19;
@@ -28,7 +28,7 @@ record Compressor(String label, ToLongFunction<byte[]> size) {
      * {@link #GZIP} first, then Brotli at {@code brotliQuality} (11 is what static assets are
      * precompressed at, but runs roughly ten times slower than 9), then zstd.
      */
-    static List<Compressor> all(int brotliQuality) {
+    public static List<Compressor> all(int brotliQuality) {
         return List.of(
                 GZIP,
                 new Compressor("brotli" + brotliQuality, data -> brotli(data, brotliQuality)),
@@ -37,7 +37,7 @@ record Compressor(String label, ToLongFunction<byte[]> size) {
                         data -> data.length == 0 ? 0 : Zstd.compress(data, ZSTD_LEVEL).length));
     }
 
-    long size(byte[] data) {
+    public long size(byte[] data) {
         return size.applyAsLong(data);
     }
 

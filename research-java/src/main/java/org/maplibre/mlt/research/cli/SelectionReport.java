@@ -18,7 +18,7 @@ import java.util.TreeMap;
  * a curve reorder (Hilbert) or the greedy chain, each predictor, the class streams, and each terminal.
  * A share is of buffers, not of bytes.
  */
-final class SelectionReport {
+public final class SelectionReport {
 
     private static final Prediction[] PREDICTORS = Prediction.values();
 
@@ -36,12 +36,12 @@ final class SelectionReport {
     private final Map<String, Map<String, long[]>> byLayer = new LinkedHashMap<>();
     private final Map<String, Map<String, long[]>> byZoom = new LinkedHashMap<>();
 
-    void record(String row, ManifestEntry entry, PipelineConfig choice) {
+    public void record(String row, ManifestEntry entry, PipelineConfig choice) {
         tally(byLayer, row, entry.layerName(), choice);
         tally(byZoom, row, String.format("z%02d", entry.z()), choice);
     }
 
-    boolean isEmpty() {
+    public boolean isEmpty() {
         return byLayer.isEmpty();
     }
 
@@ -66,7 +66,7 @@ final class SelectionReport {
         }
     }
 
-    void print() {
+    public void print() {
         System.out.printf("%n--- selection: share of buffers per choice, by layer and by zoom, per selector row ---%n");
         for (final var row : byLayer.keySet()) {
             System.out.printf("%n%s%n", row);

@@ -127,7 +127,7 @@ public enum Prediction {
      * rotated (or reversed), or {@code null} when its runs are not derivable from the topology.
      * {@code ctx} holds the vertices.
      */
-    SharedVertexRef.Scan scan(BufferContext ctx) {
+    public SharedVertexRef.Scan scan(BufferContext ctx) {
         return switch (this) {
             case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME -> SharedVertexRef.scan(ctx);
             case LINE_CONTINUATION_SHARED, LINE_CONTINUATION_SHARED_FRAME_HEADING ->
@@ -137,7 +137,7 @@ public enum Prediction {
     }
 
     /** The decoder's side of {@link #scan}: needs the topology streams and the flag and index bits. */
-    SharedVertexRef.ReferenceWalk walkForDecoding(BufferContext topo, int vertexCount, byte[] flags, byte[] indices) {
+    public SharedVertexRef.ReferenceWalk walkForDecoding(BufferContext topo, int vertexCount, byte[] flags, byte[] indices) {
         return switch (this) {
             case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME ->
                     SharedVertexRef.Walk.forDecoding(topo, vertexCount, flags, indices);

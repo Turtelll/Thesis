@@ -8,13 +8,13 @@ import java.util.Arrays;
  * cursor over a byte array. Kept here rather than borrowed from mlt-core so a value above
  * {@code Integer.MAX_VALUE} (a zigzag code stored as a signed int) is never reinterpreted.
  */
-final class Bytes {
+public final class Bytes {
 
     private Bytes() {
     }
 
     /** Writes {@code value} as an unsigned LEB128 varint (negative ints are the large unsigned values). */
-    static void putVarint(ByteArrayOutputStream out, int value) {
+    public static void putVarint(ByteArrayOutputStream out, int value) {
         var rest = value;
         while ((rest & ~0x7F) != 0) {
             out.write((rest & 0x7F) | 0x80);
@@ -24,20 +24,20 @@ final class Bytes {
     }
 
     /** A cursor over a byte array. */
-    static final class Reader {
+    public static final class Reader {
         private final byte[] data;
         private int position;
 
-        Reader(byte[] data, int position) {
+        public Reader(byte[] data, int position) {
             this.data = data;
             this.position = position;
         }
 
-        int readByte() {
+        public int readByte() {
             return data[position++] & 0xFF;
         }
 
-        int readVarint() {
+        public int readVarint() {
             var value = 0;
             for (var shift = 0; ; shift += 7) {
                 final var b = data[position++];
@@ -49,13 +49,13 @@ final class Bytes {
         }
 
         /** The next {@code length} bytes. */
-        byte[] readBytes(int length) {
+        public byte[] readBytes(int length) {
             final var bytes = Arrays.copyOfRange(data, position, position + length);
             position += length;
             return bytes;
         }
 
-        int remaining() {
+        public int remaining() {
             return data.length - position;
         }
 

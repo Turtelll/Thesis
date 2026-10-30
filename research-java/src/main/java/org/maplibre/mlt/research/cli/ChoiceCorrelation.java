@@ -30,7 +30,7 @@ import java.util.function.Function;
  * and scored on the other ({@code (x + y)} parity, both ways), so it is not scored on what it was
  * fitted on. Agreement is a share of buffers, not of bytes: a disagreement on a near tie costs nothing.
  */
-final class ChoiceCorrelation {
+public final class ChoiceCorrelation {
 
     /** One decision of the pipeline, and the value a composition takes for it. */
     enum Stage {
@@ -63,22 +63,22 @@ final class ChoiceCorrelation {
     private final List<Row> rows = new ArrayList<>();
 
     /** @param reference the name of the tile selector the rules are scored against */
-    ChoiceCorrelation(String reference) {
+    public ChoiceCorrelation(String reference) {
         this.reference = reference;
     }
 
     /** One buffer: its features and what every tile selector chose for it, by selector name. */
-    void record(ManifestEntry entry, BufferFeatures features, Map<String, PipelineConfig> choices) {
+    public void record(ManifestEntry entry, BufferFeatures features, Map<String, PipelineConfig> choices) {
         final var others = new LinkedHashMap<>(choices);
         final var chosen = others.remove(reference);
         rows.add(new Row(entry, features, chosen, others));
     }
 
-    boolean isEmpty() {
+    public boolean isEmpty() {
         return rows.isEmpty();
     }
 
-    void print() {
+    public void print() {
         System.out.printf("%n--- choice prediction: share of buffers on which a rule picks what %s picked ---%n", reference);
         final var width = 40;
         final var header = new StringBuilder(String.format("%-" + width + "s", "rule"));
@@ -225,7 +225,7 @@ final class ChoiceCorrelation {
     }
 
     /** One line per buffer: tile, layer, every feature, the reference's stage values, every selector's choice. */
-    void writeCsv(Path path) throws IOException {
+    public void writeCsv(Path path) throws IOException {
         if (path.getParent() != null) {
             Files.createDirectories(path.getParent());
         }

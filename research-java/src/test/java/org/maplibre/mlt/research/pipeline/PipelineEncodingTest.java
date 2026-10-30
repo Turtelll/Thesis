@@ -27,7 +27,7 @@ import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
  * VertexBufferCodecTest}, and pins the anchor the rest of the pipeline is verified against: the
  * identity configuration is byte-identical to the old {@code DELTA_ZIGZAG_VARINT} body.
  */
-class PipelineEncodingTest {
+public class PipelineEncodingTest {
 
   private static final GeometryFactory GF = new GeometryFactory();
 
@@ -39,7 +39,7 @@ class PipelineEncodingTest {
     return List.copyOf(byName.values());
   }
 
-  static BufferContext contextOf(VertexBufferExtractor.ExtractedColumn column) {
+  public static BufferContext contextOf(VertexBufferExtractor.ExtractedColumn column) {
     return new BufferContext(
         column.vertexBuffer(),
         column.geometryTypes(),
@@ -48,7 +48,7 @@ class PipelineEncodingTest {
         column.numRings());
   }
 
-  static void assertReconstructs(Encoding encoding, BufferContext ctx, EncodedBuffer encoded) {
+  public static void assertReconstructs(Encoding encoding, BufferContext ctx, EncodedBuffer encoded) {
     var decoded = encoding.decode(encoded, ctx, ctx.vertices().size());
     if (encoding.reordersGeometries()) {
       var emitted = encoding.emitted(ctx);

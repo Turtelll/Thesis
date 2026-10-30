@@ -10,7 +10,7 @@ import java.io.ByteArrayOutputStream;
  * stream's bytes. Streams are written one after another in stream order; empty streams write
  * nothing, since the decoder knows every stream's value count from the topology streams.
  */
-final class StreamCodec {
+public final class StreamCodec {
 
     private static final int ESCAPE_MARKER = 0xFF;
     private static final int WIDTH_MASK = 0b11;
@@ -21,9 +21,9 @@ final class StreamCodec {
     }
 
     /** What one stream is written with: the residual map, the byte width and the transpose. */
-    record Format(ResidualMap map, ByteWidth width, Transpose transpose) {
+    public record Format(ResidualMap map, ByteWidth width, Transpose transpose) {
 
-        Format withTranspose(Transpose value) {
+        public Format withTranspose(Transpose value) {
             return new Format(map, width, value);
         }
     }
@@ -38,7 +38,7 @@ final class StreamCodec {
      * @param last whether no non-empty stream follows; a stream whose byte length depends on its
      *             values signals it, except the last, which takes the rest of the payload
      */
-    static void encode(ByteArrayOutputStream out, int[] signed, Format config, boolean last) {
+    public static void encode(ByteArrayOutputStream out, int[] signed, Format config, boolean last) {
         final var side = config.map().side(signed);
         for (final var value : side) {
             Bytes.putVarint(out, EncodingUtils.encodeZigZag(value));
@@ -145,7 +145,7 @@ final class StreamCodec {
     }
 
     /** The inverse of {@link #encode}: the signed residuals of a stream of {@code valueCount} values. */
-    static int[] decode(Bytes.Reader in, int valueCount, Format config, boolean last) {
+    public static int[] decode(Bytes.Reader in, int valueCount, Format config, boolean last) {
         final var side = new int[config.map().sideValues()];
         for (var i = 0; i < side.length; i++) {
             side[i] = DecodingUtils.decodeZigZag(in.readVarint());

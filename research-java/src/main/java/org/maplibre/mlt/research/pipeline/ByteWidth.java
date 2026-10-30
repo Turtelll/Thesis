@@ -59,7 +59,7 @@ public enum ByteWidth {
     }
 
     /** The 2-bit descriptor code of a width of 1, 2 or 4 bytes. */
-    static int codeOf(int width) {
+    public static int codeOf(int width) {
         return switch (width) {
             case 1 -> 0;
             case 2 -> 1;
@@ -68,7 +68,7 @@ public enum ByteWidth {
     }
 
     /** The narrowest of 1, 2, 4 bytes that holds the unsigned {@code max}. */
-    static int minWidth(long max) {
+    public static int minWidth(long max) {
         if (max < 1L << 8) {
             return 1;
         }

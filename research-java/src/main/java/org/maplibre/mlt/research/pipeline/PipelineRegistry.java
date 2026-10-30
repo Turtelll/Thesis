@@ -435,7 +435,7 @@ public final class PipelineRegistry {
     }
 
     /** The reorder variants S1 measures, the identity first. */
-    static List<Reorder> s1Orders() {
+    public static List<Reorder> s1Orders() {
         return Arrays.stream(Reorder.values())
                 .filter(order -> order != Reorder.CLASS_HILBERT_CENTROID_ROT)
                 .toList();

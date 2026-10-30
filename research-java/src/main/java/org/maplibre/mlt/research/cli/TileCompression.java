@@ -21,12 +21,12 @@ import java.util.stream.IntStream;
  * <p>Tiles are compressed as they complete, so only one tile's payloads are ever held; the caller
  * must visit a tile's buffers contiguously and call {@link #endTile} between tiles.
  */
-final class TileCompression {
+public final class TileCompression {
 
-    static final int RAW = 0;
-    static final int ORDER0 = 1;
+    public static final int RAW = 0;
+    public static final int ORDER0 = 1;
     /** {@link Compressor#all} lists gzip first. */
-    static final int GZIP = 2;
+    public static final int GZIP = 2;
 
     private final List<Compressor> compressors;
     private final Map<String, ByteArrayOutputStream> tile = new LinkedHashMap<>();
@@ -34,16 +34,16 @@ final class TileCompression {
     private final Map<Integer, Map<String, long[]>> byZoom = new TreeMap<>();
     private int tiles;
 
-    TileCompression(List<Compressor> compressors) {
+    public TileCompression(List<Compressor> compressors) {
         this.compressors = compressors;
     }
 
-    void add(String row, byte[] payload) {
+    public void add(String row, byte[] payload) {
         tile.computeIfAbsent(row, k -> new ByteArrayOutputStream()).writeBytes(payload);
     }
 
     /** Compresses the tile collected since the last call, once per row and compressor. */
-    void endTile(int zoom) {
+    public void endTile(int zoom) {
         if (tile.isEmpty()) {
             return;
         }
@@ -82,7 +82,7 @@ final class TileCompression {
      * ceil(n * H / 8)}, the entropy lower bound for any per-byte code with no context and no
      * matches.
      */
-    static long order0Bytes(byte[] bytes) {
+    public static long order0Bytes(byte[] bytes) {
         if (bytes.length == 0) {
             return 0;
         }
@@ -104,7 +104,7 @@ final class TileCompression {
      * the same predecessor, the first byte at 8 bits. Like {@link #order0Bytes} it compresses nothing,
      * but it sees the byte-to-byte structure a layout or terminal choice changes.
      */
-    static long order1Bytes(byte[] bytes) {
+    public static long order1Bytes(byte[] bytes) {
         if (bytes.length == 0) {
             return 0;
         }
@@ -131,20 +131,20 @@ final class TileCompression {
     }
 
     /** Per row, the column sums over every tile. */
-    Map<String, long[]> totals() {
+    public Map<String, long[]> totals() {
         return totals;
     }
 
     /** {@link #totals()} split by tile zoom. */
-    Map<Integer, Map<String, long[]>> byZoom() {
+    public Map<Integer, Map<String, long[]>> byZoom() {
         return byZoom;
     }
 
-    int tiles() {
+    public int tiles() {
         return tiles;
     }
 
-    List<Compressor> compressors() {
+    public List<Compressor> compressors() {
         return compressors;
     }
 }
