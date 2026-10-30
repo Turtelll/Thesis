@@ -1,7 +1,6 @@
 package org.maplibre.mlt.research.cli;
 
 import org.maplibre.mlt.research.measurement.golden.GoldenDump;
-import org.maplibre.mlt.research.measurement.harness.MeasureHarness;
 import org.maplibre.mlt.research.probe.BufferPointProbe;
 import org.maplibre.mlt.research.probe.DecodeTimeProbe;
 import org.maplibre.mlt.research.probe.LineFramePriorProbe;
@@ -44,7 +43,7 @@ public final class Research {
         COMMANDS.put("extract", new Entry(".mbtiles -> VertexBuffer extraction", ExtractCli::main));
         COMMANDS.put("measure", new Entry(
                 "baselines vs the pipeline's rows per tile: gzip/Brotli/zstd, round-tripped, oracle, breakdowns",
-                MeasureHarness::main));
+                MeasureCli::main));
         COMMANDS.put("tile-size", new Entry(
                 "whole-tile MLT bytes (property columns and ids included) of the pipeline reorders",
                 TileSizeProbe::main));
