@@ -1,6 +1,5 @@
 package org.maplibre.mlt.research.cli;
 
-import org.maplibre.mlt.research.extraction.MbtilesExtraction;
 import org.maplibre.mlt.research.measurement.golden.GoldenDump;
 import org.maplibre.mlt.research.measurement.harness.MeasureHarness;
 import org.maplibre.mlt.research.probe.BufferPointProbe;
@@ -43,7 +42,7 @@ public final class Research {
     private static final Map<String, Entry> COMMANDS = new LinkedHashMap<>();
 
     static {
-        COMMANDS.put("extract", new Entry(".mbtiles -> VertexBuffer extraction", MbtilesExtraction::main));
+        COMMANDS.put("extract", new Entry(".mbtiles -> VertexBuffer extraction", ExtractCli::main));
         COMMANDS.put("measure", new Entry(
                 "baselines vs the pipeline's rows per tile: gzip/Brotli/zstd, round-tripped, oracle, breakdowns",
                 MeasureHarness::main));
