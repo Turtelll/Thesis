@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.encoder.prediction.mechanism;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 
 import java.util.List;
@@ -51,7 +51,7 @@ public final class SegmentQuadCorner implements ClassifiedPredictor {
 
     @Override
     public int[] classify(BufferContext ctx, int vertexCount) {
-        return classify(PartBoundaries.of(ctx, vertexCount), vertexCount);
+        return classify(VertexRuns.of(ctx, vertexCount), vertexCount);
     }
 
     @Override
@@ -78,7 +78,7 @@ public final class SegmentQuadCorner implements ClassifiedPredictor {
      * {@link org.maplibre.mlt.research.encoding.Layout#SEGMENTED}; this only reports their extents.
      */
     public int[] regionLengths(BufferContext ctx, int vertexCount) {
-        final var classes = classify(PartBoundaries.of(ctx, vertexCount), vertexCount);
+        final var classes = classify(VertexRuns.of(ctx, vertexCount), vertexCount);
         var starts = 0;
         var corners = 0;
         for (final var c : classes) {

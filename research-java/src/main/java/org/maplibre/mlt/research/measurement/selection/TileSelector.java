@@ -2,7 +2,7 @@ package org.maplibre.mlt.research.measurement.selection;
 
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
-import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 
@@ -50,10 +50,10 @@ public final class TileSelector {
     /** The pass cap of {@link #oracle}: in practice the descent converges well before it. */
     static final int ORACLE_MAX_PASSES = 10;
 
-    private static final Function<BufferContext, Predicate<PipelineConfig>> UNRESTRICTED = ctx -> config -> true;
+    private static final Function<BufferContext, Predicate<Composition>> UNRESTRICTED = ctx -> config -> true;
 
     /** What one layer of the tile was written with, and the bytes. */
-    public record Choice(PipelineConfig config, EncodedBuffer encoded) {
+    public record Choice(Composition config, EncodedBuffer encoded) {
     }
 
     /**
@@ -61,13 +61,13 @@ public final class TileSelector {
      * with the same candidates and restriction can search the tile without encoding it again.
      */
     public static final class Trial {
-        private final List<PipelineConfig> candidates;
-        private final Function<BufferContext, Predicate<PipelineConfig>> restriction;
+        private final List<Composition> candidates;
+        private final Function<BufferContext, Predicate<Composition>> restriction;
         private final boolean[][] allowed;
         private final EncodedBuffer[][] encoded;
         private final byte[][][] payloads;
 
-        private Trial(List<PipelineConfig> candidates, Function<BufferContext, Predicate<PipelineConfig>> restriction,
+        private Trial(List<Composition> candidates, Function<BufferContext, Predicate<Composition>> restriction,
                       boolean[][] allowed, EncodedBuffer[][] encoded, byte[][][] payloads) {
             this.candidates = candidates;
             this.restriction = restriction;
@@ -92,8 +92,8 @@ public final class TileSelector {
 
     private final String backend;
     private final ToLongFunction<byte[]> size;
-    private final Function<BufferContext, Predicate<PipelineConfig>> restriction;
-    private final List<PipelineConfig> candidates;
+    private final Function<BufferContext, Predicate<Composition>> restriction;
+    private final List<Composition> candidates;
     private final int maxPasses;
     private final boolean startFromAlone;
 
@@ -110,13 +110,13 @@ public final class TileSelector {
      *                    fixing some stages from the buffer's features); at least one must remain
      */
     public TileSelector(String backend, ToLongFunction<byte[]> size,
-                        Function<BufferContext, Predicate<PipelineConfig>> restriction) {
+                        Function<BufferContext, Predicate<Composition>> restriction) {
         this(backend, size, restriction, defaultCandidates(), MAX_PASSES, false);
     }
 
     private TileSelector(String backend, ToLongFunction<byte[]> size,
-                         Function<BufferContext, Predicate<PipelineConfig>> restriction,
-                         List<PipelineConfig> candidates, int maxPasses, boolean startFromAlone) {
+                         Function<BufferContext, Predicate<Composition>> restriction,
+                         List<Composition> candidates, int maxPasses, boolean startFromAlone) {
         this.backend = backend;
         this.size = size;
         this.restriction = restriction;
@@ -130,7 +130,7 @@ public final class TileSelector {
      * (at most {@link #ORACLE_MAX_PASSES}), starting from the smaller of the per-layer default tile and
      * the alone-best tile. Every {@link PipelineRegistry#forLayer} composition must be a candidate.
      */
-    public static TileSelector oracle(String backend, ToLongFunction<byte[]> size, List<PipelineConfig> candidates) {
+    public static TileSelector oracle(String backend, ToLongFunction<byte[]> size, List<Composition> candidates) {
         return new TileSelector(backend, size, UNRESTRICTED, candidates, ORACLE_MAX_PASSES, true);
     }
 
@@ -138,7 +138,7 @@ public final class TileSelector {
      * The oracle grid, then the layer defaults it does not contain (the ring-frame predictors are not
      * in the grid), so every layer can start from its default and is never worse than it.
      */
-    private static List<PipelineConfig> defaultCandidates() {
+    private static List<Composition> defaultCandidates() {
         final var all = new ArrayList<>(PipelineRegistry.oracleConfigs());
         for (final var layer : PipelineRegistry.fittedLayers()) {
             final var layerDefault = PipelineRegistry.forLayer(layer);
@@ -164,7 +164,7 @@ public final class TileSelector {
     }
 
     /** The trial set: every buffer of a tile chooses among these. */
-    public List<PipelineConfig> candidates() {
+    public List<Composition> candidates() {
         return candidates;
     }
 
@@ -290,7 +290,7 @@ public final class TileSelector {
      * the default's predictor and terminal (the restriction fixed the other stages), else the first
      * allowed one.
      */
-    private int start(PipelineConfig layerDefault, boolean[] allowed) {
+    private int start(Composition layerDefault, boolean[] allowed) {
         final var exact = candidates.indexOf(layerDefault);
         if (exact >= 0 && allowed[exact]) {
             return exact;

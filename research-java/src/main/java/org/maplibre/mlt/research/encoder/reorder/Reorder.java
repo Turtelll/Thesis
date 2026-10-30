@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.encoder.reorder;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 
 import java.util.ArrayList;
@@ -410,11 +410,11 @@ public enum Reorder {
 
         private static Features ofRuns(BufferContext ctx) {
             final var vertices = ctx.vertices();
-            final var starts = PartBoundaries.of(ctx, vertices.size());
+            final var starts = VertexRuns.of(ctx, vertices.size());
             if (starts.length < 2) {
                 return null;
             }
-            final var isLine = PartBoundaries.lineRuns(ctx, starts.length);
+            final var isLine = VertexRuns.lineRuns(ctx, starts.length);
             if (isLine == null) {
                 return null;
             }
@@ -505,7 +505,7 @@ public enum Reorder {
 
         /**
          * Emits vertices and topology streams in the new order, the streams permuted with their
-         * features so {@link PartBoundaries} derives the same run lengths from the result.
+         * features so {@link VertexRuns} derives the same run lengths from the result.
          */
         BufferContext rebuild(BufferContext ctx, int[] order, boolean rotate) {
             final var out = new ArrayList<Vertex>(vertices.size());

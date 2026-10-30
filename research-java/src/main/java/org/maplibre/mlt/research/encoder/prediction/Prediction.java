@@ -2,14 +2,14 @@ package org.maplibre.mlt.research.encoder.prediction;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.ClassifiedPredictor;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.LineContinuation;
-import org.maplibre.mlt.research.encoder.reference.LineSharedVertexRef;
+import org.maplibre.mlt.research.encoder.reference.LineReferences;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.QuadCornerLine;
-import org.maplibre.mlt.research.encoder.prediction.mechanism.RingFramePrior;
+import org.maplibre.mlt.research.encoder.prediction.mechanism.FramePrior;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.SegmentQuadCorner;
-import org.maplibre.mlt.research.encoder.reference.SharedVertexRef;
+import org.maplibre.mlt.research.encoder.reference.RingReferences;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.TurnScalar;
 
 import java.util.List;
@@ -45,7 +45,7 @@ public enum Prediction {
 
     /**
      * {@code QUAD_CORNER}, with the plain-delta edges of polygon rings coded in the frame of the
-     * nearest decoded ring ({@link RingFramePrior}): an exactly invertible integer rotation of the
+     * nearest decoded ring ({@link FramePrior}): an exactly invertible integer rotation of the
      * residual, so the stream keeps two values per vertex and nothing is signalled.
      */
     QUAD_CORNER_FRAME,
@@ -55,7 +55,7 @@ public enum Prediction {
 
     /**
      * {@code QUAD_CORNER} plus references to vertices an earlier polygon ring shares ({@link
-     * SharedVertexRef}, old {@code QUAD_CORNER_SHARED}): rings are rotated to start where a shared
+     * RingReferences}, old {@code QUAD_CORNER_SHARED}): rings are rotated to start where a shared
      * stretch begins, and a referenced vertex has no residual. Which vertices are referenced is only
      * known while decoding, so the buffer carries the flag and index bits and the stream lengths.
      * A buffer without a gain from the references is written as plain {@link #QUAD_CORNER} (the
@@ -80,7 +80,7 @@ public enum Prediction {
      * direction of the incoming edge: an along-track component (the step got longer or shorter) and a
      * sideways one (the road bent), instead of both mixed over the tile axes. The frame is the two
      * vertices before, so the decoder has it; the rotation is an exact integer bijection ({@link
-     * RingFramePrior#forwardHeading}) and nothing is signalled.
+     * FramePrior#forwardHeading}) and nothing is signalled.
      */
     LINE_CONTINUATION_HEADING,
 
@@ -89,7 +89,7 @@ public enum Prediction {
 
     /**
      * {@link #LINE_CONTINUATION} plus references to the positions earlier line parts hold ({@link
-     * LineSharedVertexRef}, old {@code LINE_CONTINUATION_SHARED_DICT}): an
+     * LineReferences}, old {@code LINE_CONTINUATION_SHARED_DICT}): an
      * entry and an exit flag at the ends of every line part, and a bit-packed index into the
      * dictionary of earlier positions in place of the residual on a hit. A part whose end is in the
      * dictionary and whose start is not is reversed, which changes line direction. Polygon rings and
@@ -127,22 +127,22 @@ public enum Prediction {
      * rotated (or reversed), or {@code null} when its runs are not derivable from the topology.
      * {@code ctx} holds the vertices.
      */
-    public SharedVertexRef.Scan scan(BufferContext ctx) {
+    public RingReferences.Scan scan(BufferContext ctx) {
         return switch (this) {
-            case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME -> SharedVertexRef.scan(ctx);
+            case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME -> RingReferences.scan(ctx);
             case LINE_CONTINUATION_SHARED, LINE_CONTINUATION_SHARED_FRAME_HEADING ->
-                    LineSharedVertexRef.scan(ctx);
+                    LineReferences.scan(ctx);
             default -> throw new UnsupportedOperationException(this + " has no references");
         };
     }
 
     /** The decoder's side of {@link #scan}: needs the topology streams and the flag and index bits. */
-    public SharedVertexRef.ReferenceWalk walkForDecoding(BufferContext topo, int vertexCount, byte[] flags, byte[] indices) {
+    public RingReferences.ReferenceWalk walkForDecoding(BufferContext topo, int vertexCount, byte[] flags, byte[] indices) {
         return switch (this) {
             case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME ->
-                    SharedVertexRef.Walk.forDecoding(topo, vertexCount, flags, indices);
+                    RingReferences.Walk.forDecoding(topo, vertexCount, flags, indices);
             case LINE_CONTINUATION_SHARED, LINE_CONTINUATION_SHARED_FRAME_HEADING ->
-                    LineSharedVertexRef.walkForDecoding(
+                    LineReferences.walkForDecoding(
                             topo, vertexCount, flags, indices);
             default -> throw new UnsupportedOperationException(this + " has no references");
         };
@@ -212,7 +212,7 @@ public enum Prediction {
     /**
      * Any predictor plus the frame: vertices of the framed kinds of run (polygon rings, line parts, or
      * both) that the inner predictor codes as plain delta, other than a run's start, are framed. Runs
-     * and ring/line are derived from the topology streams alone, as {@code SharedVertexRef} does; a
+     * and ring/line are derived from the topology streams alone, as {@code RingReferences} does; a
      * buffer whose runs are not derivable (or a single run) is not framed.
      */
     private static final class FramedPredictor implements FramedEdges {
@@ -250,8 +250,8 @@ public enum Prediction {
         public int[] classify(BufferContext ctx, int vertexCount) {
             classes = inner.classify(ctx, vertexCount);
             this.vertexCount = vertexCount;
-            final var runs = PartBoundaries.of(ctx, vertexCount);
-            final var isLine = runs.length < 2 ? null : PartBoundaries.lineRuns(ctx, runs.length);
+            final var runs = VertexRuns.of(ctx, vertexCount);
+            final var isLine = runs.length < 2 ? null : VertexRuns.lineRuns(ctx, runs.length);
             starts = runs;
             ring = new boolean[runs.length];
             line = new boolean[runs.length];
@@ -298,7 +298,7 @@ public enum Prediction {
 
         private final class FramePass implements Pass {
 
-            private final RingFramePrior prior = new RingFramePrior();
+            private final FramePrior prior = new FramePrior();
             private int run;
 
             /** The last edge accepted, the heading of the vertex after it. */

@@ -133,7 +133,7 @@ public class PipelineEncodingTest {
             List.of(square(0, 0, 10), square(500, 500, 20), square(-300, 40, 5)));
     var ctx = contextOf(column);
 
-    var payload = new PipelineEncoding(PipelineConfig.IDENTITY).encode(ctx).payload();
+    var payload = new PipelineEncoding(Composition.IDENTITY).encode(ctx).payload();
     var body = Arrays.copyOfRange(payload, PayloadHeader.HEADER_BYTES, payload.length);
 
     assertArrayEquals(
@@ -148,7 +148,7 @@ public class PipelineEncodingTest {
     var ctx = contextOf(column);
 
     var payload =
-        new PipelineEncoding(PipelineConfig.IDENTITY.withWidth(ByteWidth.VARINT_SPLIT))
+        new PipelineEncoding(Composition.IDENTITY.withWidth(ByteWidth.VARINT_SPLIT))
             .encode(ctx)
             .payload();
     var body = Arrays.copyOfRange(payload, PayloadHeader.HEADER_BYTES, payload.length);
@@ -159,7 +159,7 @@ public class PipelineEncodingTest {
 
   @Test
   void headerRoundTripsEveryChoice() {
-    var config = PipelineConfig.IDENTITY.withWidth(ByteWidth.VARINT_SPLIT);
+    var config = Composition.IDENTITY.withWidth(ByteWidth.VARINT_SPLIT);
     var header = PayloadHeader.write(config);
     assertEquals(
         config,

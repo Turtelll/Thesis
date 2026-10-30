@@ -2,7 +2,7 @@ package org.maplibre.mlt.research.measurement.report;
 
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
-import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
 import org.maplibre.mlt.research.encoder.stream.Transpose;
@@ -36,7 +36,7 @@ public final class SelectionReport {
     private final Map<String, Map<String, long[]>> byLayer = new LinkedHashMap<>();
     private final Map<String, Map<String, long[]>> byZoom = new LinkedHashMap<>();
 
-    public void record(String row, ManifestEntry entry, PipelineConfig choice) {
+    public void record(String row, ManifestEntry entry, Composition choice) {
         tally(byLayer, row, entry.layerName(), choice);
         tally(byZoom, row, String.format("z%02d", entry.z()), choice);
     }
@@ -45,7 +45,7 @@ public final class SelectionReport {
         return byLayer.isEmpty();
     }
 
-    private static void tally(Map<String, Map<String, long[]>> table, String row, String group, PipelineConfig c) {
+    private static void tally(Map<String, Map<String, long[]>> table, String row, String group, Composition c) {
         final var slots = table.computeIfAbsent(row, k -> new TreeMap<>()).computeIfAbsent(group, k -> new long[SLOTS]);
         slots[BUFFERS]++;
         if (c.reorder().keyed()) {

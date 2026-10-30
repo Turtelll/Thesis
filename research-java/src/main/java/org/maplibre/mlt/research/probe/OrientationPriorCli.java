@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.probe;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.measurement.compression.Compressor;
@@ -402,7 +402,7 @@ public final class OrientationPriorCli {
 
     private static List<Ring> rings(BufferContext ctx) {
         final var v = ctx.vertices();
-        final var starts = PartBoundaries.of(ctx, v.size());
+        final var starts = VertexRuns.of(ctx, v.size());
         final var rings = new ArrayList<Ring>(starts.length);
         for (var s = 0; s < starts.length; s++) {
             final var start = starts[s];

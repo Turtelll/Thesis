@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.encoder.prediction.mechanism;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 
 import java.util.List;
@@ -16,9 +16,9 @@ import java.util.List;
  * layers). Within LINESTRING it is also length-dependent — 2- and 3-vertex runs (most of
  * {@code transportation}) gain nothing or regress, while runs of 11-50 vertices gain 7-8%; see
  * {@code docs/results/line-continuation.md}. Both gates need nothing signalled — {@code
- * geometryTypes} and run length (via {@link PartBoundaries}) are topology streams MLT ships in the
+ * geometryTypes} and run length (via {@link VertexRuns}) are topology streams MLT ships in the
  * tile, so they are derivable identically on encode and decode, the same rule {@link
- * PartBoundaries} exists to enforce for part boundaries.
+ * VertexRuns} exists to enforce for part boundaries.
  *
  * <p>Three classes, packed like {@link SegmentQuadCorner}:
  *
@@ -77,12 +77,12 @@ public final class LineContinuation implements ClassifiedPredictor {
 
     @Override
     public int[] classify(BufferContext ctx, int vertexCount) {
-        final var starts = PartBoundaries.of(ctx, vertexCount);
+        final var starts = VertexRuns.of(ctx, vertexCount);
         final var classes = new int[vertexCount];
-        final var isLineRun = PartBoundaries.lineRuns(ctx, starts.length);
+        final var isLineRun = VertexRuns.lineRuns(ctx, starts.length);
         if (isLineRun == null) {
             // Topology does not line up with the derived runs (e.g. points in the column) — degrade
-            // to marking only part starts, exactly as PartBoundaries' own honest-fallback rule.
+            // to marking only part starts, exactly as VertexRuns' own honest-fallback rule.
             for (final var start : starts) {
                 if (start < vertexCount) {
                     classes[start] = START;

@@ -13,7 +13,7 @@ import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
  * buffer header, so a decoder needs nothing but the bytes and the topology streams; the reorder is
  * not signalled, because the tile carries the reordered topology as it is.
  */
-public record PipelineConfig(
+public record Composition(
         Reorder reorder,
         Prediction predictor,
         Segmentation segmentation,
@@ -22,7 +22,7 @@ public record PipelineConfig(
         Transpose transpose) {
 
     /** Every stage at identity, with the temporary varint terminal. */
-    public static final PipelineConfig IDENTITY = new PipelineConfig(
+    public static final Composition IDENTITY = new Composition(
             Reorder.NONE,
             Prediction.DELTA,
             Segmentation.FLAT,
@@ -41,23 +41,23 @@ public record PipelineConfig(
         return new StreamCodec.Format(map, width, transpose);
     }
 
-    public PipelineConfig withReorder(Reorder value) {
-        return new PipelineConfig(value, predictor, segmentation, map, width, transpose);
+    public Composition withReorder(Reorder value) {
+        return new Composition(value, predictor, segmentation, map, width, transpose);
     }
 
-    public PipelineConfig withPredictor(Prediction value) {
-        return new PipelineConfig(reorder, value, segmentation, map, width, transpose);
+    public Composition withPredictor(Prediction value) {
+        return new Composition(reorder, value, segmentation, map, width, transpose);
     }
 
-    public PipelineConfig withSegmentation(Segmentation value) {
-        return new PipelineConfig(reorder, predictor, value, map, width, transpose);
+    public Composition withSegmentation(Segmentation value) {
+        return new Composition(reorder, predictor, value, map, width, transpose);
     }
 
-    public PipelineConfig withWidth(ByteWidth value) {
-        return new PipelineConfig(reorder, predictor, segmentation, map, value, transpose);
+    public Composition withWidth(ByteWidth value) {
+        return new Composition(reorder, predictor, segmentation, map, value, transpose);
     }
 
-    public PipelineConfig withTranspose(Transpose value) {
-        return new PipelineConfig(reorder, predictor, segmentation, map, width, value);
+    public Composition withTranspose(Transpose value) {
+        return new Composition(reorder, predictor, segmentation, map, width, value);
     }
 }

@@ -41,7 +41,7 @@ public final class StreamCodec {
     public static void encode(ByteArrayOutputStream out, int[] signed, Format config, boolean last) {
         final var side = config.map().side(signed);
         for (final var value : side) {
-            Bytes.putVarint(out, EncodingUtils.encodeZigZag(value));
+            PayloadBytes.putVarint(out, EncodingUtils.encodeZigZag(value));
         }
         final var mapped = config.map().map(signed, side);
         if (config.width().varint() == null) {
@@ -50,7 +50,7 @@ public final class StreamCodec {
         }
         final var body = config.width().varint().encode(mapped);
         if (!last) {
-            Bytes.putVarint(out, body.length);
+            PayloadBytes.putVarint(out, body.length);
         }
         out.writeBytes(body);
     }
@@ -115,7 +115,7 @@ public final class StreamCodec {
         out.writeBytes(Transpose.INTERLEAVED_PLANES.write(tail, exceptionWidth));
     }
 
-    private static int[] readFixed(Bytes.Reader in, int n, Format config) {
+    private static int[] readFixed(PayloadBytes.Reader in, int n, Format config) {
         final var transpose = config.transpose();
         if (config.width() == ByteWidth.FORCE_4) {
             return transpose.read(in.readBytes(n * 4), n, 4);
@@ -145,7 +145,7 @@ public final class StreamCodec {
     }
 
     /** The inverse of {@link #encode}: the signed residuals of a stream of {@code valueCount} values. */
-    public static int[] decode(Bytes.Reader in, int valueCount, Format config, boolean last) {
+    public static int[] decode(PayloadBytes.Reader in, int valueCount, Format config, boolean last) {
         final var side = new int[config.map().sideValues()];
         for (var i = 0; i < side.length; i++) {
             side[i] = DecodingUtils.decodeZigZag(in.readVarint());

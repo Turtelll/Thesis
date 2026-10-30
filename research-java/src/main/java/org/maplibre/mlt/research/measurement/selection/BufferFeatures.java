@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.measurement.selection;
 
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
@@ -124,7 +124,7 @@ public record BufferFeatures(
 
     private static double meanJump(BufferContext ctx) {
         final var n = ctx.vertices().size();
-        var starts = PartBoundaries.of(ctx, n);
+        var starts = VertexRuns.of(ctx, n);
         if (starts.length < 2) {
             if (n > 1 && !ctx.geometryTypes().isEmpty()
                     && ctx.geometryTypes().stream().allMatch(t -> t == 0 || t == 3)) {

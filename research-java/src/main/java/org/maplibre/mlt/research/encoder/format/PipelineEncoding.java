@@ -5,8 +5,8 @@ import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.buffer.StreamMetadata;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
-import org.maplibre.mlt.research.encoder.reference.SharedVertexRef;
-import org.maplibre.mlt.research.encoder.stream.Bytes;
+import org.maplibre.mlt.research.encoder.reference.RingReferences;
+import org.maplibre.mlt.research.encoder.stream.PayloadBytes;
 import org.maplibre.mlt.research.encoder.stream.StreamCodec;
 import org.maplibre.mlt.research.encoder.stream.Transpose;
 import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.function.IntPredicate;
 
 /**
- * One row of the OpenZL-style pipeline, composed from a {@link PipelineConfig}:
+ * One row of the OpenZL-style pipeline, composed from a {@link Composition}:
  *
  * <pre>S1 reorder -> S2 predict -> S3 segment -> S4 zigzag -> S6 width -> S7 transpose</pre>
  *
@@ -29,16 +29,16 @@ import java.util.function.IntPredicate;
  */
 public final class PipelineEncoding implements Encoding {
 
-    private final PipelineConfig config;
+    private final Composition config;
 
-    public PipelineEncoding(PipelineConfig config) {
+    public PipelineEncoding(Composition config) {
         if (config.width().varint() != null && config.transpose() != Transpose.NONE) {
             throw new IllegalArgumentException("a byte-plane transpose needs a fixed width: " + config.name());
         }
         this.config = config;
     }
 
-    public PipelineConfig config() {
+    public Composition config() {
         return config;
     }
 
@@ -103,7 +103,7 @@ public final class PipelineEncoding implements Encoding {
     }
 
     /** The header and every non-empty stream of {@code emitted} under {@code c}, no references. */
-    private static byte[] encodeStreams(BufferContext emitted, PipelineConfig c) {
+    private static byte[] encodeStreams(BufferContext emitted, Composition c) {
         final var predictor = c.predictor().predictor();
         final var layout = c.segmentation().layout(emitted, predictor, emitted.vertices().size());
         final var streams = Segmentation.split(layout, predictor, emitted.vertices());
@@ -118,7 +118,7 @@ public final class PipelineEncoding implements Encoding {
      * stream (the references take vertices out of them, and which ones is only known while decoding),
      * then the streams.
      */
-    private byte[] encodeShared(BufferContext rotated, SharedVertexRef.Scan scan) {
+    private byte[] encodeShared(BufferContext rotated, RingReferences.Scan scan) {
         final var predictor = config.predictor().predictor();
         final var layout = config.segmentation()
                 .layout(rotated, predictor, rotated.vertices().size())
@@ -126,18 +126,18 @@ public final class PipelineEncoding implements Encoding {
         final var streams = Segmentation.split(layout, predictor, rotated.vertices(), scan.referenced());
         final var out = new ByteArrayOutputStream();
         out.writeBytes(PayloadHeader.write(config));
-        Bytes.putVarint(out, scan.flags().length);
+        PayloadBytes.putVarint(out, scan.flags().length);
         out.writeBytes(scan.flags());
-        Bytes.putVarint(out, scan.indices().length);
+        PayloadBytes.putVarint(out, scan.indices().length);
         out.writeBytes(scan.indices());
         for (final var count : layout.valueCounts()) {
-            Bytes.putVarint(out, count);
+            PayloadBytes.putVarint(out, count);
         }
         writeStreams(out, config, layout, streams);
         return out.toByteArray();
     }
 
-    private static void writeStreams(ByteArrayOutputStream out, PipelineConfig c, Segmentation.Layout layout, int[][] streams) {
+    private static void writeStreams(ByteArrayOutputStream out, Composition c, Segmentation.Layout layout, int[][] streams) {
         final var last = lastNonEmpty(streams.length, s -> streams[s].length > 0);
         for (var s = 0; s < streams.length; s++) {
             if (streams[s].length > 0) {
@@ -148,13 +148,13 @@ public final class PipelineEncoding implements Encoding {
 
     @Override
     public List<Vertex> decode(EncodedBuffer encoded, BufferContext ctx, int vertexCount) {
-        final var in = new Bytes.Reader(encoded.payload(), 0);
+        final var in = new PayloadBytes.Reader(encoded.payload(), 0);
         final var decoded = PayloadHeader.parse(in.readByte(), in.readByte(), config.reorder());
         final var topo = decoded.reorder().topology(ctx);
         final var predictor = decoded.predictor().predictor();
         var layout = decoded.segmentation().layout(topo, predictor, vertexCount);
 
-        SharedVertexRef.ReferenceWalk walk = null;
+        RingReferences.ReferenceWalk walk = null;
         if (decoded.predictor().shared()) {
             final var flags = in.readBytes(in.readVarint());
             final var indices = in.readBytes(in.readVarint());
@@ -186,7 +186,7 @@ public final class PipelineEncoding implements Encoding {
      * The configuration stream {@code s} is written with. A side stream is not {@code x, y} pairs and
      * can be of odd length, so the transposes that separate the components fall back to byte planes.
      */
-    private static StreamCodec.Format streamConfig(PipelineConfig c, Segmentation.Layout layout, int s) {
+    private static StreamCodec.Format streamConfig(Composition c, Segmentation.Layout layout, int s) {
         final var separatesComponents = c.transpose() != Transpose.NONE && c.transpose() != Transpose.INTERLEAVED_PLANES;
         return s == layout.sideStream() && separatesComponents
                 ? c.stream().withTranspose(Transpose.INTERLEAVED_PLANES)

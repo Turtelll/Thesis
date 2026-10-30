@@ -5,7 +5,7 @@ import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 import org.maplibre.mlt.research.encoder.stream.Transpose;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
-import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
 
@@ -28,45 +28,45 @@ public final class PipelineRegistry {
     }
 
     /** S0: the split varint terminal (-0,87% gzip against plain varint), the harness anchor. */
-    private static final PipelineConfig AFTER_S0 = PipelineConfig.IDENTITY.withWidth(ByteWidth.VARINT_SPLIT);
+    private static final Composition AFTER_S0 = Composition.IDENTITY.withWidth(ByteWidth.VARINT_SPLIT);
 
     /**
      * S1: Hilbert order of the bounding-box centre with ring rotation (-3,97% gzip of the geometry
      * buffers; applied to a layer only where its property columns do not lose more, see the S1
      * verdict).
      */
-    private static final PipelineConfig AFTER_S1 = AFTER_S0.withReorder(Reorder.HILBERT_CENTROID_ROT_MP);
+    private static final Composition AFTER_S1 = AFTER_S0.withReorder(Reorder.HILBERT_CENTROID_ROT_MP);
 
     /**
      * S2: {@code QUAD_CORNER_LINE}, the one predictor within 0,3 points of the best choice on every
      * layer (the per-layer choice is the selector's).
      */
-    private static final PipelineConfig AFTER_S2 = AFTER_S1.withPredictor(Prediction.QUAD_CORNER_LINE);
+    private static final Composition AFTER_S2 = AFTER_S1.withPredictor(Prediction.QUAD_CORNER_LINE);
 
     /** S3: one stream per predictor class (-1,2 points over FLAT); the role split and class sort lose. */
-    private static final PipelineConfig AFTER_S3 = AFTER_S2.withSegmentation(Segmentation.CLASS);
+    private static final Composition AFTER_S3 = AFTER_S2.withSegmentation(Segmentation.CLASS);
 
     /** S4: zigzag. The bias map was measured and removed. */
-    private static final PipelineConfig AFTER_S4 = AFTER_S3;
+    private static final Composition AFTER_S4 = AFTER_S3;
 
     /**
      * S6: the escape width (fixed-width bytes, {@code 0xFF} marks an exception): level with the
      * split varint under gzip and the terminal the S7 transposes need. {@code MIN_FIXED},
      * {@code FORCE_4} lose. S5 (GCD) was removed; this still follows S4.
      */
-    private static final PipelineConfig AFTER_S6 = AFTER_S4.withWidth(ByteWidth.ESCAPE);
+    private static final Composition AFTER_S6 = AFTER_S4.withWidth(ByteWidth.ESCAPE);
 
     /**
      * S7: byte planes of the interleaved values (all low bytes, then all high bytes): -0,6 points gzip
      * over the untransposed escape stream, -0,7 brotli, -0,9 zstd; the x/y-separating layouts lose.
      */
-    private static final PipelineConfig AFTER_S7 = AFTER_S6.withTranspose(Transpose.INTERLEAVED_PLANES);
+    private static final Composition AFTER_S7 = AFTER_S6.withTranspose(Transpose.INTERLEAVED_PLANES);
 
     /**
      * The best row measured on the geometry buffers alone: everything through S7, reorder included.
      * It is not the end-to-end choice, see {@link #DEFAULT}.
      */
-    public static final PipelineConfig GEOMETRY_BEST = AFTER_S7;
+    public static final Composition GEOMETRY_BEST = AFTER_S7;
 
     /**
      * S8: the end-to-end choice. The same pipeline without the S1 reorder: with the predictors and
@@ -74,12 +74,12 @@ public final class PipelineRegistry {
      * permutation of the property columns costs +736.000 on this corpus, a net loss everywhere
      * except {@code building} and {@code housenumber} (see the S8 verdict).
      */
-    private static final PipelineConfig AFTER_S8 = AFTER_S7.withReorder(Reorder.NONE);
+    private static final Composition AFTER_S8 = AFTER_S7.withReorder(Reorder.NONE);
 
     /** What the selection loop builds on: the winners recorded so far. */
-    public static final PipelineConfig DEFAULT = AFTER_S8;
+    public static final Composition DEFAULT = AFTER_S8;
 
-    private static Encoding row(PipelineConfig config) {
+    private static Encoding row(Composition config) {
         return new PipelineEncoding(config);
     }
 
@@ -94,7 +94,7 @@ public final class PipelineRegistry {
         return true;
     }
 
-    private static PipelineConfig composition(
+    private static Composition composition(
             Prediction predictor, Segmentation segmentation, ByteWidth width, Transpose transpose) {
         return DEFAULT.withReorder(Reorder.HILBERT_CENTROID_ROT_MP).withPredictor(predictor)
                 .withSegmentation(segmentation).withWidth(width).withTranspose(transpose);
@@ -115,7 +115,7 @@ public final class PipelineRegistry {
      * {@code aeroway} (smaller on both sides). The fit is geometry only; the property side is the
      * single-layer-tile measure above. A layer not listed takes {@link #DEFAULT}.
      */
-    private static final java.util.Map<String, PipelineConfig> BY_LAYER = java.util.Map.ofEntries(
+    private static final java.util.Map<String, Composition> BY_LAYER = java.util.Map.ofEntries(
             // (the layers on CHAIN_LAYERS carry .withReorder(Reorder.CHAIN) below)
             java.util.Map.entry("place", composition(Prediction.QUAD_CORNER_LINE,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
@@ -164,7 +164,7 @@ public final class PipelineRegistry {
      * every fitted layer reorders ({@link Reorder#HILBERT_CENTROID_ROT_MP}, or {@link Reorder#CHAIN} for
      * {@link #CHAIN_LAYERS}).
      */
-    public static PipelineConfig forLayer(String layer) {
+    public static Composition forLayer(String layer) {
         return BY_LAYER.getOrDefault(layer, DEFAULT);
     }
 
@@ -174,7 +174,7 @@ public final class PipelineRegistry {
     }
 
     /** One stage of {@link #ladder()}: the label of the decision and the pipeline with it applied. */
-    public record Stage(String label, PipelineConfig config) {
+    public record Stage(String label, Composition config) {
     }
 
     /**
@@ -185,7 +185,7 @@ public final class PipelineRegistry {
      */
     public static List<Stage> ladder() {
         return List.of(
-                new Stage("identity (plain varint)", PipelineConfig.IDENTITY),
+                new Stage("identity (plain varint)", Composition.IDENTITY),
                 new Stage("S0 split varint", AFTER_S0),
                 new Stage("S1 + Hilbert reorder", AFTER_S1),
                 new Stage("S2 + QUAD_CORNER_LINE", AFTER_S2),
@@ -426,8 +426,8 @@ public final class PipelineRegistry {
      * #DEFAULT}'s residual map. It holds {@link #DEFAULT} and every {@link #forLayer} composition. Not part
      * of {@link #all()}, so the golden dump does not grow; {@code PipelineEncodingTest} round-trips it.
      */
-    public static List<PipelineConfig> bestGrid() {
-        final var configs = new ArrayList<PipelineConfig>();
+    public static List<Composition> bestGrid() {
+        final var configs = new ArrayList<Composition>();
         for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP, Reorder.CHAIN)) {
             for (final var predictor : Prediction.values()) {
                 for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
@@ -449,7 +449,7 @@ public final class PipelineRegistry {
     }
 
     /** The trial set, the default pipeline's choices first. */
-    public static List<PipelineConfig> candidateConfigs(Reorder reorder) {
+    public static List<Composition> candidateConfigs(Reorder reorder) {
         final var base = DEFAULT.withReorder(reorder);
         final var predictors = List.of(
                 Prediction.QUAD_CORNER_LINE, Prediction.QUAD_CORNER, Prediction.LINE_CONTINUATION, Prediction.DELTA);
@@ -458,7 +458,7 @@ public final class PipelineRegistry {
                 base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.INTERLEAVED_PLANES),
                 base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.NONE),
                 base.withWidth(ByteWidth.VARINT_SPLIT).withTranspose(Transpose.NONE));
-        final var configs = new ArrayList<PipelineConfig>();
+        final var configs = new ArrayList<Composition>();
         for (final var predictor : predictors) {
             for (final var segmentation : segmentations) {
                 for (final var terminal : terminals) {
@@ -473,8 +473,8 @@ public final class PipelineRegistry {
      * The oracle grid: {@link Reorder#NONE} and {@link Reorder#HILBERT_CENTROID_ROT_MP}, each times
      * {@link #candidateConfigs}. The first row is {@link #DEFAULT}.
      */
-    public static List<PipelineConfig> oracleConfigs() {
-        final var configs = new ArrayList<PipelineConfig>();
+    public static List<Composition> oracleConfigs() {
+        final var configs = new ArrayList<Composition>();
         for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
             configs.addAll(candidateConfigs(reorder));
         }
@@ -485,7 +485,7 @@ public final class PipelineRegistry {
     public static List<Encoding> step(String name) {
         return switch (name) {
             case "s0" -> List.of(
-                    row(PipelineConfig.IDENTITY), row(PipelineConfig.IDENTITY.withWidth(ByteWidth.VARINT_SPLIT)));
+                    row(Composition.IDENTITY), row(Composition.IDENTITY.withWidth(ByteWidth.VARINT_SPLIT)));
             case "s1" -> s1Orders().stream().map(order -> row(AFTER_S0.withReorder(order))).toList();
             case "s2" -> Arrays.stream(Prediction.values())
                     .map(predictor -> row(AFTER_S1.withPredictor(predictor)))

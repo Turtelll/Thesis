@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.workshop;
 
 import org.maplibre.mlt.research.baseline.VertexTransform;
-import org.maplibre.mlt.research.buffer.Topology;
+import org.maplibre.mlt.research.buffer.VertexRunIndex;
 
 import java.util.function.Supplier;
 
@@ -23,7 +23,7 @@ public record Predictor(String name, Supplier<Rule> rules) {
      */
     @FunctionalInterface
     public interface Rule {
-        void predict(Topology t, int i, int[] xs, int[] ys, int[] out);
+        void predict(VertexRunIndex t, int i, int[] xs, int[] ys, int[] out);
     }
 
     /** A stateless rule, shared by every pass. */

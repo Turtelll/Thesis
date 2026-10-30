@@ -55,7 +55,7 @@ class SharedReferenceMechanismTest {
 
   @Test
   void secondRingIsRotatedToStartWhereTheSharedWallBegins() {
-    final var scan = SharedVertexRef.scan(terrace());
+    final var scan = RingReferences.scan(terrace());
     assertEquals(
         List.of(
             new Vertex(0, 0),
@@ -73,7 +73,7 @@ class SharedReferenceMechanismTest {
 
   @Test
   void bothVerticesOfASharedWallAreReferences() {
-    final var referenced = SharedVertexRef.scan(terrace()).referenced();
+    final var referenced = RingReferences.scan(terrace()).referenced();
     for (var i = 0; i < 4; i++) {
       assertFalse(referenced[i], "the first ring has nothing to reference: " + i);
     }
@@ -85,7 +85,7 @@ class SharedReferenceMechanismTest {
   @Test
   void detachedBuildingsReferenceNothingAndAreNotRotated() {
     final var ctx = detachedHouses();
-    final var scan = SharedVertexRef.scan(ctx);
+    final var scan = RingReferences.scan(ctx);
     assertEquals(ctx.vertices(), scan.vertices());
     for (final var flag : scan.referenced()) {
       assertFalse(flag);
@@ -95,9 +95,9 @@ class SharedReferenceMechanismTest {
   @Test
   void ringWalkDecodesTheSameReferencesFromTopologyAlone() {
     for (final var ctx : List.of(terrace(), detachedHouses())) {
-      final var scan = SharedVertexRef.scan(ctx);
+      final var scan = RingReferences.scan(ctx);
       final var walk =
-          SharedVertexRef.Walk.forDecoding(
+          RingReferences.Walk.forDecoding(
               topologyOnly(ctx), scan.vertices().size(), scan.flags(), scan.indices());
       assertWalk(scan, walk);
     }
@@ -147,7 +147,7 @@ class SharedReferenceMechanismTest {
 
   @Test
   void aJunctionStartIsAReference() {
-    final var referenced = LineSharedVertexRef.scan(tJunction()).referenced();
+    final var referenced = LineReferences.scan(tJunction()).referenced();
     assertTrue(referenced[3], "the branch starts on a position road A holds");
     assertFalse(referenced[0]);
     assertFalse(referenced[4]);
@@ -156,7 +156,7 @@ class SharedReferenceMechanismTest {
 
   @Test
   void aPartEndingOnAnEarlierRoadIsReversedSoItsStartCarriesTheReference() {
-    final var scan = LineSharedVertexRef.scan(endsOnEarlierRoad());
+    final var scan = LineReferences.scan(endsOnEarlierRoad());
     assertEquals(
         List.of(new Vertex(1000, 0), new Vertex(3000, 3000), new Vertex(5000, 5000)),
         scan.vertices().subList(2, 5));
@@ -166,7 +166,7 @@ class SharedReferenceMechanismTest {
   @Test
   void detachedRoadsReferenceNothingAndAreNotReversed() {
     final var ctx = detachedRoads();
-    final var scan = LineSharedVertexRef.scan(ctx);
+    final var scan = LineReferences.scan(ctx);
     assertEquals(ctx.vertices(), scan.vertices());
     for (final var flag : scan.referenced()) {
       assertFalse(flag);
@@ -178,16 +178,16 @@ class SharedReferenceMechanismTest {
     for (final var ctx :
         List.of(
             tJunction(), endsOnEarlierRoad(), detachedRoads(), closedLoopAndSinglePoint())) {
-      final var scan = LineSharedVertexRef.scan(ctx);
+      final var scan = LineReferences.scan(ctx);
       final var walk =
-          LineSharedVertexRef.walkForDecoding(
+          LineReferences.walkForDecoding(
               topologyOnly(ctx), scan.vertices().size(), scan.flags(), scan.indices());
       assertWalk(scan, walk);
     }
   }
 
   /** Walking the emitted vertices in order, a decoder finds a reference exactly where the encoder put one. */
-  private static void assertWalk(SharedVertexRef.Scan scan, SharedVertexRef.ReferenceWalk walk) {
+  private static void assertWalk(RingReferences.Scan scan, RingReferences.ReferenceWalk walk) {
     final var decoded = new ArrayList<Vertex>();
     for (var i = 0; i < scan.vertices().size(); i++) {
       final var reference = walk.decode(i, decoded);

@@ -11,7 +11,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.measurement.verification.GeometryEquivalence;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 
 /**
@@ -85,7 +85,7 @@ class GeometryReorderMechanismTest {
   /**
    * The rebuilt topology streams must re-derive the same run lengths, only permuted. Getting this
    * wrong is silent — the buffer still decodes, into plausible but wrong geometry — which is why
-   * {@code PartBoundaries} exists as its own class and why this is pinned rather than assumed.
+   * {@code VertexRuns} exists as its own class and why this is pinned rather than assumed.
    */
   @Test
   void rebuildsTopologyStreamsSoRunsStillDerive() {
@@ -93,8 +93,8 @@ class GeometryReorderMechanismTest {
     final var reordered = GeometryReorder.FEATURE.apply(ctx);
 
     assertArrayEquals(
-        PartBoundaries.of(ctx, ctx.vertices().size()),
-        PartBoundaries.of(reordered, reordered.vertices().size()),
+        VertexRuns.of(ctx, ctx.vertices().size()),
+        VertexRuns.of(reordered, reordered.vertices().size()),
         "equal-length parts must still tile the buffer identically");
     assertEquals(ctx.numParts(), reordered.numParts());
     assertEquals(ctx.geometryTypes(), reordered.geometryTypes());
@@ -103,7 +103,7 @@ class GeometryReorderMechanismTest {
   /** A column whose runs are not derivable must be returned untouched, not guessed at. */
   @Test
   void leavesBuffersWithoutDerivableRunsUnchanged() {
-    // Point-only: points contribute vertices but no run entry, so PartBoundaries falls back.
+    // Point-only: points contribute vertices but no run entry, so VertexRuns falls back.
     final var points =
         BufferContext.of(List.of(new Vertex(90, 90), new Vertex(10, 10), new Vertex(50, 50)));
     assertSame(points, GeometryReorder.FEATURE_REV.apply(points));

@@ -5,7 +5,7 @@ import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.measurement.selection.BufferFeatures;
-import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.measurement.stats.PipelineStats;
@@ -391,7 +391,7 @@ public final class PipelineCli {
             return;
         }
         final var layers = entries.stream().map(ManifestEntry::layerName).toList();
-        final var chosen = new ArrayList<Map<String, PipelineConfig>>();
+        final var chosen = new ArrayList<Map<String, Composition>>();
         entries.forEach(entry -> chosen.add(new LinkedHashMap<>()));
         for (final var selector : selectors) {
             final var choices = selector.select(layers, contexts);

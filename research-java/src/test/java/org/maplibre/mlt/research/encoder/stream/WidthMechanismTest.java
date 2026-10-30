@@ -1,6 +1,6 @@
 package org.maplibre.mlt.research.encoder.stream;
 
-import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -13,8 +13,8 @@ import org.junit.jupiter.params.provider.EnumSource;
 /** S6 verification: widths, the escape boundary and the descriptor, through the stream codec alone. */
 class WidthMechanismTest {
 
-  private static PipelineConfig config(ByteWidth width) {
-    return PipelineConfig.IDENTITY.withWidth(width);
+  private static Composition config(ByteWidth width) {
+    return Composition.IDENTITY.withWidth(width);
   }
 
   /** The signed residual whose zigzag is {@code mapped}. */
@@ -26,15 +26,15 @@ class WidthMechanismTest {
     return IntStream.of(mapped).map(WidthMechanismTest::signedOf).toArray();
   }
 
-  private static byte[] encode(int[] signed, PipelineConfig config) {
+  private static byte[] encode(int[] signed, Composition config) {
     var out = new ByteArrayOutputStream();
     StreamCodec.encode(out, signed, config.stream(), true);
     return out.toByteArray();
   }
 
-  private static int[] roundTrip(int[] signed, PipelineConfig config) {
+  private static int[] roundTrip(int[] signed, Composition config) {
     var bytes = encode(signed, config);
-    var in = new Bytes.Reader(bytes, 0);
+    var in = new PayloadBytes.Reader(bytes, 0);
     var decoded = StreamCodec.decode(in, signed.length, config.stream(), true);
     assertEquals(0, in.remaining(), "the decoder consumes exactly what was written");
     return decoded;

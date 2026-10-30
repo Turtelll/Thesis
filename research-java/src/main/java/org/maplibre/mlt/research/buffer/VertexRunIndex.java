@@ -4,13 +4,13 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 
 /**
  * Per-vertex view of a buffer's vertex runs (rings or line parts), derived from the topology
- * streams alone through {@link PartBoundaries}, so encoder and decoder build the same one.
+ * streams alone through {@link VertexRuns}, so encoder and decoder build the same one.
  *
  * <p>When the topology does not tile the buffer, the whole buffer is one run, and when it cannot
- * say which runs are lines ({@link PartBoundaries#lineRuns} returns {@code null}, e.g. points in the
+ * say which runs are lines ({@link VertexRuns#lineRuns} returns {@code null}, e.g. points in the
  * column) every run is neither line nor ring.
  */
-public final class Topology {
+public final class VertexRunIndex {
 
     private final int[] starts;
     private final int[] runStart;
@@ -18,7 +18,7 @@ public final class Topology {
     private final boolean[] line;
     private final boolean[] ring;
 
-    private Topology(int[] starts, int vertexCount) {
+    private VertexRunIndex(int[] starts, int vertexCount) {
         this.starts = starts;
         runStart = new int[vertexCount];
         runLength = new int[vertexCount];
@@ -26,10 +26,10 @@ public final class Topology {
         ring = new boolean[vertexCount];
     }
 
-    public static Topology of(BufferContext ctx, int vertexCount) {
-        final var starts = PartBoundaries.of(ctx, vertexCount);
-        final var topology = new Topology(starts, vertexCount);
-        final var isLine = PartBoundaries.lineRuns(ctx, starts.length);
+    public static VertexRunIndex of(BufferContext ctx, int vertexCount) {
+        final var starts = VertexRuns.of(ctx, vertexCount);
+        final var topology = new VertexRunIndex(starts, vertexCount);
+        final var isLine = VertexRuns.lineRuns(ctx, starts.length);
         for (var r = 0; r < starts.length; r++) {
             final var start = starts[r];
             final var end = r + 1 < starts.length ? starts[r + 1] : vertexCount;
@@ -47,7 +47,7 @@ public final class Topology {
         return runStart.length;
     }
 
-    /** Start index of every run, ascending, beginning with {@code 0}: {@link PartBoundaries#of}. */
+    /** Start index of every run, ascending, beginning with {@code 0}: {@link VertexRuns#of}. */
     public int[] runStarts() {
         return starts;
     }

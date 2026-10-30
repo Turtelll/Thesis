@@ -2,7 +2,7 @@ package org.maplibre.mlt.research.measurement.selection;
 
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
-import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
 
 import java.util.function.Predicate;
@@ -34,7 +34,7 @@ public final class StageRules {
     }
 
     /** For {@link TileSelector}: the candidates with this buffer's reorder and segmentation. */
-    public static Predicate<PipelineConfig> restrict(BufferContext ctx) {
+    public static Predicate<Composition> restrict(BufferContext ctx) {
         final var features = BufferFeatures.of(ctx);
         final var reorder = reorder(features);
         final var segmentation = segmentation(features);

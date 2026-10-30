@@ -10,7 +10,7 @@ import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
-import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
@@ -82,7 +82,7 @@ class LineFrameMechanismTest {
     }
   }
 
-  private static PipelineConfig config(Prediction prediction, Segmentation segmentation) {
+  private static Composition config(Prediction prediction, Segmentation segmentation) {
     return PipelineRegistry.DEFAULT.withReorder(Reorder.NONE)
         .withPredictor(prediction)
         .withSegmentation(segmentation);

@@ -16,7 +16,7 @@ import org.maplibre.mlt.research.workshop.PredictionTransform;
  * ring, so a street of buildings rotated off the tile axes costs fewer bytes than the same street
  * coded by plain delta, and the rotation is an exact bijection so the decode is lossless.
  */
-class RingFramePriorMechanismTest {
+class FramePriorMechanismTest {
 
   private static final int POLYGON = 2;
 
@@ -90,7 +90,7 @@ class RingFramePriorMechanismTest {
           List.of(
               new Vertex(1000, 1000),
               new Vertex((int) Math.round(1000 + 300 * cos), (int) Math.round(1000 + 300 * sin)));
-      final var prior = new RingFramePrior();
+      final var prior = new FramePrior();
       prior.endLine(road, 0, 2);
 
       // the next run starts nearby: an edge along the road and an edge across it both leave one
@@ -107,7 +107,7 @@ class RingFramePriorMechanismTest {
           "across the road at " + degrees + ": " + prior.x() + "," + prior.y());
     }
 
-    final var lone = new RingFramePrior();
+    final var lone = new FramePrior();
     lone.endLine(List.of(new Vertex(0, 0)), 0, 1);
     lone.beginRing(new Vertex(0, 0));
     lone.forward(200, 100);
@@ -117,7 +117,7 @@ class RingFramePriorMechanismTest {
 
   @Test
   void theRotationIsExactlyInvertibleInEveryFrame() {
-    final var prior = new RingFramePrior();
+    final var prior = new FramePrior();
     for (var angle = -90; angle < 90; angle += 3) {
       // Seed a ring whose first wall sets the frame, so forward/inverse run in that frame.
       prior.beginRing(new Vertex(0, 0));
@@ -139,7 +139,7 @@ class RingFramePriorMechanismTest {
 
   @Test
   void theHeadingRotationIsExactlyInvertibleForEveryEdge() {
-    final var prior = new RingFramePrior();
+    final var prior = new FramePrior();
     final var edges = new ArrayList<int[]>();
     edges.add(new int[] {0, 0});
     for (var angle = -180; angle <= 180; angle += 5) {
@@ -168,7 +168,7 @@ class RingFramePriorMechanismTest {
 
   @Test
   void theHeadingRotationPutsTheEdgeItselfOnThePositiveXAxis() {
-    final var prior = new RingFramePrior();
+    final var prior = new FramePrior();
     for (var angle = -180; angle < 180; angle += 7) {
       final var ex = (int) Math.round(3000 * Math.cos(Math.toRadians(angle)));
       final var ey = (int) Math.round(3000 * Math.sin(Math.toRadians(angle)));

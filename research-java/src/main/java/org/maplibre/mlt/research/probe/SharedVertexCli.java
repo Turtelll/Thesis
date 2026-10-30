@@ -1,6 +1,6 @@
 package org.maplibre.mlt.research.probe;
 
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 
 import java.io.IOException;
@@ -19,7 +19,7 @@ import java.util.TreeMap;
  * whether a reference scheme can pay — {@code building} shows sharing can vanish entirely at one
  * zoom (Planetiler merges/simplifies differently per zoom), so a pooled number hides it.
  *
- * <p>A <b>run</b> is one entry of {@link PartBoundaries#of} (a line part, or a polygon ring when
+ * <p>A <b>run</b> is one entry of {@link VertexRuns#of} (a line part, or a polygon ring when
  * the buffer holds polygons). Per buffer, every vertex is classified by its exact {@code (x, y)}:
  *
  * <ul>
@@ -75,7 +75,7 @@ public final class SharedVertexCli {
             if (vertices.isEmpty()) {
                 continue;
             }
-            final var starts = PartBoundaries.of(ctx, vertices.size());
+            final var starts = VertexRuns.of(ctx, vertices.size());
 
             final var zoomStats = byZoom.computeIfAbsent(entry.z(), k -> new Stats());
             zoomStats.buffers++;

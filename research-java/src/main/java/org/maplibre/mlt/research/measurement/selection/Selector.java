@@ -6,7 +6,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.encoder.format.PayloadHeader;
-import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 
@@ -58,7 +58,7 @@ public final class Selector implements Encoding {
     }
 
     /** What a selected buffer was written with: the choices in its header (the reorder is {@code NONE} here). */
-    public static PipelineConfig choiceOf(byte[] payload) {
+    public static Composition choiceOf(byte[] payload) {
         return PayloadHeader.parse(payload[0] & 0xFF, payload[1] & 0xFF, Reorder.NONE);
     }
 

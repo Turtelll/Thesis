@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.measurement.verification.Verification;
 
@@ -103,7 +103,7 @@ class ReorderMechanismTest {
     var ctx = squares();
     var reordered = Reorder.HILBERT_START.apply(ctx);
     assertArrayEquals(
-        PartBoundaries.of(ctx, 12), PartBoundaries.of(reordered, 12), "equal-length rings tile identically");
+        VertexRuns.of(ctx, 12), VertexRuns.of(reordered, 12), "equal-length rings tile identically");
     assertEquals(ctx.numParts(), reordered.numParts());
     assertEquals(ctx.numRings(), reordered.numRings());
     assertEquals(ctx.geometryTypes(), reordered.geometryTypes());
@@ -152,7 +152,7 @@ class ReorderMechanismTest {
     var ctx = new BufferContext(vertices, List.of(1, 1), List.of(), List.of(2, 3), List.of());
     for (var mode : List.of(Reorder.HILBERT_START, Reorder.MORTON_CENTROID, Reorder.HILBERT_START_ROT)) {
       var reordered = mode.apply(ctx);
-      var starts = PartBoundaries.of(reordered, 5);
+      var starts = VertexRuns.of(reordered, 5);
       var parts = new ArrayList<List<Vertex>>();
       for (var i = 0; i < starts.length; i++) {
         parts.add(reordered.vertices().subList(starts[i], i + 1 < starts.length ? starts[i + 1] : 5));

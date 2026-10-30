@@ -9,7 +9,7 @@ import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
 
 /**
  * The two-byte header every pipeline payload starts with: the format's self-description. It carries
- * every choice of a {@link PipelineConfig} but the reorder, which the caller supplies when reading.
+ * every choice of a {@link Composition} but the reorder, which the caller supplies when reading.
  */
 public final class PayloadHeader {
 
@@ -35,7 +35,7 @@ public final class PayloadHeader {
      * the byte-width terminal in byte 1 (low 4 bits) with the predictor's fourth bit above it: the
      * predictors outgrew the three bits byte 0 has for them.
      */
-    public static byte[] write(PipelineConfig c) {
+    public static byte[] write(Composition c) {
         final var predictor = c.predictor().ordinal();
         final var first = (predictor & PREDICTOR_MASK)
                 | c.segmentation().ordinal() << SEGMENTATION_SHIFT
@@ -46,8 +46,8 @@ public final class PayloadHeader {
     }
 
     /** The inverse of {@link #write}; the reorder is not in it, so the caller supplies it. */
-    public static PipelineConfig parse(int first, int second, Reorder reorder) {
-        return new PipelineConfig(
+    public static Composition parse(int first, int second, Reorder reorder) {
+        return new Composition(
                 reorder,
                 Prediction.values()[(first & PREDICTOR_MASK) | (second >> PREDICTOR_HIGH_SHIFT) << PREDICTOR_BITS],
                 Segmentation.values()[(first >> SEGMENTATION_SHIFT) & SEGMENTATION_MASK],

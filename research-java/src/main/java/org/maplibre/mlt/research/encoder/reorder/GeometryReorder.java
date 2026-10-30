@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.encoder.reorder;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 
 import java.util.ArrayList;
@@ -34,7 +34,7 @@ import java.util.Map;
  *       changes; {@link #PART_CHAIN} permutes a MultiLineString's parts only among themselves,
  *       which leaves the set of lines it describes unchanged;
  *   <li>a buffer whose topology does not yield usable part runs is returned unchanged, matching how
- *       {@link PartBoundaries} degrades rather than guessing at boundaries.
+ *       {@link VertexRuns} degrades rather than guessing at boundaries.
  * </ul>
  */
 public final class GeometryReorder {
@@ -173,8 +173,8 @@ public final class GeometryReorder {
             return FEATURE.apply(RING_CANONICAL.apply(ctx));
         }
         final var vertices = ctx.vertices();
-        final var starts = PartBoundaries.of(ctx, vertices.size());
-        // A single whole-buffer run is PartBoundaries' documented "I cannot locate the boundaries"
+        final var starts = VertexRuns.of(ctx, vertices.size());
+        // A single whole-buffer run is VertexRuns' documented "I cannot locate the boundaries"
         // answer, not a one-part buffer worth reordering.
         if (starts.length < 2) {
             return ctx;
@@ -209,7 +209,7 @@ public final class GeometryReorder {
         }
         final var source = mode == Mode.RING_CANONICAL_THEN_FEATURE ? RING_CANONICAL.apply(ctx) : ctx;
         final var vertices = source.vertices();
-        final var starts = PartBoundaries.of(source, vertices.size());
+        final var starts = VertexRuns.of(source, vertices.size());
         if (starts.length < 2) {
             return null;
         }
@@ -399,7 +399,7 @@ public final class GeometryReorder {
      * streams are untouched. Ties (a repeated smallest position) keep the first occurrence.
      */
     private static BufferContext canonicalRings(BufferContext ctx, List<Vertex> vertices, int[] starts) {
-        final var isLine = PartBoundaries.lineRuns(ctx, starts.length);
+        final var isLine = VertexRuns.lineRuns(ctx, starts.length);
         if (isLine == null) {
             return ctx;
         }
@@ -569,7 +569,7 @@ public final class GeometryReorder {
 
     /**
      * Emits vertices and topology streams in the new order. The streams are permuted with the
-     * features, so {@link PartBoundaries} derives the same run lengths from the result — deriving
+     * features, so {@link VertexRuns} derives the same run lengths from the result — deriving
      * them wrongly is silent, which is why they are rebuilt here rather than carried over.
      */
     private BufferContext rebuild(

@@ -7,7 +7,7 @@ import java.util.HashSet;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.research.buffer.Encoding;
-import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 
 /**
@@ -42,7 +42,7 @@ class LadderTest {
   @Test
   void endsAreTheIdentityAndTheDefault() {
     var ladder = PipelineRegistry.ladder();
-    assertEquals(PipelineConfig.IDENTITY, ladder.getFirst().config());
+    assertEquals(Composition.IDENTITY, ladder.getFirst().config());
     assertEquals(PipelineRegistry.DEFAULT, ladder.getLast().config());
     assertTrue(
         ladder.stream().anyMatch(s -> s.config().equals(PipelineRegistry.GEOMETRY_BEST)),

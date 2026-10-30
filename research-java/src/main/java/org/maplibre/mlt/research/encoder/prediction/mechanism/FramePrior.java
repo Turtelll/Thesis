@@ -28,7 +28,7 @@ import java.util.List;
  * #endRing} — and every value is derived from integer vertices by {@link StrictMath} and IEEE
  * arithmetic, which are specified bit for bit. Nothing is transmitted.
  */
-public final class RingFramePrior {
+public final class FramePrior {
 
     /**
      * The neighbour's frame against the ring's own decoded edges, as an edge length: the neighbour is
@@ -62,7 +62,7 @@ public final class RingFramePrior {
     private int[] next = new int[64];
     private final int[] head = new int[GRID * GRID];
 
-    public RingFramePrior() {
+    public FramePrior() {
         Arrays.fill(head, -1);
     }
 

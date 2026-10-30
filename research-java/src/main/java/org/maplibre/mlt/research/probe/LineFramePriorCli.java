@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.probe;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.LineContinuation;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
@@ -147,8 +147,8 @@ public final class LineFramePriorCli {
             for (var o = 0; o < ORDERS.size(); o++) {
                 final var ctx = ORDERS.get(o).apply(original);
                 final var n = ctx.vertices().size();
-                final var starts = PartBoundaries.of(ctx, n);
-                final var isLine = starts.length < 2 ? null : PartBoundaries.lineRuns(ctx, starts.length);
+                final var starts = VertexRuns.of(ctx, n);
+                final var isLine = starts.length < 2 ? null : VertexRuns.lineRuns(ctx, starts.length);
                 final var predictor = new LineContinuation();
                 final var classes = predictor.classify(ctx, n);
                 for (var r = 0; r < ROWS.size(); r++) {

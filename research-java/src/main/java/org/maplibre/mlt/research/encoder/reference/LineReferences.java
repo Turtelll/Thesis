@@ -2,10 +2,10 @@ package org.maplibre.mlt.research.encoder.reference;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
-import org.maplibre.mlt.research.encoder.reference.SharedVertexRef.BitReader;
-import org.maplibre.mlt.research.encoder.reference.SharedVertexRef.BitWriter;
-import org.maplibre.mlt.research.encoder.reference.SharedVertexRef.PositionTable;
-import org.maplibre.mlt.research.encoder.reference.SharedVertexRef.Runs;
+import org.maplibre.mlt.research.encoder.reference.RingReferences.BitReader;
+import org.maplibre.mlt.research.encoder.reference.RingReferences.BitWriter;
+import org.maplibre.mlt.research.encoder.reference.RingReferences.PositionTable;
+import org.maplibre.mlt.research.encoder.reference.RingReferences.Runs;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * References, for {@link LineContinuation}, into a dictionary of the positions earlier line parts
- * hold — the line counterpart of {@link SharedVertexRef}. Roads meet at junctions, so a part's
+ * hold — the line counterpart of {@link RingReferences}. Roads meet at junctions, so a part's
  * endpoints often repeat a position an earlier part already carries
  * ({@code docs/results/line-shared-vertices.md}).
  *
@@ -36,9 +36,9 @@ import java.util.List;
  *
  * <p>Polygon rings and points in the column keep plain residuals and never enter the dictionary.
  */
-public final class LineSharedVertexRef {
+public final class LineReferences {
 
-    private LineSharedVertexRef() {
+    private LineReferences() {
     }
 
     /**
@@ -87,13 +87,13 @@ public final class LineSharedVertexRef {
      * and index bits {@link #walkForDecoding} reads back. {@code null} when the runs are not
      * derivable from the topology streams (then no vertex can be a reference).
      */
-    public static SharedVertexRef.Scan scan(BufferContext ctx) {
+    public static RingReferences.Scan scan(BufferContext ctx) {
         final var runs = Runs.of(ctx, ctx.vertices().size());
         if (runs == null) {
             return null;
         }
         final var scan = references(ctx.vertices(), runs);
-        return new SharedVertexRef.Scan(
+        return new RingReferences.Scan(
                 scan.vertices(), scan.referenced(), scan.flags().toBytes(), scan.indices().toBytes());
     }
 
@@ -102,7 +102,7 @@ public final class LineSharedVertexRef {
      *
      * @param topo topology streams of the emitted buffer; no vertices needed
      */
-    public static SharedVertexRef.ReferenceWalk walkForDecoding(
+    public static RingReferences.ReferenceWalk walkForDecoding(
             BufferContext topo, int vertexCount, byte[] flags, byte[] indices) {
         final var runs = Runs.of(topo, vertexCount);
         if (runs == null) {
@@ -115,7 +115,7 @@ public final class LineSharedVertexRef {
      * The decoder of {@link #references} as a pass over the buffer: reads an entry or exit flag at
      * every line part end, and keeps the dictionary the encoder keeps.
      */
-    private static final class Walk implements SharedVertexRef.ReferenceWalk {
+    private static final class Walk implements RingReferences.ReferenceWalk {
         private final Runs runs;
         private final int vertexCount;
         private final BitReader flags;
@@ -149,7 +149,7 @@ public final class LineSharedVertexRef {
             final var dictionary = dictionary(vertices);
             final var partEnd = runs.isLine()[run] && (i == runs.starts()[run] || i == runs.end(run) - 1);
             if (partEnd && dictionary.size() > 0 && flags.read(1) == 1) {
-                return dictionary.get(indices.read(SharedVertexRef.width(dictionary.size())));
+                return dictionary.get(indices.read(RingReferences.width(dictionary.size())));
             }
             return null;
         }
@@ -179,7 +179,7 @@ public final class LineSharedVertexRef {
         final var index = dictionary.indexOf(vertex);
         flags.write(index >= 0 ? 1 : 0, 1);
         if (index >= 0) {
-            indices.write(index, SharedVertexRef.width(dictionary.size()));
+            indices.write(index, RingReferences.width(dictionary.size()));
         }
         return index >= 0;
     }

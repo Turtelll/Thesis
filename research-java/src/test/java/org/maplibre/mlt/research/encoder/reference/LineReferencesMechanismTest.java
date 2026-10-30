@@ -13,7 +13,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoder.format.PayloadHeader;
-import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
@@ -27,7 +27,7 @@ import org.maplibre.mlt.research.measurement.verification.Verification;
  * back to the plain predictor with nothing reversed, and either way the decoder needs only the bytes
  * and the topology.
  */
-class LineSharedMechanismTest {
+class LineReferencesMechanismTest {
 
   private static final int LINESTRING = 1;
 
@@ -88,7 +88,7 @@ class LineSharedMechanismTest {
         List.of(), ctx.geometryTypes(), ctx.numGeometries(), ctx.numParts(), ctx.numRings());
   }
 
-  private static PipelineConfig config(Prediction prediction, Segmentation segmentation) {
+  private static Composition config(Prediction prediction, Segmentation segmentation) {
     return PipelineRegistry.DEFAULT.withPredictor(prediction).withSegmentation(segmentation);
   }
 

@@ -26,9 +26,9 @@ import java.util.List;
  * spanning the whole buffer. That is the honest fallback: a transform that cannot locate the
  * boundaries must degrade to the continuous baseline rather than guess at them.
  */
-public final class PartBoundaries {
+public final class VertexRuns {
 
-    private PartBoundaries() {
+    private VertexRuns() {
     }
 
     /**

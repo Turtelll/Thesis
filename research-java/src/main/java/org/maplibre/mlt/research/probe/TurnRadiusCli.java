@@ -2,7 +2,7 @@ package org.maplibre.mlt.research.probe;
 
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 
 import java.io.IOException;
@@ -91,8 +91,8 @@ public final class TurnRadiusCli {
             if (vertices.isEmpty()) {
                 continue;
             }
-            final var starts = PartBoundaries.of(ctx, vertices.size());
-            final var isLineRun = PartBoundaries.lineRuns(ctx, starts.length);
+            final var starts = VertexRuns.of(ctx, vertices.size());
+            final var isLineRun = VertexRuns.lineRuns(ctx, starts.length);
             if (isLineRun == null) {
                 buffersSkipped++;
                 continue;

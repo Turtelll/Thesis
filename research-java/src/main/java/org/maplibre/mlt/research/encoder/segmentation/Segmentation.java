@@ -2,9 +2,9 @@ package org.maplibre.mlt.research.encoder.segmentation;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.ClassifiedPredictor;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
-import org.maplibre.mlt.research.encoder.reference.SharedVertexRef;
+import org.maplibre.mlt.research.encoder.reference.RingReferences;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 
 import java.util.ArrayList;
@@ -134,7 +134,7 @@ public enum Segmentation {
         if (vertexCount == 0) {
             return roles;
         }
-        final var starts = PartBoundaries.of(topo, vertexCount);
+        final var starts = VertexRuns.of(topo, vertexCount);
         if (starts.length == 1 && !topo.geometryTypes().isEmpty()
                 && topo.geometryTypes().stream().allMatch(t -> t == 0 || t == 3)) {
             Arrays.fill(roles, JUMP);
@@ -228,7 +228,7 @@ public enum Segmentation {
      */
     public static List<Vertex> join(
             Layout layout, ClassifiedPredictor predictor, int[][] streams, int vertexCount,
-            SharedVertexRef.ReferenceWalk walk) {
+            RingReferences.ReferenceWalk walk) {
         final var cursors = new int[streams.length];
         final var vertices = new ArrayList<Vertex>(vertexCount);
         final var sided = predictor instanceof Prediction.SideValues s ? s : null;

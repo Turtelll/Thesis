@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.measurement.stats;
 
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
@@ -90,7 +90,7 @@ public final class PipelineStats {
         /** {@code {sum, boundaries}}, or {@code null} if the runs are not derivable. */
         private static long[] jumps(BufferContext ctx) {
             final var vertices = ctx.vertices();
-            var starts = PartBoundaries.of(ctx, vertices.size());
+            var starts = VertexRuns.of(ctx, vertices.size());
             if (starts.length < 2) {
                 if (!ctx.geometryTypes().isEmpty() && ctx.geometryTypes().stream().allMatch(t -> t == 0 || t == 3)) {
                     starts = IntStream.range(0, vertices.size()).toArray();

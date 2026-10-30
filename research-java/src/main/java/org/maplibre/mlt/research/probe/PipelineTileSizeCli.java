@@ -15,7 +15,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoder.reorder.GeometryReorder;
 import org.maplibre.mlt.research.extraction.MbtilesSource;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
-import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
@@ -232,7 +232,7 @@ public final class PipelineTileSizeCli {
      * (the reference), the same without the reorder, the references with no reorder, with Hilbert and
      * with the two greedy chains, and the chains without the references.
      */
-    private static List<PipelineConfig> jointConfigs(String layer) {
+    private static List<Composition> jointConfigs(String layer) {
         final var base = PipelineRegistry.forLayer(layer)
                 .withPredictor(Prediction.LINE_CONTINUATION_FRAME_HEADING)
                 .withSegmentation(Segmentation.CLASS);

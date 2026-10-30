@@ -17,7 +17,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 import org.maplibre.mlt.research.encoder.format.PayloadHeader;
-import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncodingTest;
 import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
 
@@ -156,7 +156,7 @@ class PredictionMechanismTest {
   @ParameterizedTest
   @EnumSource(Prediction.class)
   void headerCarriesThePredictor(Prediction prediction) {
-    var config = PipelineConfig.IDENTITY.withPredictor(prediction).withWidth(ByteWidth.VARINT_SPLIT);
+    var config = Composition.IDENTITY.withPredictor(prediction).withWidth(ByteWidth.VARINT_SPLIT);
     var header = PayloadHeader.write(config);
     assertEquals(
         config, PayloadHeader.parse(header[0] & 0xFF, header[1] & 0xFF, config.reorder()));

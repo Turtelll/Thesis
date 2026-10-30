@@ -2,7 +2,7 @@ package org.maplibre.mlt.research.measurement.verification;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -102,7 +102,7 @@ public final class GeometryEquivalence {
      */
     private static List<List<Vertex>> parts(BufferContext ctx) {
         final var vertices = ctx.vertices();
-        final var starts = PartBoundaries.of(ctx, vertices.size());
+        final var starts = VertexRuns.of(ctx, vertices.size());
         final var parts = new ArrayList<List<Vertex>>(starts.length);
         for (var i = 0; i < starts.length; i++) {
             final var end = i + 1 < starts.length ? starts[i + 1] : vertices.size();
@@ -118,7 +118,7 @@ public final class GeometryEquivalence {
      * Per part, whether it is a polygon ring; all {@code false} (strict) if not derivable.
      */
     private static boolean[] ringRuns(BufferContext ctx, int runCount) {
-        final var isLine = PartBoundaries.lineRuns(ctx, runCount);
+        final var isLine = VertexRuns.lineRuns(ctx, runCount);
         final var isRing = new boolean[runCount];
         if (isLine != null) {
             for (var i = 0; i < runCount; i++) {

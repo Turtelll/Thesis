@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.encoder.reference;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 
 import java.io.ByteArrayOutputStream;
@@ -27,9 +27,9 @@ import java.util.List;
  * <p>Simplification against the probe this came from: the window and the "earlier" set are counted
  * in polygon rings, not polygons, so a hole sharing a vertex with its own outer ring also counts.
  */
-public final class SharedVertexRef {
+public final class RingReferences {
 
-    private SharedVertexRef() {
+    private RingReferences() {
     }
 
     static final int WINDOW = 4;
@@ -116,7 +116,7 @@ public final class SharedVertexRef {
 
     /**
      * What a decoder needs from a reference scheme, ring ({@link Walk}) or line ({@link
-     * LineSharedVertexRef#walkForDecoding}): per vertex in order, first {@link #decode} (the vertex
+     * LineReferences#walkForDecoding}): per vertex in order, first {@link #decode} (the vertex
      * it references, or {@code null} when it carries a residual), then {@link #accept} once the
      * vertex is known.
      */
@@ -395,11 +395,11 @@ public final class SharedVertexRef {
      */
     record Runs(int[] starts, boolean[] isLine, int vertexCount) {
         static Runs of(BufferContext ctx, int vertexCount) {
-            final var starts = PartBoundaries.of(ctx, vertexCount);
+            final var starts = VertexRuns.of(ctx, vertexCount);
             if (starts.length < 2) {
                 return null;
             }
-            final var isLine = PartBoundaries.lineRuns(ctx, starts.length);
+            final var isLine = VertexRuns.lineRuns(ctx, starts.length);
             return isLine == null ? null : new Runs(starts, isLine, vertexCount);
         }
 

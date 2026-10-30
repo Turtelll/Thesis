@@ -5,7 +5,7 @@ import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.decoder.DecodingUtils;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.baseline.VertexTransform;
-import org.maplibre.mlt.research.buffer.Topology;
+import org.maplibre.mlt.research.buffer.VertexRunIndex;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +34,7 @@ final class PredictorTransform implements VertexTransform {
     public int[] apply(BufferContext ctx) {
         final var vertices = ctx.vertices();
         final var n = vertices.size();
-        final var topology = Topology.of(ctx, n);
+        final var topology = VertexRunIndex.of(ctx, n);
         final var xs = new int[n];
         final var ys = new int[n];
         for (var i = 0; i < n; i++) {
@@ -55,7 +55,7 @@ final class PredictorTransform implements VertexTransform {
     @Override
     public List<Vertex> invert(int[] values, BufferContext ctx) {
         final var n = values.length / 2;
-        final var topology = Topology.of(ctx, n);
+        final var topology = VertexRunIndex.of(ctx, n);
         final var xs = new int[n];
         final var ys = new int[n];
         final var out = new int[2];

@@ -15,7 +15,7 @@ import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.baseline.VertexTransform;
 import org.maplibre.mlt.research.encoder.format.PayloadHeader;
-import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 
 /** S7 verification: every layout is a permutation of the bytes, and the anchors equal the old codecs. */
@@ -34,13 +34,13 @@ class TransposeMechanismTest {
     return BufferContext.of(vertices);
   }
 
-  private static byte[] body(PipelineConfig config, BufferContext ctx) {
+  private static byte[] body(Composition config, BufferContext ctx) {
     var payload = new PipelineEncoding(config).encode(ctx).payload();
     return Arrays.copyOfRange(payload, PayloadHeader.HEADER_BYTES, payload.length);
   }
 
-  private static PipelineConfig plain(ByteWidth width, Transpose transpose) {
-    return PipelineConfig.IDENTITY.withWidth(width).withTranspose(transpose);
+  private static Composition plain(ByteWidth width, Transpose transpose) {
+    return Composition.IDENTITY.withWidth(width).withTranspose(transpose);
   }
 
   @ParameterizedTest

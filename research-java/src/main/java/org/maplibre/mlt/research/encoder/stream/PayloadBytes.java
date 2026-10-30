@@ -8,9 +8,9 @@ import java.util.Arrays;
  * cursor over a byte array. Kept here rather than borrowed from mlt-core so a value above
  * {@code Integer.MAX_VALUE} (a zigzag code stored as a signed int) is never reinterpreted.
  */
-public final class Bytes {
+public final class PayloadBytes {
 
-    private Bytes() {
+    private PayloadBytes() {
     }
 
     /** Writes {@code value} as an unsigned LEB128 varint (negative ints are the large unsigned values). */

@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.encoder.prediction.mechanism;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 
 import java.util.List;
@@ -51,9 +51,9 @@ public final class QuadCornerLine implements ClassifiedPredictor {
 
     @Override
     public int[] classify(BufferContext ctx, int vertexCount) {
-        final var starts = PartBoundaries.of(ctx, vertexCount);
+        final var starts = VertexRuns.of(ctx, vertexCount);
         final var classes = new int[vertexCount];
-        final var isLineRun = PartBoundaries.lineRuns(ctx, starts.length);
+        final var isLineRun = VertexRuns.lineRuns(ctx, starts.length);
         for (var r = 0; r < starts.length; r++) {
             final var start = starts[r];
             final var end = r + 1 < starts.length ? starts[r + 1] : vertexCount;

@@ -3,7 +3,7 @@ package org.maplibre.mlt.research.measurement.report;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.measurement.selection.BufferFeatures;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
-import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.stream.Transpose;
@@ -40,19 +40,19 @@ public final class ChoiceCorrelation {
         TERMINAL(c -> c.width() == ByteWidth.VARINT_SPLIT ? "split"
                 : c.transpose() == Transpose.INTERLEAVED_PLANES ? "planes" : "escape");
 
-        private final Function<PipelineConfig, String> value;
+        private final Function<Composition, String> value;
 
-        Stage(Function<PipelineConfig, String> value) {
+        Stage(Function<Composition, String> value) {
             this.value = value;
         }
 
-        String of(PipelineConfig config) {
+        String of(Composition config) {
             return value.apply(config);
         }
     }
 
-    private record Row(ManifestEntry entry, BufferFeatures features, PipelineConfig reference,
-                       Map<String, PipelineConfig> others) {
+    private record Row(ManifestEntry entry, BufferFeatures features, Composition reference,
+                       Map<String, Composition> others) {
 
         int fold() {
             return (entry.x() + entry.y()) & 1;
@@ -68,7 +68,7 @@ public final class ChoiceCorrelation {
     }
 
     /** One buffer: its features and what every tile selector chose for it, by selector name. */
-    public void record(ManifestEntry entry, BufferFeatures features, Map<String, PipelineConfig> choices) {
+    public void record(ManifestEntry entry, BufferFeatures features, Map<String, Composition> choices) {
         final var others = new LinkedHashMap<>(choices);
         final var chosen = others.remove(reference);
         rows.add(new Row(entry, features, chosen, others));
