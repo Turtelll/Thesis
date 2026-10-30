@@ -4,7 +4,7 @@ import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.decoder.DecodingUtils;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
-import org.maplibre.mlt.research.pipeline.Segmentation;
+import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
 
 import java.util.Arrays;
 import java.util.List;

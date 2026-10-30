@@ -14,9 +14,9 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexTransform;
-import org.maplibre.mlt.research.pipeline.PayloadHeader;
-import org.maplibre.mlt.research.pipeline.PipelineConfig;
-import org.maplibre.mlt.research.pipeline.PipelineEncoding;
+import org.maplibre.mlt.research.encoder.format.PayloadHeader;
+import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 
 /** S7 verification: every layout is a permutation of the bytes, and the anchors equal the old codecs. */
 class TransposeMechanismTest {

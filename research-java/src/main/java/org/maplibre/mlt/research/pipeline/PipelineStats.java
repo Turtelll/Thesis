@@ -7,6 +7,7 @@ import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
+import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
 
 import java.util.ArrayList;
 import java.util.Arrays;

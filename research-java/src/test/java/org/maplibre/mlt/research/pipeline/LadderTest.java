@@ -7,6 +7,8 @@ import java.util.HashSet;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.research.buffer.Encoding;
+import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 
 /**
  * {@code pipeline --step ladder} sizes the build-up of the pipeline without checking round trips, so

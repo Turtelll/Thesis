@@ -16,10 +16,10 @@ import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
-import org.maplibre.mlt.research.pipeline.PayloadHeader;
-import org.maplibre.mlt.research.pipeline.PipelineConfig;
-import org.maplibre.mlt.research.pipeline.PipelineEncodingTest;
-import org.maplibre.mlt.research.pipeline.Segmentation;
+import org.maplibre.mlt.research.encoder.format.PayloadHeader;
+import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.PipelineEncodingTest;
+import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
 
 /**
  * S2 verification: the residuals the pipeline's predictors produce are the ones of the old

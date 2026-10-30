@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.pipeline;
+package org.maplibre.mlt.research.encoder.format;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,6 +22,8 @@ import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
+import org.maplibre.mlt.research.pipeline.PipelineRegistry;
+import org.maplibre.mlt.research.pipeline.Verification;
 
 /**
  * Round-trips every registered pipeline row over the same hand-built buffers as {@code

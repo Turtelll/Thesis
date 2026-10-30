@@ -15,12 +15,12 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoder.reorder.GeometryReorder;
 import org.maplibre.mlt.research.extraction.MbtilesSource;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
-import org.maplibre.mlt.research.pipeline.PipelineConfig;
-import org.maplibre.mlt.research.pipeline.PipelineEncoding;
+import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.pipeline.PipelineRegistry;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
-import org.maplibre.mlt.research.pipeline.Segmentation;
+import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
 
 import java.io.File;
 import java.util.ArrayList;

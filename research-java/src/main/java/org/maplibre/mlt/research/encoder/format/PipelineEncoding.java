@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.pipeline;
+package org.maplibre.mlt.research.encoder.format;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding;
@@ -9,6 +9,7 @@ import org.maplibre.mlt.research.encoder.reference.SharedVertexRef;
 import org.maplibre.mlt.research.encoder.stream.Bytes;
 import org.maplibre.mlt.research.encoder.stream.StreamCodec;
 import org.maplibre.mlt.research.encoder.stream.Transpose;
+import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
 
 import java.io.ByteArrayOutputStream;
 import java.util.List;

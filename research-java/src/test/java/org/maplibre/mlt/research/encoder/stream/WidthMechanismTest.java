@@ -1,6 +1,6 @@
 package org.maplibre.mlt.research.encoder.stream;
 
-import org.maplibre.mlt.research.pipeline.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.PipelineConfig;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

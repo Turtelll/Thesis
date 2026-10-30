@@ -5,6 +5,9 @@ import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
+import org.maplibre.mlt.research.encoder.format.PayloadHeader;
+import org.maplibre.mlt.research.encoder.format.PipelineConfig;
+import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 
 import java.util.ArrayList;
 import java.util.List;
