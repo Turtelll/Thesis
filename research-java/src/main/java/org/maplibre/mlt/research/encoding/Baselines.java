@@ -1,5 +1,6 @@
 package org.maplibre.mlt.research.encoding;
 
+import org.maplibre.mlt.research.buffer.Encoding;
 import java.util.List;
 
 public final class Baselines {

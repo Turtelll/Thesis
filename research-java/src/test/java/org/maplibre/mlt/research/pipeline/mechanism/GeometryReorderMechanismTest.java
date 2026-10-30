@@ -11,8 +11,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoding.GeometryEquivalence;
-import org.maplibre.mlt.research.encoding.PartBoundaries;
-import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
+import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 
 /**
  * Pins the properties that make a measured reordering win meaningful rather than an artifact: it

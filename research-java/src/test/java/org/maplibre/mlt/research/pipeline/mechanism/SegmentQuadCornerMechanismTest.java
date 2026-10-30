@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
+import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 
 /**
  * Pins that {@code SEGMENT_QUAD_CORNER} really is the composition of its two parts: on a polygon column it applies {@link QuadCorner}'s parallelogram predictor

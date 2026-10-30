@@ -1,8 +1,8 @@
 package org.maplibre.mlt.research.pipeline.mechanism;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.PartBoundaries;
-import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
+import org.maplibre.mlt.research.buffer.PartBoundaries;
+import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,7 +13,7 @@ import java.util.Map;
  * Reorders whole features within a buffer so each one starts near where the previous one ended,
  * shrinking the part-start residuals that a continuous delta cursor pays at every boundary.
  *
- * <p>This is <b>not</b> an {@link org.maplibre.mlt.research.encoding.Encoding}. It rewrites the
+ * <p>This is <b>not</b> an {@link org.maplibre.mlt.research.buffer.Encoding}. It rewrites the
  * {@link BufferContext} before any encoding runs, so every existing encoding stays byte-for-byte
  * unchanged and strictly lossless <em>against the reordered context</em>:
  *
@@ -21,7 +21,7 @@ import java.util.Map;
  *
  * <p>The reason this can pay at all is that <b>no permutation is transmitted</b> — the order need
  * not be recovered: no coordinates change, only a geometry's position <em>within</em> the buffer,
- * which the MLT spec allows (see {@link org.maplibre.mlt.research.encoding.Encoding#reordersGeometries()}
+ * which the MLT spec allows (see {@link org.maplibre.mlt.research.buffer.Encoding#reordersGeometries()}
  * and {@code docs/results/reordering.md} for the earlier experiments that assumed otherwise). The
  * decoder does not reconstruct the original layout and is not asked to — it emits the order it
  * reads. What must be preserved is the <em>set</em> of geometries, which {@link

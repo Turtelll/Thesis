@@ -1,7 +1,8 @@
 package org.maplibre.mlt.research.encoding;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
+import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
+import org.maplibre.mlt.research.buffer.PartBoundaries;
 
 import java.util.ArrayList;
 import java.util.HashMap;

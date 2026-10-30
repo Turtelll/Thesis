@@ -1,7 +1,7 @@
 package org.maplibre.mlt.research.cli;
 
 import org.maplibre.mlt.research.encoding.Baselines;
-import org.maplibre.mlt.research.encoding.Encoding;
+import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.pipeline.BufferFeatures;
@@ -14,7 +14,7 @@ import org.maplibre.mlt.research.pipeline.Selector;
 import org.maplibre.mlt.research.pipeline.StageRules;
 import org.maplibre.mlt.research.pipeline.TileSelector;
 import org.maplibre.mlt.research.pipeline.Verification;
-import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
+import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -340,7 +340,7 @@ public final class PipelineCli {
             OracleReport oracle,
             String layer,
             List<Encoding> rows,
-            org.maplibre.mlt.research.encoding.Encoding.BufferContext ctx,
+            org.maplibre.mlt.research.buffer.Encoding.BufferContext ctx,
             List<Compressor> compressors,
             TileCompression perTile,
             StringBuilder line) {

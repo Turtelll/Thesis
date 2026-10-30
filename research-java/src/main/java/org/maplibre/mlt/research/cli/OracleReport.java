@@ -1,6 +1,6 @@
 package org.maplibre.mlt.research.cli;
 
-import org.maplibre.mlt.research.encoding.Encoding;
+import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.pipeline.PipelineEncoding;
 import org.maplibre.mlt.research.pipeline.Transpose;
 

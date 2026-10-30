@@ -1,6 +1,7 @@
 package org.maplibre.mlt.research.workshop;
 
 import org.maplibre.mlt.research.encoding.VertexTransform;
+import org.maplibre.mlt.research.buffer.Topology;
 
 import java.util.function.Supplier;
 

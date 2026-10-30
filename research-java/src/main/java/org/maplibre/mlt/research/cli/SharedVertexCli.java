@@ -1,6 +1,6 @@
 package org.maplibre.mlt.research.cli;
 
-import org.maplibre.mlt.research.encoding.PartBoundaries;
+import org.maplibre.mlt.research.buffer.PartBoundaries;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 
 import java.io.IOException;

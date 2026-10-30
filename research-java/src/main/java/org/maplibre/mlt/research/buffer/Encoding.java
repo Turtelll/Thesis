@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoding;
+package org.maplibre.mlt.research.buffer;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 

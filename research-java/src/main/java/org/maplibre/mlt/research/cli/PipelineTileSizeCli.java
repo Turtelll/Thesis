@@ -11,7 +11,7 @@ import org.maplibre.mlt.converter.mvt.MvtUtils;
 import org.maplibre.mlt.data.Feature;
 import org.maplibre.mlt.data.Layer;
 import org.maplibre.mlt.data.MapboxVectorTile;
-import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
+import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.pipeline.mechanism.GeometryReorder;
 import org.maplibre.mlt.research.extraction.MbtilesSource;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;

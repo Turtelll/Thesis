@@ -1,6 +1,6 @@
 package org.maplibre.mlt.research.pipeline;
 
-import org.maplibre.mlt.research.encoding.Encoding;
+import org.maplibre.mlt.research.buffer.Encoding;
 
 import java.util.ArrayList;
 import java.util.Arrays;

@@ -1,11 +1,11 @@
 package org.maplibre.mlt.research.cli;
 
 import org.maplibre.mlt.research.encoding.Baselines;
-import org.maplibre.mlt.research.encoding.Encoding;
+import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.encoding.IntCodec;
 import org.maplibre.mlt.research.encoding.VertexBufferCodec;
-import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
-import org.maplibre.mlt.research.encoding.Encoding.EncodedBuffer;
+import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
+import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.encoding.VertexTransform;
 import org.maplibre.mlt.research.pipeline.PipelineRegistry;
 import org.maplibre.mlt.research.pipeline.Verification;

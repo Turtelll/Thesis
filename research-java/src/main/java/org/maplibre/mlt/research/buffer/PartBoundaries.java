@@ -1,6 +1,6 @@
-package org.maplibre.mlt.research.encoding;
+package org.maplibre.mlt.research.buffer;
 
-import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
+import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 
 import java.util.List;
 

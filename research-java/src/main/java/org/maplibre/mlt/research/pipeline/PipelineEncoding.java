@@ -1,10 +1,10 @@
 package org.maplibre.mlt.research.pipeline;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoding.Encoding;
-import org.maplibre.mlt.research.encoding.StreamMetadata;
-import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
-import org.maplibre.mlt.research.encoding.Encoding.EncodedBuffer;
+import org.maplibre.mlt.research.buffer.Encoding;
+import org.maplibre.mlt.research.buffer.StreamMetadata;
+import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
+import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.pipeline.mechanism.SharedVertexRef;
 
 import java.io.ByteArrayOutputStream;

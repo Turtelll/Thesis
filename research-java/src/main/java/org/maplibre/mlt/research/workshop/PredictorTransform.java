@@ -3,8 +3,9 @@ package org.maplibre.mlt.research.workshop;
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.decoder.DecodingUtils;
-import org.maplibre.mlt.research.encoding.Encoding.BufferContext;
+import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoding.VertexTransform;
+import org.maplibre.mlt.research.buffer.Topology;
 
 import java.util.ArrayList;
 import java.util.List;

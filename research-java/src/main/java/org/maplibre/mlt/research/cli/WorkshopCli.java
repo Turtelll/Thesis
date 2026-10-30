@@ -1,8 +1,8 @@
 package org.maplibre.mlt.research.cli;
 
 import org.maplibre.mlt.research.encoding.Baselines;
-import org.maplibre.mlt.research.encoding.Encoding;
-import org.maplibre.mlt.research.encoding.Encoding.EncodedBuffer;
+import org.maplibre.mlt.research.buffer.Encoding;
+import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.pipeline.Reorder;
 import org.maplibre.mlt.research.pipeline.Verification;
