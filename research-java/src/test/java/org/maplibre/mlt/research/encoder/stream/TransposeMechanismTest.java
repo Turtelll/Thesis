@@ -13,7 +13,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
-import org.maplibre.mlt.research.encoding.VertexTransform;
+import org.maplibre.mlt.research.baseline.VertexTransform;
 import org.maplibre.mlt.research.encoder.format.PayloadHeader;
 import org.maplibre.mlt.research.encoder.format.PipelineConfig;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;

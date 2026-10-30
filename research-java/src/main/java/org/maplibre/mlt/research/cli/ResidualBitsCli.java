@@ -1,13 +1,13 @@
 package org.maplibre.mlt.research.cli;
 
-import org.maplibre.mlt.research.encoding.Baselines;
+import org.maplibre.mlt.research.baseline.Baselines;
 import org.maplibre.mlt.research.buffer.Encoding;
-import org.maplibre.mlt.research.encoding.VertexBufferCodec;
+import org.maplibre.mlt.research.baseline.VertexBufferCodec;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
-import org.maplibre.mlt.research.encoding.VertexTransform;
+import org.maplibre.mlt.research.baseline.VertexTransform;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
-import org.maplibre.mlt.research.pipeline.PredictionTransform;
+import org.maplibre.mlt.research.workshop.PredictionTransform;
 
 import java.io.IOException;
 import java.nio.file.Path;

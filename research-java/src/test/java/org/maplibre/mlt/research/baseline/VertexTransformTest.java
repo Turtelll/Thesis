@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoding;
+package org.maplibre.mlt.research.baseline;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

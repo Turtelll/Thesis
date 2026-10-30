@@ -13,6 +13,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.encoder.format.PipelineEncodingTest;
+import org.maplibre.mlt.research.registry.PipelineRegistry;
 
 /**
  * The selection on the tile: every chosen buffer round-trips, the tile is never larger than the

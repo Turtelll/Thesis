@@ -4,7 +4,7 @@ import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.pipeline.BufferFeatures;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 import org.maplibre.mlt.research.encoder.format.PipelineConfig;
-import org.maplibre.mlt.research.pipeline.PipelineRegistry;
+import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.stream.Transpose;
 

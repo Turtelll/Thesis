@@ -17,7 +17,7 @@ import org.maplibre.mlt.research.extraction.MbtilesSource;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.encoder.format.PipelineConfig;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
-import org.maplibre.mlt.research.pipeline.PipelineRegistry;
+import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.encoder.segmentation.Segmentation;

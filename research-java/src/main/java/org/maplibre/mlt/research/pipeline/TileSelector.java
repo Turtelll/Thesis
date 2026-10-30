@@ -4,6 +4,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.encoder.format.PipelineConfig;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
+import org.maplibre.mlt.research.registry.PipelineRegistry;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;

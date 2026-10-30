@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoding;
+package org.maplibre.mlt.research.baseline;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -18,6 +18,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.workshop.Workshop;
 import org.maplibre.mlt.research.buffer.Encoding;
+import org.maplibre.mlt.research.encoding.GeometryEquivalence;
 
 /**
  * Round-trips real extracted vertex buffers through every registered encoding and compares against

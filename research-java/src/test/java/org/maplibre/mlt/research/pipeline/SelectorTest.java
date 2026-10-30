@@ -22,6 +22,7 @@ import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.encoder.format.PipelineEncodingTest;
+import org.maplibre.mlt.research.registry.PipelineRegistry;
 
 /**
  * The selection loop: it round-trips, it is never larger than the default pipeline under the

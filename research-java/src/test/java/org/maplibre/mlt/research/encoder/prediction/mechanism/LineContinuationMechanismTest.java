@@ -8,9 +8,9 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
-import org.maplibre.mlt.research.pipeline.PredictionTransform;
+import org.maplibre.mlt.research.workshop.PredictionTransform;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
-import org.maplibre.mlt.research.encoding.VertexTransform;
+import org.maplibre.mlt.research.baseline.VertexTransform;
 
 /**
  * Pins that {@code LINE_CONTINUATION} predicts on LineString interiors only, never on polygon

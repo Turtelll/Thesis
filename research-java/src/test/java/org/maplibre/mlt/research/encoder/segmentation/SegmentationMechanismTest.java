@@ -19,7 +19,7 @@ import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.encoder.format.PayloadHeader;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.encoder.format.PipelineEncodingTest;
-import org.maplibre.mlt.research.pipeline.PipelineRegistry;
+import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.pipeline.Verification;
 
 /**

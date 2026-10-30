@@ -43,7 +43,7 @@ public final class GeometryReorder {
      * The identity: the buffer is passed through untouched.
      *
      * <p>This is what makes reordering an <em>optional</em> component of {@link
-     * org.maplibre.mlt.research.encoding.VertexBufferCodec} rather than a separate wrapper class —
+     * org.maplibre.mlt.research.baseline.VertexBufferCodec} rather than a separate wrapper class —
      * a codec always has a reorder, and one that does not reorder has this one. It also contributes
      * no name suffix, so an unreordered encoding's name is unchanged.
      */

@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
-import org.maplibre.mlt.research.pipeline.PredictionTransform;
+import org.maplibre.mlt.research.workshop.PredictionTransform;
 
 /**
  * Pins {@code QUAD_CORNER_SHARED_FRAME}: ring edges are coded in the frame of the nearest decoded

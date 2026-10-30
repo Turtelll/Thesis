@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.pipeline;
+package org.maplibre.mlt.research.registry;
 
 import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;

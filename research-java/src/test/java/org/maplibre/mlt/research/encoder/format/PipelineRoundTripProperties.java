@@ -14,7 +14,7 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
-import org.maplibre.mlt.research.pipeline.PipelineRegistry;
+import org.maplibre.mlt.research.registry.PipelineRegistry;
 
 /**
  * Property: every row of the pipeline, on random buffers of points, lines, rectangles and

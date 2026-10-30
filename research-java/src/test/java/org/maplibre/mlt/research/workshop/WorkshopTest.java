@@ -17,8 +17,7 @@ import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoder.stream.IntCodec;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
-import org.maplibre.mlt.research.pipeline.PredictionTransform;
-import org.maplibre.mlt.research.encoding.VertexTransform;
+import org.maplibre.mlt.research.baseline.VertexTransform;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.QuadCornerLine;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.SegmentQuadCorner;
 

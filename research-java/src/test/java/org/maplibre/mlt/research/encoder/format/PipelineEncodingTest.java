@@ -19,10 +19,10 @@ import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.encoder.stream.IntCodec;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
-import org.maplibre.mlt.research.encoding.VertexTransform;
+import org.maplibre.mlt.research.baseline.VertexTransform;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
-import org.maplibre.mlt.research.pipeline.PipelineRegistry;
+import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.pipeline.Verification;
 
 /**

@@ -12,7 +12,7 @@ import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoder.format.PipelineConfig;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
-import org.maplibre.mlt.research.pipeline.PipelineRegistry;
+import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
 import org.maplibre.mlt.research.pipeline.Verification;

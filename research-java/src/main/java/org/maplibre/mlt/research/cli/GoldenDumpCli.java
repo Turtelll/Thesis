@@ -1,13 +1,13 @@
 package org.maplibre.mlt.research.cli;
 
 import com.aayushatharva.brotli4j.encoder.Encoder;
-import org.maplibre.mlt.research.encoding.Baselines;
+import org.maplibre.mlt.research.baseline.Baselines;
 import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
-import org.maplibre.mlt.research.pipeline.PipelineRegistry;
+import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.pipeline.Verification;
 
 import java.io.BufferedReader;

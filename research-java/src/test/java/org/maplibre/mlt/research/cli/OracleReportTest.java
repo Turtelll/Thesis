@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.HashSet;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.maplibre.mlt.research.pipeline.PipelineRegistry;
+import org.maplibre.mlt.research.registry.PipelineRegistry;
 
 /**
  * The per-buffer oracle of {@code pipeline --oracle}: it picks the smallest candidate per backend,

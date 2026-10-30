@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
-import org.maplibre.mlt.research.pipeline.PredictionTransform;
+import org.maplibre.mlt.research.workshop.PredictionTransform;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 
 /**

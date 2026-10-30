@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoding;
+package org.maplibre.mlt.research.baseline;
 
 import org.maplibre.mlt.research.buffer.Encoding;
 import org.maplibre.mlt.research.buffer.StreamMetadata;

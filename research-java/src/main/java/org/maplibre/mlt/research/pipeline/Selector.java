@@ -8,6 +8,7 @@ import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.encoder.format.PayloadHeader;
 import org.maplibre.mlt.research.encoder.format.PipelineConfig;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
+import org.maplibre.mlt.research.registry.PipelineRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
