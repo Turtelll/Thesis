@@ -8,6 +8,7 @@ import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
+import org.maplibre.mlt.research.registry.CompositionGrids;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 
 import java.util.ArrayList;
@@ -46,7 +47,7 @@ public final class StepProbes {
     /** The probes of one step. */
     public static List<Probe> probes(String step) {
         return switch (step) {
-            case "s1" -> List.of(new JumpProbe(PipelineRegistry.s1Orders()));
+            case "s1" -> List.of(new JumpProbe(CompositionGrids.s1Orders()));
             case "s2" -> List.of(new PredictProbe());
             case "s3" -> List.of(new RoleProbe());
             case "s6" -> List.of(new WidthProbe());

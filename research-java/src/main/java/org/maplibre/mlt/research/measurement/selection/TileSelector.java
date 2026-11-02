@@ -5,6 +5,7 @@ import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.registry.LayerCompositions;
+import org.maplibre.mlt.research.registry.CompositionGrids;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 
 import java.io.ByteArrayOutputStream;
@@ -140,7 +141,7 @@ public final class TileSelector {
      * in the grid), so every layer can start from its default and is never worse than it.
      */
     private static List<Composition> defaultCandidates() {
-        final var all = new ArrayList<>(PipelineRegistry.oracleConfigs());
+        final var all = new ArrayList<>(CompositionGrids.oracleConfigs());
         for (final var layer : LayerCompositions.fittedLayers()) {
             final var layerDefault = LayerCompositions.forLayer(layer);
             if (!all.contains(layerDefault)) {

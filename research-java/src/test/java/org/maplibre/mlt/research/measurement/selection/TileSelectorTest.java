@@ -14,7 +14,7 @@ import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.encoder.format.PipelineEncodingTest;
 import org.maplibre.mlt.research.registry.LayerCompositions;
-import org.maplibre.mlt.research.registry.PipelineRegistry;
+import org.maplibre.mlt.research.registry.CompositionGrids;
 
 /**
  * The selection on the tile: every chosen buffer round-trips, the tile is never larger than the
@@ -99,7 +99,7 @@ class TileSelectorTest {
   @Test
   void theOracleRoundTripsAndBeatsBothStartsOnTheTile() {
     var buffers = tile();
-    var oracle = TileSelector.oracle("gzip", BufferSelectorTest::gzipSize, PipelineRegistry.bestGrid());
+    var oracle = TileSelector.oracle("gzip", BufferSelectorTest::gzipSize, CompositionGrids.bestGrid());
     var search = oracle.search(LAYERS, oracle.encode(buffers));
     assertEquals(buffers.size(), search.tile().size());
     assertEquals(buffers.size(), search.alone().size());
@@ -128,7 +128,7 @@ class TileSelectorTest {
   @Test
   void aSearchRejectsATrialOfOtherCandidates() {
     var buffers = tile();
-    var oracle = TileSelector.oracle("gzip", BufferSelectorTest::gzipSize, PipelineRegistry.bestGrid());
+    var oracle = TileSelector.oracle("gzip", BufferSelectorTest::gzipSize, CompositionGrids.bestGrid());
     var trial = new TileSelector("gzip", BufferSelectorTest::gzipSize).encode(buffers);
     org.junit.jupiter.api.Assertions.assertThrows(
         IllegalArgumentException.class, () -> oracle.search(LAYERS, trial));
@@ -152,7 +152,7 @@ class TileSelectorTest {
   void startsFromThePerLayerDefault() {
     var candidates = new TileSelector("gzip", BufferSelectorTest::gzipSize).candidates();
     // the 48-row oracle grid first, then each distinct layer default it lacks (the ring-frame rows)
-    var grid = PipelineRegistry.oracleConfigs();
+    var grid = CompositionGrids.oracleConfigs();
     assertEquals(48, grid.size());
     assertEquals(grid, candidates.subList(0, 48));
     var extras =

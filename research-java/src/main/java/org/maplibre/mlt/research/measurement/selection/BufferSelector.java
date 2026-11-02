@@ -8,6 +8,7 @@ import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.encoder.format.PayloadHeader;
 import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
+import org.maplibre.mlt.research.registry.CompositionGrids;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 
 import java.util.ArrayList;
@@ -52,7 +53,7 @@ public final class BufferSelector implements Encoding {
         this.reorder = reorder;
         this.backend = backend;
         this.size = size;
-        for (final var config : PipelineRegistry.candidateConfigs(reorder)) {
+        for (final var config : CompositionGrids.candidateConfigs(reorder)) {
             candidates.add(new PipelineEncoding(config));
         }
     }

@@ -8,6 +8,7 @@ import org.maplibre.mlt.research.measurement.selection.BufferFeatures;
 import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.registry.LayerCompositions;
+import org.maplibre.mlt.research.registry.CompositionGrids;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.measurement.stats.StepProbes;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
@@ -103,7 +104,7 @@ public final class MeasureHarness {
         final var tileOracles = bestStep
                 ? compressors.stream()
                         .map(compressor -> TileSelector.oracle(compressor.label(), compressor::size,
-                                PipelineRegistry.bestGrid()))
+                                CompositionGrids.bestGrid()))
                         .toList()
                 : List.<TileSelector>of();
         final var aloneOracle = bestStep ? new OracleReport(rows, compressors) : null;

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.HashSet;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.maplibre.mlt.research.registry.CompositionGrids;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.measurement.compression.Compressor;
 
@@ -21,7 +22,7 @@ class OracleReportTest {
 
   @Test
   void picksTheSmallestPerBackendAndBreaksTiesTowardsTheFirst() {
-    var grid = PipelineRegistry.oracle();
+    var grid = CompositionGrids.oracle();
     var report = new OracleReport(grid.subList(0, 3), TWO);
     // candidate 2 is smallest under backend 0, candidate 1 under backend 1, backend 1 ties 0 and 1 first
     var sizes = new long[][] {{10, 5}, {9, 5}, {4, 7}};
@@ -32,7 +33,7 @@ class OracleReportTest {
 
   @Test
   void gridStartsWithTheDefaultAndHasDistinctRows() {
-    var grid = PipelineRegistry.oracle();
+    var grid = CompositionGrids.oracle();
     assertEquals(48, grid.size());
     assertEquals(PipelineRegistry.DEFAULT.name(), grid.getFirst().name());
     var names = new HashSet<String>();
@@ -43,7 +44,7 @@ class OracleReportTest {
 
   @Test
   void labelsAreDistinctPerBackend() {
-    var report = new OracleReport(PipelineRegistry.oracle().subList(0, 2), Compressor.all(9));
+    var report = new OracleReport(CompositionGrids.oracle().subList(0, 2), Compressor.all(9));
     var labels = new HashSet<String>();
     for (var c = 0; c < Compressor.all(9).size(); c++) {
       assertTrue(labels.add(report.label(c)));

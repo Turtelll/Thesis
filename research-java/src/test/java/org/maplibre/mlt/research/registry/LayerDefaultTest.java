@@ -47,7 +47,7 @@ class LayerDefaultTest {
 
   @Test
   void theOracleGridHoldsEveryLayerDefault() {
-    var grid = PipelineRegistry.bestGrid();
+    var grid = CompositionGrids.bestGrid();
     assertEquals(252, grid.size());
     assertEquals(grid.size(), new java.util.HashSet<>(grid).size(), "the grid has duplicates");
     assertTrue(grid.contains(PipelineRegistry.DEFAULT));
