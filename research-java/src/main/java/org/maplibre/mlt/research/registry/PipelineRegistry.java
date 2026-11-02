@@ -111,176 +111,6 @@ public final class PipelineRegistry {
                 "shared", "framelines", "linesshared");
     }
 
-    /**
-     * {@code TURN_SCALAR} against {@code QUAD_CORNER} on the same terminal (S8's {@link #DEFAULT}),
-     * per segmentation, without and then with the {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder,
-     * then on the {@code building} layer's own composition ({@link LayerCompositions#forLayer}: Hilbert reorder,
-     * class streams, escape width). The side value (the edge-length scalar) is a stream of its own
-     * under every segmentation, so the rows show what separating the near-zero corrections from the
-     * scalars is worth, and what the reorder adds on top.
-     */
-    private static List<Encoding> turnRows() {
-        final var rows = new ArrayList<Encoding>();
-        for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
-            for (final var predictor : List.of(Prediction.QUAD_CORNER, Prediction.TURN_SCALAR)) {
-                for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS, Segmentation.ROLE_CLASS)) {
-                    rows.add(row(DEFAULT.withReorder(reorder).withPredictor(predictor).withSegmentation(segmentation)));
-                }
-            }
-        }
-        // LayerCompositions.forLayer(LayerCompositions.BUILDING) uses the ring frame and shared references; QUAD_CORNER is the plain reference
-        final var building = LayerCompositions.forLayer(LayerCompositions.BUILDING);
-        rows.add(row(building.withPredictor(Prediction.QUAD_CORNER)));
-        rows.add(row(building.withPredictor(Prediction.TURN_SCALAR)));
-        return rows;
-    }
-
-    /**
-     * The ring frame beside its plain predictor on the {@code building} layer: {@code QUAD_CORNER}
-     * against {@code QUAD_CORNER_FRAME}, per segmentation, without and then with the
-     * {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder, then the frame on the layer's own composition
-     * ({@link LayerCompositions#forLayer}, which uses the frame) with the other terminals and with the line predictor. The
-     * rows after the grid are the previous default ({@code QUAD_CORNER}), the current one, then variants. Rows that equal a grid row (the planes terminal is
-     * {@link #DEFAULT}'s) are not repeated: a duplicate name is summed twice by the benchmark.
-     */
-    private static List<Encoding> frameRows() {
-        final var rows = new ArrayList<Encoding>();
-        for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
-            for (final var predictor : List.of(Prediction.QUAD_CORNER, Prediction.QUAD_CORNER_FRAME)) {
-                for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS, Segmentation.ROLE_CLASS)) {
-                    rows.add(row(DEFAULT.withReorder(reorder).withPredictor(predictor).withSegmentation(segmentation)));
-                }
-            }
-        }
-        // LayerCompositions.forLayer(LayerCompositions.BUILDING) has the shared references on top of the frame since the shared step; the framed
-        // row is the one the frame step was fitted on, the plain predictor the one before it
-        final var building = LayerCompositions.forLayer(LayerCompositions.BUILDING);
-        rows.add(row(building.withPredictor(Prediction.QUAD_CORNER)));
-        rows.add(row(building.withPredictor(Prediction.QUAD_CORNER_FRAME)));
-        rows.add(row(building.withPredictor(Prediction.QUAD_CORNER_LINE_FRAME)));
-        rows.add(row(building.withPredictor(Prediction.QUAD_CORNER_FRAME).withWidth(ByteWidth.VARINT_SPLIT)));
-        rows.add(row(building.withPredictor(Prediction.QUAD_CORNER_FRAME).withReorder(Reorder.HILBERT_CENTROID_ROT)));
-        return rows;
-    }
-
-    /**
-     * The shared-vertex references on the {@code building} layer: {@code QUAD_CORNER} and its ring
-     * frame against {@code QUAD_CORNER_SHARED} and {@code QUAD_CORNER_SHARED_FRAME}, flat and class
-     * streams, without and then with the {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder, on {@link
-     * #DEFAULT}'s terminal (escape width, byte planes) and on the terminal {@code building} uses
-     * (escape width, no planes). The reorder rotates every ring to start nearest the previous
-     * vertex; the references then rotate the rings that share a wall to start where it begins, so
-     * the order of the two is what the reorder rows measure.
-     */
-    private static List<Encoding> sharedRows() {
-        final var rows = new ArrayList<Encoding>();
-        for (final var terminal : List.of(DEFAULT, LayerCompositions.forLayer(LayerCompositions.BUILDING))) {
-            for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
-                for (final var predictor : List.of(Prediction.QUAD_CORNER, Prediction.QUAD_CORNER_FRAME,
-                        Prediction.QUAD_CORNER_SHARED, Prediction.QUAD_CORNER_SHARED_FRAME)) {
-                    for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
-                        rows.add(row(terminal.withReorder(reorder).withPredictor(predictor)
-                                .withSegmentation(segmentation)));
-                    }
-                }
-            }
-        }
-        return rows;
-    }
-
-    /**
-     * The ring frame on every layer, not just {@code building}: the four quad-corner predictors
-     * (plain and framed, with and without the line rule) under each (segmentation, width, transpose) the
-     * fitted layers use, all with {@link Reorder#HILBERT_CENTROID_ROT_MP}. Read the by-layer table: a layer
-     * compares the rows of its own terminal. The rows are layer-independent, so a layer without rings
-     * (or whose predictor is not a quad-corner one) shows the frame doing nothing.
-     */
-    private static List<Encoding> frameLayerRows() {
-        final var rows = new ArrayList<Encoding>();
-        final var terminals = List.of(
-                LayerCompositions.composition(Prediction.QUAD_CORNER, Segmentation.CLASS, ByteWidth.ESCAPE,
-                        Transpose.INTERLEAVED_PLANES),
-                LayerCompositions.composition(Prediction.QUAD_CORNER, Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.NONE),
-                LayerCompositions.composition(Prediction.QUAD_CORNER, Segmentation.CLASS, ByteWidth.VARINT_SPLIT, Transpose.NONE),
-                LayerCompositions.composition(Prediction.QUAD_CORNER, Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE));
-        for (final var terminal : terminals) {
-            for (final var predictor : List.of(Prediction.QUAD_CORNER, Prediction.QUAD_CORNER_FRAME,
-                    Prediction.QUAD_CORNER_LINE, Prediction.QUAD_CORNER_LINE_FRAME)) {
-                rows.add(row(terminal.withPredictor(predictor)));
-            }
-        }
-        return rows;
-    }
-
-    /**
-     * The frame on line parts: {@code LINE_CONTINUATION} against {@code LINE_CONTINUATION_FRAME}, the
-     * heading rotation of the continued vertices ({@code _HEADING}) and both ({@code _FRAME_HEADING}), per
-     * segmentation, without and then with the {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder, on the
-     * terminal {@code transportation} uses (escape width, byte planes: {@link LayerCompositions#forLayer}) and on the
-     * one {@code transportation_name} and {@code waterway} use (split varint, no planes). The rows are
-     * layer-independent, so read the by-layer table: a layer without line parts shows the frame doing
-     * nothing. The {@code transportation} row of the current default is the Hilbert, class-stream one.
-     */
-    private static List<Encoding> frameLineRows() {
-        final var rows = new ArrayList<Encoding>();
-        final var terminals = List.of(
-                LayerCompositions.forLayer(LayerCompositions.TRANSPORTATION),
-                LayerCompositions.forLayer(LayerCompositions.WATERWAY));
-        for (final var terminal : terminals) {
-            for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
-                for (final var predictor : List.of(Prediction.LINE_CONTINUATION, Prediction.LINE_CONTINUATION_FRAME,
-                        Prediction.LINE_CONTINUATION_HEADING, Prediction.LINE_CONTINUATION_FRAME_HEADING)) {
-                    for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
-                        rows.add(row(terminal.withReorder(reorder).withPredictor(predictor)
-                                .withSegmentation(segmentation)));
-                    }
-                }
-            }
-        }
-        return rows;
-    }
-
-    /**
-     * The references to earlier line parts' positions ({@link Prediction#LINE_CONTINUATION_SHARED}) beside
-     * their plain predictors: {@code LINE_CONTINUATION} and the frame and heading one {@code transportation}
-     * uses, each without and with the references, per segmentation, without and then with the
-     * {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder, on the terminal {@code transportation} uses (escape
-     * width, byte planes: {@link LayerCompositions#forLayer}) and on the one {@code transportation_name} and {@code
-     * waterway} use (split varint, no planes). The rows are layer-independent, so read the by-layer table:
-     * a layer without line parts shows the references doing nothing.
-     */
-    private static List<Encoding> lineSharedRows() {
-        final var rows = new ArrayList<Encoding>();
-        final var terminals = List.of(
-                LayerCompositions.forLayer(LayerCompositions.TRANSPORTATION),
-                LayerCompositions.forLayer(LayerCompositions.WATERWAY));
-        for (final var terminal : terminals) {
-            for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
-                for (final var predictor : List.of(
-                        Prediction.LINE_CONTINUATION, Prediction.LINE_CONTINUATION_SHARED,
-                        Prediction.LINE_CONTINUATION_FRAME_HEADING,
-                        Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING)) {
-                    for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
-                        rows.add(row(terminal.withReorder(reorder).withPredictor(predictor)
-                                .withSegmentation(segmentation)));
-                    }
-                }
-            }
-        }
-        // the old pipeline's greedy nearest-endpoint chaining as the reorder, class streams only, on the
-        // transportation terminal: chaining already turns junction starts into short jumps, so the
-        // references have less to catch (it never reverses a part)
-        for (final var reorder : List.of(Reorder.CHAIN, Reorder.CANON_CHAIN)) {
-            for (final var predictor : List.of(
-                    Prediction.LINE_CONTINUATION_FRAME_HEADING,
-                    Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING)) {
-                rows.add(row(LayerCompositions.forLayer(LayerCompositions.TRANSPORTATION).withReorder(reorder).withPredictor(predictor)
-                        .withSegmentation(Segmentation.CLASS)));
-            }
-        }
-        return rows;
-    }
-
     /** The rows measured by one step. */
     public static List<Encoding> step(String name) {
         return switch (name) {
@@ -290,26 +120,26 @@ public final class PipelineRegistry {
             case "s2" -> Arrays.stream(Prediction.values())
                     .map(predictor -> row(AFTER_S1.withPredictor(predictor)))
                     .toList();
-            case "s3" -> s3Rows();
+            case "s3" -> StepRows.s3Rows();
             case "s4" -> List.of(row(AFTER_S4));
-            case "s6" -> s6Rows();
-            case "s7" -> s7Rows();
-            case "s8" -> s8Rows();
+            case "s6" -> StepRows.s6Rows();
+            case "s7" -> StepRows.s7Rows();
+            case "s8" -> StepRows.s8Rows();
             // the fixed rows the per-buffer selection is measured against; the selectors themselves
             // need a compressor and are built by PipelineCli
             case "selector" -> List.of(row(DEFAULT), row(GEOMETRY_BEST));
             // not a step of the build-up: TURN_SCALAR beside QUAD_CORNER, for the building layer
-            case "turn" -> turnRows();
+            case "turn" -> StepRows.turnRows();
             // not a step of the build-up: the ring frame beside QUAD_CORNER, for the building layer
-            case "frame" -> frameRows();
+            case "frame" -> StepRows.frameRows();
             // the ring frame on every layer, under each layer terminal
-            case "framelayers" -> frameLayerRows();
+            case "framelayers" -> StepRows.frameLayerRows();
             // the shared-vertex references beside the plain and framed predictors, for the building layer
-            case "shared" -> sharedRows();
+            case "shared" -> StepRows.sharedRows();
             // the ring frame on line parts: LINE_CONTINUATION beside LINE_CONTINUATION_FRAME
-            case "framelines" -> frameLineRows();
+            case "framelines" -> StepRows.frameLineRows();
             // the references to earlier line parts' positions beside the line predictors
-            case "linesshared" -> lineSharedRows();
+            case "linesshared" -> StepRows.lineSharedRows();
             // not a step of the build-up: the cumulative stages, for the benchmark run
             case "ladder" -> ladder().stream().map(stage -> row(stage.config())).toList();
             // the grid the oracle chooses among; its rows are added to all() below
@@ -328,74 +158,6 @@ public final class PipelineRegistry {
             case "best" -> CompositionGrids.bestGrid().stream().map(PipelineRegistry::row).toList();
             default -> throw new IllegalArgumentException("unknown step: " + name + " (known: " + steps() + ")");
         };
-    }
-
-    private static List<Encoding> s3Rows() {
-        final var rows = new ArrayList<Encoding>();
-        // the SegmentPair re-check: plain delta, with and without the role split, over LZ
-        for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS, Segmentation.ROLE)) {
-            rows.add(row(AFTER_S2.withPredictor(Prediction.DELTA).withSegmentation(segmentation)));
-        }
-        for (final var segmentation : Segmentation.values()) {
-            rows.add(row(AFTER_S2.withSegmentation(segmentation)));
-        }
-        // the per-layer winners of S2 under the segmentations that use their classes
-        for (final var predictor : List.of(Prediction.QUAD_CORNER, Prediction.LINE_CONTINUATION)) {
-            rows.add(row(AFTER_S2.withPredictor(predictor).withSegmentation(Segmentation.CLASS)));
-            rows.add(row(AFTER_S2.withPredictor(predictor).withSegmentation(Segmentation.ROLE_CLASS)));
-        }
-        // the (class, Hilbert) sort: classes contiguous in feature order
-        for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.ROLE_CLASS)) {
-            rows.add(row(AFTER_S2.withReorder(Reorder.CLASS_HILBERT_CENTROID_ROT).withSegmentation(segmentation)));
-        }
-        return rows;
-    }
-
-    private static List<Encoding> s6Rows() {
-        final var rows = new ArrayList<Encoding>();
-        rows.add(row(AFTER_S4.withWidth(ByteWidth.VARINT)));
-        rows.add(row(AFTER_S4));
-        for (final var width : List.of(ByteWidth.MIN_FIXED, ByteWidth.ESCAPE, ByteWidth.FORCE_4)) {
-            rows.add(row(AFTER_S4.withWidth(width)));
-        }
-        // the role split, whose point is a separate width per stream (S3 left it open)
-        for (final var width : List.of(ByteWidth.MIN_FIXED, ByteWidth.ESCAPE)) {
-            rows.add(row(AFTER_S4.withSegmentation(Segmentation.ROLE_CLASS).withWidth(width)));
-        }
-        return rows;
-    }
-
-    private static List<Encoding> s7Rows() {
-        final var rows = new ArrayList<Encoding>();
-        rows.add(row(AFTER_S4));
-        for (final var width : List.of(ByteWidth.MIN_FIXED, ByteWidth.ESCAPE, ByteWidth.FORCE_4)) {
-            for (final var transpose : Transpose.values()) {
-                rows.add(row(AFTER_S6.withWidth(width).withTranspose(transpose)));
-            }
-        }
-        for (final var transpose : Transpose.values()) {
-            rows.add(row(AFTER_S6.withSegmentation(Segmentation.ROLE_CLASS).withTranspose(transpose)));
-        }
-        return rows;
-    }
-
-    /**
-     * S8: the S7 winner against the choices around it, one row per decision the earlier steps took,
-     * so the backend that prefers another one shows. Each is a single change to {@code AFTER_S7}.
-     */
-    private static List<Encoding> s8Rows() {
-        return List.of(
-                row(AFTER_S7),
-                row(AFTER_S7.withReorder(Reorder.NONE)),
-                row(AFTER_S7.withReorder(Reorder.HILBERT_CENTROID)),
-                row(AFTER_S7.withReorder(Reorder.HILBERT_CENTROID_ROT)),
-                row(AFTER_S7.withPredictor(Prediction.DELTA)),
-                row(AFTER_S7.withPredictor(Prediction.QUAD_CORNER)),
-                row(AFTER_S7.withPredictor(Prediction.LINE_CONTINUATION)),
-                row(AFTER_S7.withSegmentation(Segmentation.FLAT)),
-                row(AFTER_S7.withWidth(ByteWidth.VARINT_SPLIT).withTranspose(Transpose.NONE)),
-                row(AFTER_S7.withWidth(ByteWidth.MIN_FIXED)),
-                row(AFTER_S7.withTranspose(Transpose.NONE)));
     }
 
     /** Every row of every step, once. */
