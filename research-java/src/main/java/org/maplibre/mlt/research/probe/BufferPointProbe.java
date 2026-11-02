@@ -25,14 +25,14 @@ import java.util.TreeMap;
  */
 public final class BufferPointProbe {
 
-    public static void main(String[] args) throws Exception {
+    public static void run(File tileset) throws Exception {
         var config = ConversionConfig.builder().useFastPFOR(true).build();
         // per zoom: tiles, bytes before, bytes after, features dropped, points dropped
         var perZoom = new TreeMap<Integer, long[]>();
         // per layer: bytes before, bytes after
         var perLayer = new TreeMap<String, long[]>();
         MbtilesSource.forEachTile(
-                new File(args[0]),
+                tileset,
                 Integer.MIN_VALUE,
                 Integer.MAX_VALUE,
                 tileRef -> {

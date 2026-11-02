@@ -1,6 +1,5 @@
 package org.maplibre.mlt.research.cli;
 
-import org.maplibre.mlt.research.probe.BufferPointProbe;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -49,7 +48,7 @@ public final class Research {
         COMMANDS.put("turn-radius", new Entry("probe: per-zoom turn radius and curvature", TurnRadiusCli::main));
         COMMANDS.put("orientation-prior", new Entry("probe: ring frame predicted from decoded neighbours", OrientationPriorCli::main));
         COMMANDS.put("line-frame-prior", new Entry("probe: line-run edges in a predicted frame", LineFramePriorCli::main));
-        COMMANDS.put("buffer-point", new Entry("MLT bytes with vs without buffer points", BufferPointProbe::main));
+        COMMANDS.put("buffer-point", new Entry("MLT bytes with vs without buffer points", BufferPointCli::main));
     }
 
     public static void main(String[] args) throws Exception {
