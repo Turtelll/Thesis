@@ -6,6 +6,12 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.measurement.compression.Compressor;
 
+import static org.maplibre.mlt.research.probe.ProbeMath.angleDiff;
+import static org.maplibre.mlt.research.probe.ProbeMath.bits;
+import static org.maplibre.mlt.research.probe.ProbeMath.fold;
+import static org.maplibre.mlt.research.probe.ProbeMath.writeVarint;
+import static org.maplibre.mlt.research.probe.ProbeMath.zigzag;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -518,15 +524,6 @@ public final class OrientationPriorProbe {
         return dx == 0 && dy == 0 ? 0 : fold(Math.toDegrees(Math.atan2(dy, dx)));
     }
 
-    /** Folds degrees into [-45, 45). */
-    private static double fold(double deg) {
-        return ((deg + 45) % 90 + 90) % 90 - 45;
-    }
-
-    private static double angleDiff(double a, double b) {
-        return Math.abs(fold(a - b));
-    }
-
     private static int bin(double theta, int bins) {
         return Math.min(bins - 1, Math.max(0, (int) Math.floor((theta + 45) / BIN_DEG)));
     }
@@ -611,23 +608,6 @@ public final class OrientationPriorProbe {
     // ---------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------
-
-    private static long zigzag(long value) {
-        return (value << 1) ^ (value >> 63);
-    }
-
-    private static int bits(long value) {
-        return 64 - Long.numberOfLeadingZeros(zigzag(value));
-    }
-
-    private static void writeVarint(ByteArrayOutputStream out, long value) {
-        var zz = zigzag(value);
-        while ((zz & ~0x7FL) != 0) {
-            out.write((int) (zz & 0x7F) | 0x80);
-            zz >>>= 7;
-        }
-        out.write((int) zz);
-    }
 
     private static int ceilLog2(int k) {
         return k <= 1 ? 0 : 32 - Integer.numberOfLeadingZeros(k - 1);

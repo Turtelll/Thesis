@@ -8,6 +8,12 @@ import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.measurement.compression.Compressor;
 
+import static org.maplibre.mlt.research.probe.ProbeMath.angleDiff;
+import static org.maplibre.mlt.research.probe.ProbeMath.bits;
+import static org.maplibre.mlt.research.probe.ProbeMath.fold;
+import static org.maplibre.mlt.research.probe.ProbeMath.writeVarint;
+import static org.maplibre.mlt.research.probe.ProbeMath.zigzag;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -312,14 +318,6 @@ public final class LineFramePriorProbe {
         return dx == 0 && dy == 0 ? 0 : fold(Math.toDegrees(Math.atan2(dy, dx)));
     }
 
-    private static double fold(double deg) {
-        return ((deg + 45) % 90 + 90) % 90 - 45;
-    }
-
-    private static double angleDiff(double a, double b) {
-        return Math.abs(fold(a - b));
-    }
-
     private static double quantize(double theta) {
         final var index = (int) Math.round((theta + 45) / 90 * 65536) & 0xFFFF;
         return index * 90.0 / 65536 - 45;
@@ -381,26 +379,9 @@ public final class LineFramePriorProbe {
     // Bytes
     // ---------------------------------------------------------------------------
 
-    private static long zigzag(long value) {
-        return (value << 1) ^ (value >> 63);
-    }
-
-    private static int bits(long value) {
-        return 64 - Long.numberOfLeadingZeros(zigzag(value));
-    }
-
     private static void write(ByteArrayOutputStream out, long x, long y) {
         writeVarint(out, x);
         writeVarint(out, y);
-    }
-
-    private static void writeVarint(ByteArrayOutputStream out, long value) {
-        var zz = zigzag(value);
-        while ((zz & ~0x7FL) != 0) {
-            out.write((int) (zz & 0x7F) | 0x80);
-            zz >>>= 7;
-        }
-        out.write((int) zz);
     }
 
     // ---------------------------------------------------------------------------
