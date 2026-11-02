@@ -26,7 +26,7 @@ import java.util.stream.IntStream;
  * Varint, no segmentation, against both {@code DELTA_ZIGZAG} baselines. Per row it reports the mean
  * and median absolute residual of the x and y components, the share of
  * {@code (0, 0)} pairs and of side values outside the pairs, Varint bytes, and gzip bytes with every
- * tile compressed on its own, as {@code BenchmarkCli} does. Every row is round-tripped on every buffer.
+ * tile compressed on its own, as {@code MeasureHarness} does. Every row is round-tripped on every buffer.
  *
  * <p>The pipeline's feature reorderings run alongside as {@code REORDER_<variant>} rows, each the plain
  * {@code DELTA} predictor over the reordered buffer (never combined with another predictor), to set
@@ -191,7 +191,7 @@ public final class WorkshopReport {
             var measured = IntStream.range(0, encodings.size()).parallel().mapToObj(r -> {
                 var encoding = encodings.get(r);
                 EncodedBuffer encoded = encoding.encode(ctx);
-                // The pipeline's gate, not BenchmarkCli's: it also compares reordered Point/MultiPoint
+                // The pipeline's gate, not MeasureHarness's: it also compares reordered Point/MultiPoint
                 // columns, which GeometryEquivalence (parts only) would reject.
                 RoundTrip.roundTrip(
                         String.format("%d/%d/%d %s", entry.z(), entry.x(), entry.y(), entry.layerName()),

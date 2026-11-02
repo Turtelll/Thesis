@@ -5,7 +5,7 @@ via a composite build (`includeBuild('../maplibre-tile-spec/java')` in
 `settings.gradle`, substituting `org.maplibre:mlt`) — `mlt-core` builds from
 source on every run, so the submodule is never published or modified.
 
-There is **one encoder stack**, the modular `pipeline/`, and **one entry point**,
+There is **one encoder stack**, `encoder/` (composed by `registry/`), and **one entry point**,
 `./gradlew research --args="<command> ..."` (`cli/Research`; `./gradlew research` lists the commands).
 The pre-consolidation code (the per-idea `Encoding` classes, `BenchmarkCli`, the
 FastPFOR/rANS rows, the one-off probes) is at git tag `pre-consolidation`; the plan, the inventory and
@@ -13,53 +13,82 @@ the deviations are in [consolidation-inventory.md](consolidation-inventory.md).
 
 ## Packages
 
-Under `org.maplibre.mlt.research`:
+The packages follow the stages of the bitstream ([bitstream.md](bitstream.md)) for the encoder, and
+sit above it for everything that measures. Under `org.maplibre.mlt.research`:
 
-- **`extraction/`** — `cli/ExtractCli` reads an `.mbtiles` (via `MbtilesSource`) and
-  `VertexBufferExtractor` turns each (tile, layer) into a `VertexBuffer` exactly as
-  `maplibre-tile-spec`'s `GeometryEncoder` would (interleaved little-endian `int32`
+**The encoder side** — what a decoder needs; none of it knows about measurement, compression
+backends, extraction or the command line.
+
+- **`buffer/`** — the contract and the shape of the data. `Encoding`: `name()`,
+  `encode(BufferContext)`, `decode(EncodedBuffer, BufferContext, vertexCount)`, with `BufferContext`
+  and `EncodedBuffer` nested in it. `decode` is mandatory and must not read `ctx.vertices()`, since
+  every run round-trips every row on every buffer and fails loudly on mismatch — an unverified
+  encoding is not a result. `BufferContext` carries the topology streams alongside the vertices, so a
+  predictor derives structural reset points (part starts, ring corners) identically on encode and
+  decode without signalling anything: `VertexRuns` is the list of runs (rings, line parts, points),
+  `VertexRunIndex` the per-vertex view of them. `StreamMetadata` is the header MLT writes in front of
+  a stream.
+- **`encoder/reorder/`** — S1, not in the payload: `Reorder` (the geometry orders) and
+  `GeometryReorder` (what applies them).
+- **`encoder/prediction/`** — S2: `Prediction`, the predictor ordinal the header carries.
+  **`encoder/prediction/mechanism/`** holds the mechanisms the predictions are built from, each a
+  self-contained idea with its own mechanism test: `ClassifiedPredictor` (a per-vertex class plus what
+  each class predicts), `SegmentQuadCorner`, `QuadCornerLine`, `LineContinuation`, `TurnScalar` and the
+  ring/line frame prior `FramePrior`. Nothing here is an `Encoding`.
+- **`encoder/reference/`** — the shared-reference block: `RingReferences` and `LineReferences` (the
+  references to an earlier ring's or line part's positions).
+- **`encoder/segmentation/`** — S3: `Segmentation`, how the residuals are split into streams and
+  in what order.
+- **`encoder/stream/`** — S4/S6/S7 and the byte terminals: `ResidualMap` (zigzag only), `ByteWidth`,
+  `Transpose`, `StreamCodec` (map, width and transpose of one stream), `IntCodec` (`int[] <-> byte[]`)
+  and `PayloadBytes` (varint lengths and the payload cursor).
+- **`encoder/format/`** — the self-describing payload: `Composition` is one row (the per-stage
+  choices plus the reorder), `PayloadHeader` the two-byte header, `PipelineEncoding` its `Encoding`.
+  Every choice except the reorder is in the header and stream lengths follow from the topology.
+- **`baseline/`** — the **two baselines** (`DELTA_ZIGZAG_FASTPFOR`, `DELTA_ZIGZAG_VARINT`,
+  `Baselines.baseline()`): `VertexTransform` (`List<Vertex> <-> int[]`) and an `IntCodec` composed
+  in a `VertexBufferCodec`.
+- **`registry/`** — the compositions. `PipelineRegistry` holds the stage chain (`AFTER_S0` ...
+  `DEFAULT`, the end-to-end choice), the step switch (`step(name)`), `ladder()` and `all()`.
+  `LayerCompositions` is the per-layer default (`forLayer`) and the only place where the MVT layer
+  names appear, as constants. `CompositionGrids` holds the fit grid, the 48-row oracle grid, the
+  252-composition `bestGrid()` of the per-(tile, layer) oracle and the selectors' trial sets.
+  `StepRows` builds the multi-row steps (`turn`, `frame`, `shared`, `framelayers`, `framelines`,
+  `linesshared`, S3, S6-S8).
+
+**Above the encoder**
+
+- **`extraction/`** — `MbtilesExtraction` (the `extract` command) reads an `.mbtiles` (via
+  `MbtilesSource`) and `VertexBufferExtractor` turns each (tile, layer) into a `VertexBuffer` exactly
+  as `maplibre-tile-spec`'s `GeometryEncoder` would (interleaved little-endian `int32`
   `[x0,y0,x1,y1,...]`, undelta'd, unencoded). `ExtractionWriter` writes the `.bin` +
   `.json` sidecar (topology streams: `tileExtent`, `geometryTypes`, `numParts`,
   `numRings`, `vertexCount`) and a `manifest.json` indexing the run; `ExtractionReader` reads
-  them back. See [mlt-fidelity.md](mlt-fidelity.md) for how this stays pinned to upstream.
-- **`encoding/`** — the contracts and the building blocks the pipeline reuses.
-  `Encoding`: `name()`, `encode(BufferContext)`, `decode(EncodedBuffer, BufferContext,
-  vertexCount)`. `decode` is mandatory and must not read `ctx.vertices()`, since every run
-  round-trips every row on every buffer and fails loudly on mismatch — an unverified encoding is
-  not a result. `BufferContext` carries the topology streams alongside the vertices, so a
-  predictor derives structural reset points (part starts, ring corners) identically on encode and
-  decode without signalling anything (`PartBoundaries`). `ClassifiedPredictor` is a per-vertex class
-  plus what each class predicts. `VertexTransform` (`List<Vertex> <-> int[]`) and `IntCodec`
-  (`int[] <-> byte[]`) composed in a `VertexBufferCodec` are the **two baselines**
-  (`DELTA_ZIGZAG_FASTPFOR`, `DELTA_ZIGZAG_VARINT`, `Baselines.baseline()`), and the byte building
-  blocks of the pipeline's width stage. `GeometryEquivalence` is the order-independent geometry
-  check for rows that reorder.
-- **`pipeline/`** — the encoder, composed of stages after the
-  [OpenZL-style design](results/DesingDocOpenzl.md): `Reorder` (S1) -> `Prediction` (S2, pure
-  predictors) -> `Segmentation` (S3) -> `ResidualMap` (S4, zigzag only) -> `ByteWidth` (S6) ->
-  `Transpose` (S7), then the general-purpose backend (S8, applied per tile by the CLI). S5 (a
-  per-stream GCD) was measured and removed; the later stage numbers are unchanged. One
-  `PipelineConfig` is one row, `PipelineEncoding` its `Encoding`; every choice except the reorder is
-  in a two-byte header and stream lengths follow from the topology
-  ([bitstream.md](bitstream.md)). `PipelineRegistry` lists the rows per step (`DEFAULT` = the
-  end-to-end choice, `forLayer` = the per-layer default, `bestGrid` = the 252 compositions of the
-  per-(tile, layer) oracle); `Selector` / `TileSelector` are the opt-in selection reports
-  (`TileSelector.oracle` is the `--step best` oracle over `bestGrid`); `PipelineStats` holds each step's probes; `Verification` checks round trips
-  that reorder (also point columns); `PredictionTransform` reads a predictor's residual pairs
-  through the `FLAT` split for the workshop and the probes.
-- **`pipeline/mechanism/`** — the mechanisms the stages are built from, each a self-contained idea
-  with its own mechanism test: the predictors (`SegmentQuadCorner`, `LineContinuation`,
-  `QuadCornerLine`, `TurnScalar`), the ring frame (`RingFramePrior`), the shared-vertex references
-  (`SharedVertexRef`, `LineSharedVertexRef`) and the geometry reordering (`GeometryReorder`).
-  Nothing here is an `Encoding`.
-- **`cli/`** — `Research` dispatches the commands: `extract`, `measure` (`PipelineCli`, the
-  measurement harness), `tile-size`, `dump` (`GoldenDumpCli`), `workshop`, `decode-time`, and the
-  probes `residual-bits`, `shared-vertex`, `turn-radius`, `orientation-prior`, `line-frame-prior`,
-  `buffer-point`. `Compressor` / `TileCompression` size per tile; `OracleReport`, `SelectionReport`
-  and `ChoiceCorrelation` are the report halves of `measure`.
+  them back; `Corpus` is the tile and layer naming the measurements share. See
+  [mlt-fidelity.md](mlt-fidelity.md) for how this stays pinned to upstream.
+- **`measurement/`** — everything that sizes, compares or verifies, never part of the payload:
+  - `compression/`: `Compressor` (gzip, Brotli, zstd) and `TileCompression` (one tile's buffers
+    concatenated and compressed one-shot).
+  - `verification/`: `RoundTrip` (checks a row's round trip, also for reordering rows and point
+    columns) and `GeometryEquivalence` (the order-independent geometry check).
+  - `selection/`: `BufferSelector` and `TileSelector` (the opt-in selection reports; `TileSelector.oracle`
+    is the `--step best` oracle over `bestGrid`), `FeatureRules`, `BufferFeatures`.
+  - `report/`: `OracleReport`, `SelectionReport`, `ChoiceCorrelation`, the report halves of `measure`.
+  - `stats/`: `StepProbes`, each step's probes.
+  - `harness/`: `MeasureHarness`, the `measure` command's engine (an `Options` record in, tables out).
+  - `golden/`: `GoldenDump` (SHA-256 and sizes of every row on every buffer) and `GoldenDiff`.
 - **`workshop/`** — fast predictor experiments: a `Predictor` is a name plus a one-line rule over the
-  decoded prefix and a per-vertex `Topology`; `Workshop.known()` holds the pipeline's predictors
-  through `PredictionTransform`, `Workshop.experiments()` the new ones.
+  decoded prefix and a per-vertex `VertexRunIndex`; `Workshop.known()` holds the pipeline's predictors
+  through `PredictionTransform`, `Workshop.experiments()` the new ones; `WorkshopReport` is the
+  `workshop` command's engine.
+- **`probe/`** — the measurement-only probes (no encoder, no bytes written): `ResidualBitsProbe`,
+  `SharedVertexProbe`, `TurnRadiusProbe`, `OrientationPriorProbe`, `LineFramePriorProbe`,
+  `DecodeTimeProbe`, `BufferPointProbe`, `TileSizeProbe`. Each has a `run(...)` over plain
+  arguments or an `Options` record.
+- **`cli/`** — `Research` dispatches the commands (`extract`, `measure`, `tile-size`, `dump`,
+  `workshop`, `decode-time`, `residual-bits`, `shared-vertex`, `turn-radius`, `orientation-prior`,
+  `line-frame-prior`, `buffer-point`); each has a `<Command>Cli` that only parses the arguments and
+  calls the engine above it.
 
 `data-analysis/` (Python 3.13, stdlib + numpy/matplotlib) analyzes raw `.mbtiles`
 tilesets independently of the Java pipeline (`mvt_stats.py` for byte composition,
@@ -70,6 +99,14 @@ scan, so don't rerun without `--force`.
 
 `tools/map-viewer/` is an independent Node/TypeScript + MapLibre GL JS app for visually
 inspecting an `.mbtiles` tileset in a browser; see its own README.
+
+## Pipeline stages
+
+The encoder is composed of stages after the [OpenZL-style design](results/DesingDocOpenzl.md):
+`Reorder` (S1) -> `Prediction` (S2, pure predictors) -> `Segmentation` (S3) -> `ResidualMap`
+(S4, zigzag only) -> `ByteWidth` (S6) -> `Transpose` (S7), then the general-purpose backend (S8,
+applied per tile by `measure`). S5 (a per-stream GCD) was measured and removed; the later stage
+numbers are unchanged. One `Composition` is one row, `PipelineEncoding` its `Encoding`.
 
 ## Baseline
 
@@ -91,8 +128,56 @@ measured and rejected.
 
 ## Dependency rules
 
-`ArchitectureTest` enforces the layering: `pipeline` and `encoding` never depend on `cli` or
-`workshop`; `encoding` does not depend on `pipeline`; `extraction` depends only on the `encoding` contract (`ExtractionReader` fills its `BufferContext`) and never on `pipeline`, `cli` or `workshop`.
+`ArchitectureTest` enforces the layering (an arrow means "may depend on"):
+
+```
+cli -> probe -> workshop -> measurement -> registry -> encoder
+                                 |  \-> baseline -> encoder
+                                 \----> extraction -> buffer
+encoder -> buffer
+```
+
+- every layer (`buffer`, `encoder`, `baseline`, `extraction`, `registry`, `measurement`, `workshop`,
+  `probe`, `cli`) is only accessed from the layers above it (`cli` from none, `probe` from `cli`,
+  `workshop` from `probe` and `cli`, ...);
+- inside `encoder`, `format` is above `segmentation`, above `prediction`, above `reference`, above
+  `reorder`; `stream` is used by `format` and `segmentation` only;
+- no two packages depend on each other in a cycle;
+- `buffer` and `encoder` only depend on each other, `java.lang`/`util`/`io`/`nio` and mlt-core
+  (`converter`, `decoder`, the FastPFOR integer compression it uses), so a decoder needs no
+  measurement code;
+- `buffer`, `encoder`, `baseline` and `registry` never depend on measurement, probes, the
+  workshop, the command line, extraction or a compression backend (brotli4j, zstd, `java.util.zip`);
+- nothing outside `cli` depends on `cli`.
+
+A restructure commit never changes a byte: the golden dump (`research dump --diff`) of the tree
+before and after must show zero changed rows.
+
+## Known duplication
+
+PMD CPD over `src/main` (the restructure's before/after, `--minimum-tokens 50 / 75`): exact-token
+duplicates 38 / 16 before, 36 / 12 after; with identifiers and literals ignored 92 / 32 before, 93 / 28
+after. Duplication between the probes and the mechanisms is zero on exact tokens at both thresholds
+and one block at 50 tokens with identifiers ignored. The copies that were byte for byte the same
+(the angle fold and the zigzag varint bytes of `LineFramePriorProbe` and `OrientationPriorProbe`) are
+`probe/ProbeMath`; the argument parser of the per-layer probes is `cli/ExtractionArgs`. What is left is
+kept on purpose:
+
+- **Probe against probe** (`LineFramePriorProbe`/`OrientationPriorProbe`: the nearest-point grid and
+  the frame-error tables; `SharedVertexProbe`/`TurnRadiusProbe`: the manifest walk over one layer).
+  Each probe is a measurement whose printed numbers are quoted in `docs/results/`; the copies differ
+  in element type or in what is accumulated, so a shared helper would have to be generic over both,
+  and a change in either would move a published figure. A probe stays self-contained.
+- **Probe against mechanism** (`OrientationPriorProbe` against `FramePrior`: the nearest-ring
+  search). The probe measures the idea independently of the mechanism it motivated, on purpose: it must
+  not change when the mechanism does.
+- **Inside one class** (`StepRows`, `TileSizeProbe`, `OracleReport`, `MeasureHarness`,
+  `DecodeTimeProbe`, `StepProbes`): table-printing and grid-building loops that differ in one
+  constant per copy.
+- **`buffer`/`encoder` mechanisms among themselves** (`VertexRuns`, `GeometryReorder`, `Reorder`,
+  `LineContinuation`, `QuadCornerLine`, `TurnScalar`, `RingReferences`, `LineReferences`): each
+  re-derives the runs of a buffer, and they disagree on single-run buffers. They are not merged,
+  because merging would change the bytes of a kept row; the golden dump pins each one.
 
 ## Project layout
 
@@ -102,21 +187,31 @@ research-java/
   build.gradle                research (JavaExec, -Xmx6g), test, run
   golden/                     manifest of the pre-consolidation golden dump (the dumps themselves are in data/)
   src/main/java/org/maplibre/mlt/research/
-    cli/                      Research (dispatcher), PipelineCli (measure), GoldenDumpCli, ExtractCli, the probes
-    extraction/               MbtilesSource, VertexBufferExtractor, ExtractionWriter, ExtractionReader
-    encoding/                 Encoding, VertexBufferCodec (+ BufferContext, EncodedBuffer), VertexTransform,
-                                IntCodec, ClassifiedPredictor, PartBoundaries, StreamMetadata,
-                                GeometryEquivalence, Baselines
-    pipeline/                 Reorder, Prediction, Segmentation, ResidualMap, ByteWidth, Transpose,
-                                PipelineConfig, PipelineEncoding, PipelineRegistry, Selector, TileSelector, ...
-      mechanism/              predictors, RingFramePrior, SharedVertexRef, LineSharedVertexRef, GeometryReorder
-    workshop/                 Workshop, Predictor, PredictorTransform, Topology
+    buffer/                   Encoding (+ BufferContext, EncodedBuffer), StreamMetadata, VertexRuns, VertexRunIndex
+    encoder/
+      reorder/                Reorder, GeometryReorder
+      reference/              RingReferences, LineReferences
+      prediction/             Prediction
+        mechanism/            ClassifiedPredictor, SegmentQuadCorner, QuadCornerLine, LineContinuation,
+                                TurnScalar, FramePrior
+      segmentation/           Segmentation
+      stream/                 StreamCodec, ResidualMap, ByteWidth, Transpose, IntCodec, PayloadBytes
+      format/                 Composition, PayloadHeader, PipelineEncoding
+    baseline/                 Baselines, VertexBufferCodec, VertexTransform
+    extraction/               MbtilesSource, VertexBufferExtractor, ExtractionWriter, ExtractionReader,
+                                MbtilesExtraction, Corpus
+    registry/                 PipelineRegistry, LayerCompositions, CompositionGrids, StepRows
+    measurement/              compression/, verification/, selection/, report/, stats/, harness/, golden/
+    workshop/                 Workshop, Predictor, PredictorTransform, PredictionTransform, WorkshopReport
+    probe/                    the eight *Probe classes (+ ProbeMath)
+    cli/                      Research (dispatcher) and one <Command>Cli per command
   src/test/java/org/maplibre/mlt/research/
+    ArchitectureTest          the dependency rules above
+    baseline/                 VertexBufferCodecTest, VertexTransformTest (the baselines)
     extraction/               VertexBufferExtractorFidelityTest (reflective pin against mlt-core)
-    encoding/                 IntCodecTest, VertexTransformTest, VertexBufferCodecTest (the baselines)
-    pipeline/                 PipelineEncodingTest (round trip of every row), one test per stage,
-                                SharedVertexMechanismTest, ArchitectureTest, ...
-    pipeline/mechanism/       one mechanism test per idea (pins how it works on a small fixture)
+    encoder/format/           PipelineEncodingTest (round trip of every row), PipelineRoundTripProperties
+    encoder/<stage>/          one mechanism test per idea (pins how it works on a small fixture)
+    measurement/              OracleReportTest, BufferSelectorTest, TileSelectorTest
+    registry/                 LadderTest, LayerDefaultTest
     workshop/                 WorkshopTest
-    cli/                      report tests
 ```

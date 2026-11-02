@@ -31,7 +31,7 @@ import java.util.List;
  * </ul>
  *
  * <p>Parts are reversed (never transmitted) when only the end is in the dictionary, so the entry
- * flag catches it; {@code Verification} accepts part reversal. This changes line direction, which
+ * flag catches it; {@code RoundTrip} accepts part reversal. This changes line direction, which
  * one-way rendering and direction-dependent labels rely on.
  *
  * <p>Polygon rings and points in the column keep plain residuals and never enter the dictionary.

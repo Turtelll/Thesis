@@ -74,8 +74,8 @@ public final class SegmentQuadCorner implements ClassifiedPredictor {
      *
      * <p>Exposed for {@link org.maplibre.mlt.research.encoding.SegmentedRansCodec}, which prices
      * each region with its own frequency table rather than one shared table. The regions are the
-     * ones {@link org.maplibre.mlt.research.encoding.PredictedTransform#apply} already writes under
-     * {@link org.maplibre.mlt.research.encoding.Layout#SEGMENTED}; this only reports their extents.
+     * ones {@code PredictedTransform.apply} already writes under
+     * {@link org.maplibre.mlt.research.encoder.segmentation.Segmentation}; this only reports their extents.
      */
     public int[] regionLengths(BufferContext ctx, int vertexCount) {
         final var classes = classify(VertexRuns.of(ctx, vertexCount), vertexCount);

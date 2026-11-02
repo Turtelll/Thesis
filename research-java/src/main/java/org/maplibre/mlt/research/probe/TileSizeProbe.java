@@ -32,7 +32,7 @@ import java.util.List;
  * Whole-tile check of the feature reorders of the pipeline's S1: the geometry-buffer experiments
  * only see VertexBuffer bytes, but reordering the features of a layer reorders its property
  * columns and ids as well. This encodes every tile of an {@code .mbtiles} tileset with mlt-core's
- * {@code MltConverter} (FastPFOR on, as in {@link TileSizeCli}) once per reorder mode, in two
+ * {@code MltConverter} (FastPFOR on, as in {@link TileSizeProbe}) once per reorder mode, in two
  * variants:
  *
  * <ul>
@@ -176,7 +176,7 @@ public final class TileSizeProbe {
     /**
      * Per layer, each layer encoded as a single-layer tile: gzip of the props-only tile (geometry
      * replaced by a constant point) per mode, and its change against the unreordered layer. Set
-     * beside the per-layer geometry change of {@code PipelineCli} this gives the net effect of a
+     * beside the per-layer geometry change of {@code MeasureHarness} this gives the net effect of a
      * reorder per layer.
      */
     private static void byLayer(File file, List<Reorder> modes, int limit) throws Exception {

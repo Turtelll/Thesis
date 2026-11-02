@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * The oracle of {@code PipelineCli --oracle}: for every buffer, the composition (row) whose payload is
+ * The oracle of {@code measure --oracle}: for every buffer, the composition (row) whose payload is
  * smallest under a backend, one oracle per backend, with a tally of what was chosen and how often.
  * Where the per-row tables say what one composition does to a tileset, this says which combination of
  * compositions compresses best.

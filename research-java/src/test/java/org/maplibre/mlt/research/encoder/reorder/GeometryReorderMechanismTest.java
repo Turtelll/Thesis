@@ -20,7 +20,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
  * reason about.
  *
  * <p>A round-trip test cannot cover this transform at all — reordering deliberately changes the
- * order, so {@code BenchmarkCli}'s exact-equality check does not apply to it. The safety property
+ * order, so {@code MeasureHarness}'s exact-equality check does not apply to it. The safety property
  * is {@link GeometryEquivalence} instead, and these tests are what stop that weaker contract from
  * silently permitting a dropped or deformed geometry.
  */

@@ -79,7 +79,7 @@ public final class Workshop {
         return row(new PredictionTransform(prediction));
     }
     /**
-     * New ideas. A rule predicts vertex {@code i} from vertices {@code < i} and the {@link Topology},
+     * New ideas. A rule predicts vertex {@code i} from vertices {@code < i} and the {@link org.maplibre.mlt.research.buffer.VertexRunIndex},
      * e.g. continuation on every line vertex past the second:
      *
      * <pre>{@code

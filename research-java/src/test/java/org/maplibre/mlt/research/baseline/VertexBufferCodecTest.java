@@ -37,7 +37,7 @@ class VertexBufferCodecTest {
     return all;
   }
 
-  /** A context carrying the real topology streams, as {@code BenchmarkCli} builds from a sidecar. */
+  /** A context carrying the real topology streams, as {@code MeasureHarness} builds from a sidecar. */
   private static BufferContext contextOf(VertexBufferExtractor.ExtractedColumn column) {
     return new BufferContext(
         column.vertexBuffer(),
@@ -91,7 +91,7 @@ class VertexBufferCodecTest {
   /**
    * Asserts the decode reconstructed the buffer, by the contract the encoding actually claims.
    *
-   * <p>Mirrors {@code pipeline.Verification.roundTrip}: an encoding declaring {@link
+   * <p>Mirrors {@code RoundTrip.roundTrip}: an encoding declaring {@link
    * Encoding#reordersGeometries()} reconstructs an <em>equivalent</em> buffer rather than an
    * identical one, so it is checked for geometry preservation plus a faithful decode of what it
    * emitted. Everything else is held to exact equality. Without the split these tests would either

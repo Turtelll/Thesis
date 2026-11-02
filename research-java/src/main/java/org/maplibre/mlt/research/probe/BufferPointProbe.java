@@ -20,7 +20,7 @@ import java.util.TreeMap;
  * MultiPoint member) outside the tile extent {@code [0, extent)} is dropped, a MultiPoint left
  * empty drops its feature, an emptied layer is dropped. MapLibre GL JS never renders these
  * (symbol_layout.ts / circle_bucket.ts skip anchors outside the extent); the neighbour tile draws
- * them. Encoding as in {@link TileSizeCli}. Prints per-zoom totals and per-layer bytes (each layer
+ * them. Encoding as in {@link TileSizeProbe}. Prints per-zoom totals and per-layer bytes (each layer
  * encoded as a single-layer tile). Measurement only, no bytes written.
  */
 public final class BufferPointProbe {

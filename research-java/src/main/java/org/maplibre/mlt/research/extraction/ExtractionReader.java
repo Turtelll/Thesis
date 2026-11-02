@@ -20,7 +20,7 @@ import java.util.List;
  * Reads back what {@link ExtractionWriter} wrote: the manifest, and each entry's {@code .bin} plus
  * {@code .json} sidecar as a {@link BufferContext}.
  *
- * <p>Every CLI over an extraction directory ({@code BenchmarkCli}, {@code RingPriorCli}, and the
+ * <p>Every CLI over an extraction directory ({@code MeasureHarness} and the
  * measurement-only probes) needs exactly this, and each used to carry its own copy. It lives next
  * to the writer so the two file formats stay described in one place.
  */

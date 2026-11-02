@@ -2,7 +2,7 @@
 
 A lightweight harness for testing VertexBuffer encoding ideas against the baseline. Everything runs
 through one entry point, `./gradlew research --args="<command> ..."` (`./gradlew research` lists the
-commands); the encoder is the modular `pipeline/`, the only encoder stack.
+commands); the encoder is the modular `encoder/` (composed by `registry/`), the only encoder stack.
 It extracts geometries from `data/MVT/munich-plantiler.mbtiles` into MLT-compatible
 `VertexBuffer`s (exactly as `maplibre-tile-spec`'s `GeometryEncoder` would, one buffer
 per MVT layer per tile), then measures the pipeline's rows against the baseline
@@ -203,7 +203,7 @@ with every tile compressed on its own. Every row is round-tripped on every buffe
 
 1. **Write the rule.** In `workshop/Workshop.experiments()`, add one `Predictor`. A rule writes the
    predicted `(x, y)` of vertex `i` into `out`, from `xs`/`ys` below `i` and the per-vertex
-   `Topology` (`runStart`, `runLength`, `indexInRun`, `isRunStart`, `isLine`, `isRing`):
+   `VertexRunIndex` (`runStart`, `runLength`, `indexInRun`, `isRunStart`, `isLine`, `isRing`):
 
    ```java
    Predictor.of("LINE_CONT_ALL", (t, i, xs, ys, out) -> {
@@ -250,20 +250,20 @@ with `./gradlew research --args="measure"`, where segmentation, the byte width a
 
 ## Adding an idea to the pipeline
 
-Everything `measure` sizes is one kind of thing: `org.maplibre.mlt.research.encoding.Encoding` —
+Everything `measure` sizes is one kind of thing: `org.maplibre.mlt.research.buffer.Encoding` —
 `name()`, `encode(BufferContext)`, `decode(EncodedBuffer, BufferContext, vertexCount)`; the pipeline's
-row is `PipelineEncoding(PipelineConfig)`. `decode` is mandatory and must not read `ctx.vertices()` —
+row is `PipelineEncoding(Composition)`. `decode` is mandatory and must not read `ctx.vertices()` —
 that is the buffer it is reconstructing, and reading it would make even a codec that discards the
 buffer round-trip successfully.
 
 1. **Write the mechanism.** A predictor is a `ClassifiedPredictor` (per-vertex class derived from the
-   topology streams, and what each class predicts), put in `pipeline/mechanism/` beside `SegmentQuadCorner`
+   topology streams, and what each class predicts), put in `encoder/prediction/mechanism/` beside `SegmentQuadCorner`
    and `LineContinuation`. A reordering is a `Reorder` entry. `BufferContext` carries the topology
    streams (`numParts`, `numRings`, `geometryTypes`) alongside the vertices, so both sides derive
    the same runs.
 2. **Register it** — one `Prediction` constant, appended at the end (the ordinals are the header's
    predictor id, see [docs/bitstream.md](docs/bitstream.md); the header has room for 16 predictors and
-   3 free bits). `PipelineRegistry` lists which compositions are rows.
+   3 free bits). `registry/` lists which compositions are rows (`PipelineRegistry` for the steps, `CompositionGrids` for the grids, `LayerCompositions` for the per-layer defaults).
 3. **Round-trip it.** `./gradlew test` round-trips every row of `PipelineRegistry.all()` and every
    `Prediction` from the topology alone; a mechanism test pins how the idea works on a small fixture.
 4. **Measure it.** `./gradlew research --args="measure --rows <row> --by-zoom"`, then

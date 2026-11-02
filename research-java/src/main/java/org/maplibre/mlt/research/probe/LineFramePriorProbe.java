@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Evaluation-protocol Stage 0 probe: does the ring frame prior ({@code RingFramePrior}, {@code
+ * Evaluation-protocol Stage 0 probe: does the ring frame prior ({@code FramePrior}, {@code
  * OrientationPriorProbe}) carry over to line parts, i.e. to the {@code transportation} layer? Nothing
  * is kept; the streams below exist only to be sized.
  *
@@ -43,7 +43,7 @@ import java.util.Map;
  *   <li>{@code OWN_EDGE}: the edge's own direction. A ceiling only, the decoder does not have it.
  *   <li>{@code PREV_PART}: the direction of the last edge of the previous line run.
  *   <li>{@code NEAREST_CENTROID}: the frame of the decoded run whose centroid is nearest the run's
- *       start vertex ({@code RingFramePrior}'s rule on open runs).
+ *       start vertex ({@code FramePrior}'s rule on open runs).
  *   <li>{@code NEAREST_EDGE}: the direction of the decoded edge whose midpoint is nearest the run's
  *       start vertex.
  *   <li>{@code NEAREST_EDGE_REFINED}: {@code NEAREST_EDGE}'s direction as a prior of {@link

@@ -3,7 +3,7 @@
 What `PipelineEncoding` writes for one `VertexBuffer`, byte by byte, and what a decoder needs
 besides the bytes. This is the format every row of `research measure` is sized in; the stage
 semantics are in [results/openzl-pipeline.md](results/openzl-pipeline.md), the code in
-`pipeline/PipelineEncoding.java` and `pipeline/StreamCodec.java`.
+`encoder/format/PipelineEncoding.java` and `encoder/stream/StreamCodec.java`.
 
 The size of an encoding is `payload.length` under the tile's general-purpose compressor
 (gzip, Brotli or zstd, applied per tile outside this format).
@@ -14,7 +14,7 @@ Nothing about the geometry is repeated in the payload. The decoder reads, before
 buffer, the topology streams of the tile (`geometryTypes`, `numGeometries`, `numParts`,
 `numRings`), and from them derives, identically on both sides:
 
-- the **runs** (rings, line parts, points; `PartBoundaries`),
+- the **runs** (rings, line parts, points; `VertexRuns`),
 - the **class** of every vertex (the predictor's `classify`),
 - the **value count of every stream** (`Segmentation.layout`).
 
@@ -24,7 +24,7 @@ of a shared-reference buffer; both below).
 
 The **reorder** (stage S1) is not in the payload either: the tile already carries the
 reordered topology streams, and the decoder emits the vertices in the order it reads. A
-decoder is handed the reorder it should assume (`PipelineConfig.reorder`).
+decoder is handed the reorder it should assume (`Composition.reorder`).
 
 ## Payload
 
@@ -79,12 +79,12 @@ a byte, last byte zero-padded). Which vertices are references is only known whil
 buffer, so a referenced vertex's residual is removed from its stream and the stream lengths
 cannot be derived from the topology; hence the explicit `valueCount`s.
 
-- **Rings** (`SharedVertexRef`): per ring vertex that can reference an earlier ring in a window
+- **Rings** (`RingReferences`): per ring vertex that can reference an earlier ring in a window
   of `WINDOW`=4 rings, an entry flag and, on entry, a `ceil(log2 candidates)`-bit index into
-  the candidate positions; after a referenced vertex a follow flag says "the next vertex is the
-  previous vertex of the referenced ring". Rings are rotated by the encoder to start where a
+  the candidate positions; after any vertex whose position an earlier ring holds (a referenced vertex or
+  one that coincides with it) a follow flag says "the next vertex is the previous vertex of that ring". Rings are rotated by the encoder to start where a
   shared stretch begins; the rotation is never transmitted (the decoder emits the rotated ring).
-- **Lines** (`LineSharedVertexRef`): at every line part start and end, a flag and on a hit a
+- **Lines** (`LineReferences`): at every line part start and end, a flag and on a hit a
   `ceil(log2 dictionarySize)`-bit index into the dictionary of all distinct positions of earlier
   line parts. A part whose end alone is in the dictionary is reversed by the encoder (never
   transmitted; this changes line direction).

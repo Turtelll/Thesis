@@ -59,7 +59,7 @@ public final class CompositionGrids {
      * The compositions the oracle chooses among: every combination of the decisions that a buffer's
      * content can change the answer of, not the one-at-a-time variants of the steps. Reorder (none or
      * Hilbert) x predictor x class streams or not x byte terminal (escape with planes, escape, split
-     * varint) = 48 rows, the {@link Selector}'s grid with the reorder added. The first row is {@link
+     * varint) = 48 rows, the {@code BufferSelector}'s grid with the reorder added. The first row is {@link
      * #DEFAULT}, so a tie goes to it.
      */
     public static List<Encoding> oracle() {

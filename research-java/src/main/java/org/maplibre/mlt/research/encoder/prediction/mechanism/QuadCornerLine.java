@@ -44,7 +44,7 @@ public final class QuadCornerLine implements ClassifiedPredictor {
 
     @Override
     public int[] regionOrder() {
-        // Start, interior, then the predicted classes. SharedVertexRef reverses this under
+        // Start, interior, then the predicted classes. RingReferences reverses this under
         // SEGMENTED so the wide starts land in FastPFOR's VariableByte tail.
         return new int[]{START, INTERIOR, CORNER, LINE_INTERIOR};
     }

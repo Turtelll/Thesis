@@ -126,7 +126,7 @@ public final class PipelineRegistry {
             case "s7" -> StepRows.s7Rows();
             case "s8" -> StepRows.s8Rows();
             // the fixed rows the per-buffer selection is measured against; the selectors themselves
-            // need a compressor and are built by PipelineCli
+            // need a compressor and are built by MeasureHarness
             case "selector" -> List.of(row(DEFAULT), row(GEOMETRY_BEST));
             // not a step of the build-up: TURN_SCALAR beside QUAD_CORNER, for the building layer
             case "turn" -> StepRows.turnRows();
@@ -151,10 +151,10 @@ public final class PipelineRegistry {
             // the previous default, beside which the benchmark sizes the per-layer default (forLayer)
             case "layer" -> List.of(row(DEFAULT));
             // the fixed rows the tile selection is measured against; the TileSelectors need a
-            // compressor and are built by PipelineCli
+            // compressor and are built by MeasureHarness
             case "tile" -> List.of(row(DEFAULT));
             // the grid of the per-(tile, layer) oracle; the oracles themselves need a compressor and are
-            // built by PipelineCli. Not in steps(), so all() does not take the grid
+            // built by MeasureHarness. Not in steps(), so all() does not take the grid
             case "best" -> CompositionGrids.bestGrid().stream().map(PipelineRegistry::row).toList();
             default -> throw new IllegalArgumentException("unknown step: " + name + " (known: " + steps() + ")");
         };

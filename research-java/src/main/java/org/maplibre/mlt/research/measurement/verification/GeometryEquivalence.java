@@ -78,7 +78,7 @@ public final class GeometryEquivalence {
     }
 
     /**
-     * A human-readable reason for a failure, for the message {@code BenchmarkCli} throws.
+     * A human-readable reason for a failure, for the message {@code MeasureHarness} throws.
      */
     public static String describe(BufferContext original, BufferContext reordered) {
         if (original.vertices().size() != reordered.vertices().size()) {

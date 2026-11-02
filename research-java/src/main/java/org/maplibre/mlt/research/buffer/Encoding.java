@@ -8,7 +8,7 @@ import java.util.List;
  * One vertex-buffer encoding: the single abstraction the harness measures and verifies.
  *
  * <p>{@link #decode} is mandatory: an encoding that cannot be decoded cannot be shown to be
- * lossless, so {@code BenchmarkCli} round-trips every encoding over the real corpus on every run.
+ * lossless, so {@code MeasureHarness} round-trips every encoding over the real corpus on every run.
  */
 public interface Encoding {
 

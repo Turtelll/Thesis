@@ -13,7 +13,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
  * <p>{@code predictX}/{@code predictY} are given the vertex index and the vertices reconstructed
  * so far (on decode, exactly as far as a real decoder has gotten) plus the vertex classes, and
  * must be pure functions of already-known state — the same "derived, not signalled" rule {@code
- * PartBoundaries} exists to enforce for the class itself.
+ * VertexRuns} exists to enforce for the class itself.
  */
 public interface ClassifiedPredictor {
 

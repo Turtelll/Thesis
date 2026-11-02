@@ -17,9 +17,8 @@ import java.util.stream.Stream;
 
 /**
  * Measurement-only probe, no bytes written: mean residual bit width, zero-pair share and per-vertex
- * change against {@code DELTA_ZIGZAG} for the transform of every baseline and {@link
- * Baselines#research() research} row. A codec-independent headroom signal — whether it reaches
- * the tile is what {@code BenchmarkCli} measures.
+ * change against {@code DELTA_ZIGZAG} for the transform of every baseline row. A codec-independent headroom signal — whether it reaches
+ * the tile is what {@code MeasureHarness} measures.
  *
  * <p>Usage: {@code [extractionDir] [--layer <name>] [--by-zoom]}. {@code extractionDir} defaults
  * to {@code ../data/extractedBaseline}.
@@ -35,13 +34,13 @@ public final class ResidualBitsProbe {
 
     /**
      * Mean residual bit width per {@link VertexTransform}, corpus-wide — a codec-independent
-     * headroom signal, separate from {@code BenchmarkCli}'s byte tables.
+     * headroom signal, separate from {@code MeasureHarness}'s byte tables.
      *
      * <p>Keyed on the transform's name rather than the encoding's: {@code QUAD_CORNER_VARINT},
      * {@code QUAD_CORNER_RANS} and {@code QUAD_CORNER_FASTPFOR} all wrap the same transform and so
      * produce byte-identical residuals, and printing the mean three times would wrongly imply the
      * codec affects it. A predictor that lowers mean bits has found real structure; whether that
-     * structure survives into fewer bytes depends on layout and codec — {@code BenchmarkCli}'s tables answer that
+     * structure survives into fewer bytes depends on layout and codec — {@code MeasureHarness}'s tables answer that
      * separately. {@code QUAD_CORNER} is the worked example: -9,6% mean bits, -0,0% bytes interleaved
      * under FastPFOR, -12,2% bytes once segmented (see {@code docs/evaluation-protocol.md}).
      *

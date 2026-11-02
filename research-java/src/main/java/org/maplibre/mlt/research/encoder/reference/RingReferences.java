@@ -22,7 +22,7 @@ import java.util.List;
  * earlier ring holds, a <b>follow flag</b> says "the next vertex is that ring's previous vertex" —
  * a shared wall is walked in the opposite direction by the two rings on either side of it. A
  * referenced vertex has no residual. Rotation is never transmitted: the decoder emits the rotated
- * rings, which {@code Verification} accepts.
+ * rings, which {@code RoundTrip} accepts.
  *
  * <p>Simplification against the probe this came from: the window and the "earlier" set are counted
  * in polygon rings, not polygons, so a hole sharing a vertex with its own outer ring also counts.
