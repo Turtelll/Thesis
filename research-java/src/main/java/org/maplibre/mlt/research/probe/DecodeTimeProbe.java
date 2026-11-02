@@ -61,7 +61,7 @@ public final class DecodeTimeProbe {
     /** Name prefix of the baseline transform's rows, e.g. {@code DELTA_ZIGZAG_VARINT_XY}. */
     private static final String REFERENCE_TRANSFORM = "DELTA_ZIGZAG_";
 
-    private static final String USAGE =
+    public static final String USAGE =
             "Usage: [extractionDir] [--encoding <NAME>[,<NAME>...]] [--layer <name>] [--reps <n>]"
                     + " [--warmup <n>] [--max-ratio <x>] [--csv <file>]";
 
@@ -91,7 +91,7 @@ public final class DecodeTimeProbe {
     /**
      * Every encoding selectable by name: {@link Baselines#all()} and the pipeline's rows.
      */
-    private static Map<String, Encoding> candidates() {
+    public static Map<String, Encoding> candidates() {
         final var byName = new LinkedHashMap<String, Encoding>();
         for (final var encoding : Baselines.all()) {
             byName.put(encoding.name(), encoding);
@@ -201,42 +201,25 @@ public final class DecodeTimeProbe {
      */
     private static long sink;
 
-    public static void main(String[] args) throws IOException {
-        String inArg = null;
-        String layer = null;
-        var reps = 5;
-        var warmup = 2;
-        var maxRatio = 1.5;
-        String csvFile = null;
-        final var requested = new ArrayList<String>();
-        for (var i = 0; i < args.length; i++) {
-            switch (args[i]) {
-                case "--encoding" -> {
-                    for (final var name : args[++i].split(",")) {
-                        if (!name.isBlank()) {
-                            requested.add(name.trim());
-                        }
-                    }
-                }
-                case "--layer" -> layer = args[++i];
-                case "--reps" -> reps = Integer.parseInt(args[++i]);
-                case "--warmup" -> warmup = Integer.parseInt(args[++i]);
-                case "--max-ratio" -> maxRatio = Double.parseDouble(args[++i]);
-                case "--csv" -> csvFile = args[++i];
-                case "--help", "-h" -> throw new IllegalArgumentException(USAGE);
-                default -> {
-                    if (args[i].startsWith("--")) {
-                        final var bare = args[i].substring(2);
-                        final var hint = candidates().containsKey(bare)
-                                ? " Did you mean --encoding " + bare + "?"
-                                : "";
-                        throw new IllegalArgumentException("Unknown option " + args[i] + "." + hint + " " + USAGE);
-                    }
-                    inArg = args[i];
-                }
-            }
-        }
-        final var inDir = Path.of(inArg != null ? inArg : "../data/extractedBaseline");
+    /** What a decode-time run measures: the extraction, the optional layer, and the timing knobs. */
+    public record Options(
+            Path inDir,
+            String layer,
+            int reps,
+            int warmup,
+            double maxRatio,
+            String csvFile,
+            List<String> requested) {
+    }
+
+    public static void run(Options options) throws IOException {
+        final var inDir = options.inDir();
+        final var layer = options.layer();
+        final var reps = options.reps();
+        final var warmup = options.warmup();
+        final var maxRatio = options.maxRatio();
+        final var csvFile = options.csvFile();
+        final var requested = options.requested();
         final var manifest = ExtractionReader.readManifest(inDir);
         final var rows = rows(requested);
 
