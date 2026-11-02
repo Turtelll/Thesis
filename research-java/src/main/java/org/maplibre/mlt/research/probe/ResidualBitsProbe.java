@@ -323,25 +323,7 @@ public final class ResidualBitsProbe {
                 "",
                 DELTA_ZIGZAG::apply);
     }
-    public static void main(String[] args) throws IOException {
-        var inDir = "../data/extractedBaseline";
-        String layer = null;
-        var byZoom = false;
-        var positional = 0;
-        for (var i = 0; i < args.length; i++) {
-            switch (args[i]) {
-                case "--layer" -> layer = args[++i];
-                case "--by-zoom" -> byZoom = true;
-                default -> {
-                    if (args[i].startsWith("-") || positional++ > 0) {
-                        throw new IllegalArgumentException(
-                                "Usage: [extractionDir] [--layer <name>] [--by-zoom]");
-                    }
-                    inDir = args[i];
-                }
-            }
-        }
-
+    public static void run(String inDir, String layer, boolean byZoom) throws IOException {
         var sources = new ArrayList<ResidualSource>();
         for (var encoding : Baselines.baseline()) {
             sources.add(residualSourceOf(encoding));
