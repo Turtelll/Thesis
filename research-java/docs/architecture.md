@@ -150,6 +150,11 @@ encoder -> buffer
   workshop, the command line, extraction or a compression backend (brotli4j, zstd, `java.util.zip`);
 - nothing outside `cli` depends on `cli`.
 
+The package graph (jdeps) has 21 packages, 101 edges and no cycle. At class level the four classes of
+`registry` reference each other (`PipelineRegistry` holds the stage chain and the step switch, the
+other three the per-layer defaults, the grids and the step rows built on that chain); the cycle
+stays inside the package and no static initialiser runs in a loop.
+
 A restructure commit never changes a byte: the golden dump (`research dump --diff`) of the tree
 before and after must show zero changed rows.
 
