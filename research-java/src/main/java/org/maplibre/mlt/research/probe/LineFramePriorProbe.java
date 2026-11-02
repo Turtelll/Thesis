@@ -105,25 +105,7 @@ public final class LineFramePriorProbe {
         final List<Double> errors = new ArrayList<>();
     }
 
-    public static void main(String[] args) throws IOException {
-        var layer = "transportation";
-        final var dirs = new ArrayList<String>();
-        for (var i = 0; i < args.length; i++) {
-            if (args[i].equals("--layer") && i + 1 < args.length) {
-                layer = args[++i];
-            } else if (!args[i].startsWith("--")) {
-                dirs.add(args[i]);
-            }
-        }
-        if (dirs.isEmpty()) {
-            throw new IllegalArgumentException("Usage: <extractionDir>... [--layer <name>]");
-        }
-        for (final var dir : dirs) {
-            run(Path.of(dir), layer);
-        }
-    }
-
-    private static void run(Path inDir, String layer) throws IOException {
+    public static void run(Path inDir, String layer) throws IOException {
         final var manifest = ExtractionReader.readManifest(inDir);
         final var stats = new Stats[ORDERS.size()][ROWS.size()];
         for (final var perOrder : stats) {
