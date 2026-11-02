@@ -54,7 +54,7 @@ import java.util.List;
  */
 public final class TileSizeProbe {
 
-    private static final List<Reorder> DEFAULT_MODES = List.of(
+    public static final List<Reorder> DEFAULT_MODES = List.of(
             Reorder.HILBERT_START, Reorder.HILBERT_CENTROID, Reorder.MORTON_START, Reorder.MORTON_CENTROID);
 
     /**
@@ -64,7 +64,7 @@ public final class TileSizeProbe {
      * is what mlt-core then writes (0, 1, 2, .. in feature order), {@code DROP} omits the id column.
      * Both change the data, so they only apply to tilesets whose ids are not needed.
      */
-    private enum IdPolicy { KEEP, SEQUENTIAL, DROP }
+    public enum IdPolicy { KEEP, SEQUENTIAL, DROP }
 
     private static IdPolicy ids = IdPolicy.KEEP;
 
@@ -86,39 +86,29 @@ public final class TileSizeProbe {
         return new Layer(layer.name(), features, layer.tileExtent());
     }
 
-    public static void main(String[] args) throws Exception {
-        File file = null;
-        var modes = new ArrayList<Reorder>(DEFAULT_MODES);
-        var brotli = 9;
-        var limit = Integer.MAX_VALUE;
-        var byLayer = false;
-        var runs = false;
-        var joint = false;
-        String jointLayer = null;
-        for (var i = 0; i < args.length; i++) {
-            switch (args[i]) {
-                case "--ids" -> ids = IdPolicy.valueOf(args[++i].trim().toUpperCase());
-                case "--modes" -> {
-                    modes.clear();
-                    for (var name : args[++i].split(",")) {
-                        modes.add(Reorder.valueOf(name.trim()));
-                    }
-                }
-                case "--brotli-quality" -> brotli = Integer.parseInt(args[++i]);
-                case "--limit-tiles" -> limit = Integer.parseInt(args[++i]);
-                case "--by-layer" -> byLayer = true;
-                case "--runs" -> runs = true;
-                case "--joint" -> {
-                    joint = true;
-                    jointLayer = args[++i];
-                }
-                default -> file = new File(args[i]);
-            }
-        }
-        if (file == null) {
-            file = new File("../data/MVT/munich-plantiler.mbtiles");
-        }
-        if (runs) {
+    /** What a tile-size run measures: the tileset, the reorder modes, and which report to print. */
+    public record Options(
+            File file,
+            List<Reorder> modes,
+            int brotli,
+            int limit,
+            boolean byLayer,
+            boolean runs,
+            boolean joint,
+            String jointLayer,
+            IdPolicy ids) {
+    }
+
+    public static void run(Options options) throws Exception {
+        final var file = options.file();
+        final var modes = options.modes();
+        final var brotli = options.brotli();
+        final var limit = options.limit();
+        final var byLayer = options.byLayer();
+        final var runs = options.runs();
+        final var joint = options.joint();
+        final var jointLayer = options.jointLayer();
+        ids = options.ids();        if (runs) {
             runs(file, modes.get(0), limit);
             return;
         }

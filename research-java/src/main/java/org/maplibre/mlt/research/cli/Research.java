@@ -2,7 +2,6 @@ package org.maplibre.mlt.research.cli;
 
 import org.maplibre.mlt.research.probe.BufferPointProbe;
 import org.maplibre.mlt.research.probe.LineFramePriorProbe;
-import org.maplibre.mlt.research.probe.TileSizeProbe;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -40,7 +39,7 @@ public final class Research {
                 MeasureCli::main));
         COMMANDS.put("tile-size", new Entry(
                 "whole-tile MLT bytes (property columns and ids included) of the pipeline reorders",
-                TileSizeProbe::main));
+                TileSizeCli::main));
         COMMANDS.put("dump", new Entry(
                 "golden master of every row (SHA-256, sizes); --diff <old> <new> compares two dumps",
                 DumpCli::main));
