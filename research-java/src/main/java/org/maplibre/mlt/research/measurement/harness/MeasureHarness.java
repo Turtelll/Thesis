@@ -7,6 +7,7 @@ import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.measurement.selection.BufferFeatures;
 import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
+import org.maplibre.mlt.research.registry.LayerCompositions;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.measurement.stats.StepProbes;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
@@ -196,7 +197,7 @@ public final class MeasureHarness {
                     tileContexts.add(ctx);
                 }
                 if (layerStep || tileStep || bestStep) {
-                    final var payload = new PipelineEncoding(PipelineRegistry.forLayer(entry.layerName()))
+                    final var payload = new PipelineEncoding(LayerCompositions.forLayer(entry.layerName()))
                             .encode(ctx).payload();
                     perTile.add(OracleReport.PER_LAYER, payload);
                     final var gzip = Compressor.GZIP.size(payload);
@@ -243,7 +244,7 @@ public final class MeasureHarness {
             aloneOracle.printByLayer();
             final var gridNames = rows.stream().map(Encoding::name).toList();
             aloneOracle.printBestFixedPerLayer((layer, candidate) -> true,
-                    layer -> gridNames.indexOf(new PipelineEncoding(PipelineRegistry.forLayer(layer)).name()),
+                    layer -> gridNames.indexOf(new PipelineEncoding(LayerCompositions.forLayer(layer)).name()),
                     "per layer");
             final var shown = new ArrayList<>(baselineNames);
             shown.add(OracleReport.PER_LAYER);
@@ -284,7 +285,7 @@ public final class MeasureHarness {
             oracle.printBestFixedPerLayer((layer, candidate) ->
                     !(candidate instanceof PipelineEncoding row)
                             || row.config().reorder() == Reorder.NONE
-                            || PipelineRegistry.reorderPays(layer));
+                            || LayerCompositions.reorderPays(layer));
             oracle.printComparison(perTile, reference, baselineNames);
             if (opts.byZoom) {
                 final var shown = new ArrayList<>(baselineNames);
@@ -366,7 +367,7 @@ public final class MeasureHarness {
         }
         // the pipeline's default: the layer's fixed composition (not a choice made on this buffer)
         perTile.add(OracleReport.PER_LAYER,
-                new PipelineEncoding(PipelineRegistry.forLayer(layer)).encode(ctx).payload());
+                new PipelineEncoding(LayerCompositions.forLayer(layer)).encode(ctx).payload());
     }
 
     /**

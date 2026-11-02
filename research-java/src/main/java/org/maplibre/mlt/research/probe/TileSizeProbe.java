@@ -17,7 +17,7 @@ import org.maplibre.mlt.research.extraction.MbtilesSource;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
-import org.maplibre.mlt.research.registry.PipelineRegistry;
+import org.maplibre.mlt.research.registry.LayerCompositions;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.reorder.Reorder;
 import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
@@ -223,7 +223,7 @@ public final class TileSizeProbe {
      * with the two greedy chains, and the chains without the references.
      */
     private static List<Composition> jointConfigs(String layer) {
-        final var base = PipelineRegistry.forLayer(layer)
+        final var base = LayerCompositions.forLayer(layer)
                 .withPredictor(Prediction.LINE_CONTINUATION_FRAME_HEADING)
                 .withSegmentation(Segmentation.CLASS);
         final var shared = Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING;

@@ -21,26 +21,26 @@ class LayerDefaultTest {
   @Test
   void everyCompositionIsARoundTrippedRow() {
     var covered = PipelineRegistry.all().stream().map(Encoding::name).collect(Collectors.toSet());
-    for (var layer : PipelineRegistry.fittedLayers()) {
-      var name = new PipelineEncoding(PipelineRegistry.forLayer(layer)).name();
+    for (var layer : LayerCompositions.fittedLayers()) {
+      var name = new PipelineEncoding(LayerCompositions.forLayer(layer)).name();
       assertTrue(covered.contains(name), layer + " is not a row of any step: " + name);
     }
   }
 
   @Test
   void everyFittedLayerReorders() {
-    for (var layer : PipelineRegistry.fittedLayers()) {
-      assertTrue(PipelineRegistry.reorderPays(layer), layer);
+    for (var layer : LayerCompositions.fittedLayers()) {
+      assertTrue(LayerCompositions.reorderPays(layer), layer);
       assertEquals(
-          PipelineRegistry.CHAIN_LAYERS.contains(layer) ? Reorder.CHAIN : Reorder.HILBERT_CENTROID_ROT_MP,
-          PipelineRegistry.forLayer(layer).reorder(),
+          LayerCompositions.CHAIN_LAYERS.contains(layer) ? Reorder.CHAIN : Reorder.HILBERT_CENTROID_ROT_MP,
+          LayerCompositions.forLayer(layer).reorder(),
           layer);
     }
   }
 
   @Test
   void transportationChainsItsRoadsAndReferencesEarlierJunctions() {
-    var config = PipelineRegistry.forLayer("transportation");
+    var config = LayerCompositions.forLayer("transportation");
     assertEquals(Reorder.CHAIN, config.reorder());
     assertEquals(Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING, config.predictor());
   }
@@ -51,13 +51,13 @@ class LayerDefaultTest {
     assertEquals(252, grid.size());
     assertEquals(grid.size(), new java.util.HashSet<>(grid).size(), "the grid has duplicates");
     assertTrue(grid.contains(PipelineRegistry.DEFAULT));
-    for (var layer : PipelineRegistry.fittedLayers()) {
-      assertTrue(grid.contains(PipelineRegistry.forLayer(layer)), layer);
+    for (var layer : LayerCompositions.fittedLayers()) {
+      assertTrue(grid.contains(LayerCompositions.forLayer(layer)), layer);
     }
   }
 
   @Test
   void unknownLayerFallsBackToDefault() {
-    assertEquals(PipelineRegistry.DEFAULT, PipelineRegistry.forLayer("no-such-layer"));
+    assertEquals(PipelineRegistry.DEFAULT, LayerCompositions.forLayer("no-such-layer"));
   }
 }

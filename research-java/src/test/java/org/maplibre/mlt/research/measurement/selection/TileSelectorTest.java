@@ -13,6 +13,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.VertexBufferExtractor;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.encoder.format.PipelineEncodingTest;
+import org.maplibre.mlt.research.registry.LayerCompositions;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 
 /**
@@ -88,7 +89,7 @@ class TileSelectorTest {
     var fixed = new ArrayList<byte[]>();
     for (var b = 0; b < buffers.size(); b++) {
       fixed.add(
-          new PipelineEncoding(PipelineRegistry.forLayer(LAYERS.get(b)))
+          new PipelineEncoding(LayerCompositions.forLayer(LAYERS.get(b)))
               .encode(buffers.get(b))
               .payload());
     }
@@ -114,7 +115,7 @@ class TileSelectorTest {
         assertTrue(aloneSize <= size);
       }
       fixed.add(
-          new PipelineEncoding(PipelineRegistry.forLayer(LAYERS.get(b)))
+          new PipelineEncoding(LayerCompositions.forLayer(LAYERS.get(b)))
               .encode(buffers.get(b))
               .payload());
     }
@@ -155,16 +156,16 @@ class TileSelectorTest {
     assertEquals(48, grid.size());
     assertEquals(grid, candidates.subList(0, 48));
     var extras =
-        PipelineRegistry.fittedLayers().stream()
-            .map(PipelineRegistry::forLayer)
+        LayerCompositions.fittedLayers().stream()
+            .map(LayerCompositions::forLayer)
             .filter(config -> !grid.contains(config))
             .distinct()
             .count();
     assertTrue(extras > 0, "the ring-frame defaults are outside the grid");
     assertEquals(48 + extras, candidates.size());
-    for (var layer : PipelineRegistry.fittedLayers()) {
-      assertTrue(candidates.contains(PipelineRegistry.forLayer(layer)), layer);
+    for (var layer : LayerCompositions.fittedLayers()) {
+      assertTrue(candidates.contains(LayerCompositions.forLayer(layer)), layer);
     }
-    assertTrue(candidates.contains(PipelineRegistry.forLayer("no-such-layer")));
+    assertTrue(candidates.contains(LayerCompositions.forLayer("no-such-layer")));
   }
 }

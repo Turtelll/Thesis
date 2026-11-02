@@ -4,6 +4,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.buffer.Encoding.EncodedBuffer;
 import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
+import org.maplibre.mlt.research.registry.LayerCompositions;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 
 import java.io.ByteArrayOutputStream;
@@ -140,8 +141,8 @@ public final class TileSelector {
      */
     private static List<Composition> defaultCandidates() {
         final var all = new ArrayList<>(PipelineRegistry.oracleConfigs());
-        for (final var layer : PipelineRegistry.fittedLayers()) {
-            final var layerDefault = PipelineRegistry.forLayer(layer);
+        for (final var layer : LayerCompositions.fittedLayers()) {
+            final var layerDefault = LayerCompositions.forLayer(layer);
             if (!all.contains(layerDefault)) {
                 all.add(layerDefault);
             }
@@ -218,7 +219,7 @@ public final class TileSelector {
 
         var chosen = new int[n];
         for (var b = 0; b < n; b++) {
-            chosen[b] = start(PipelineRegistry.forLayer(layers.get(b)), allowed[b]);
+            chosen[b] = start(LayerCompositions.forLayer(layers.get(b)), allowed[b]);
         }
         var best = size.applyAsLong(concat(payloads, chosen, -1, 0));
 

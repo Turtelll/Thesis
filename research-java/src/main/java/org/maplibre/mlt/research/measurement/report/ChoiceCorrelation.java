@@ -4,7 +4,7 @@ import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.measurement.selection.BufferFeatures;
 import org.maplibre.mlt.research.encoder.stream.ByteWidth;
 import org.maplibre.mlt.research.encoder.format.Composition;
-import org.maplibre.mlt.research.registry.PipelineRegistry;
+import org.maplibre.mlt.research.registry.LayerCompositions;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.encoder.stream.Transpose;
 
@@ -88,7 +88,7 @@ public final class ChoiceCorrelation {
         header.append(String.format(" %13s", "all four"));
         System.out.println(header);
 
-        agreement("per-layer default (forLayer)", width, (row, stage) -> stage.of(PipelineRegistry.forLayer(row.entry().layerName())));
+        agreement("per-layer default (forLayer)", width, (row, stage) -> stage.of(LayerCompositions.forLayer(row.entry().layerName())));
         final var byLayer = majority(row -> row.entry().layerName());
         agreement("majority per layer (2-fold)", width, byLayer);
         final var byLayerZoom = majority(row -> row.entry().layerName() + "/" + row.entry().z());

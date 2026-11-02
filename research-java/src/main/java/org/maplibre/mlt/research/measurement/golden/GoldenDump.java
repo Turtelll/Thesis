@@ -7,6 +7,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
+import org.maplibre.mlt.research.registry.LayerCompositions;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.measurement.verification.RoundTrip;
 import org.maplibre.mlt.research.extraction.Corpus;
@@ -178,7 +179,7 @@ public final class GoldenDump {
                     bufferCount++;
                     final var where = Corpus.tileKey(entry) + " " + entry.layerName();
                     final var layerEncoding = perLayerEncodings.computeIfAbsent(
-                            entry.layerName(), l -> new PipelineEncoding(PipelineRegistry.forLayer(l)));
+                            entry.layerName(), l -> new PipelineEncoding(LayerCompositions.forLayer(l)));
                     final var range = IntStream.range(0, rows.size());
                     final var results = (opts.serial ? range : range.parallel())
                             .mapToObj(r -> encode(rows.get(r), layerEncoding, entry, ctx, where, compressors))
