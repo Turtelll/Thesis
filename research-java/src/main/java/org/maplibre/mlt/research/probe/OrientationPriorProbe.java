@@ -140,20 +140,7 @@ public final class OrientationPriorProbe {
         final List<Double> angleErrRect = new ArrayList<>();
     }
 
-    public static void main(String[] args) throws IOException {
-        String inArg = null;
-        var layer = "building";
-        for (var i = 0; i < args.length; i++) {
-            if (args[i].equals("--layer") && i + 1 < args.length) {
-                layer = args[++i];
-            } else if (!args[i].startsWith("--")) {
-                inArg = args[i];
-            }
-        }
-        if (inArg == null) {
-            throw new IllegalArgumentException("Usage: <extractionDir> [--layer <name>]");
-        }
-        final var inDir = Path.of(inArg);
+    public static void run(Path inDir, String layer) throws IOException {
         final var manifest = ExtractionReader.readManifest(inDir);
 
         final var stats = new Stats[SOURCES.length];
