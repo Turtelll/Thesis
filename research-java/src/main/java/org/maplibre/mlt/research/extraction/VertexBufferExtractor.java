@@ -3,6 +3,7 @@ package org.maplibre.mlt.research.extraction;
 import org.locationtech.jts.geom.*;
 import org.maplibre.mlt.converter.encodings.GeometryEncoder;
 import org.maplibre.mlt.converter.geometry.GeometryType;
+import org.maplibre.mlt.converter.geometry.PolygonWinding;
 import org.maplibre.mlt.converter.geometry.Vertex;
 
 import java.util.ArrayList;
@@ -80,7 +81,9 @@ public final class VertexBufferExtractor {
             ArrayList<Integer> numParts,
             ArrayList<Integer> numRings) {
         final var containsPolygon = containsPolygon(geometries);
-        for (var geometry : geometries) {
+        for (var sourceGeometry : geometries) {
+            // Upstream (maplibre-tile-spec #1980) winds polygon rings as MVT does before storing them.
+            final var geometry = PolygonWinding.wind(sourceGeometry);
             switch (geometry) {
                 case Point point -> {
                     geometryTypes.add(GeometryType.POINT.ordinal());
