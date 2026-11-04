@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoder.prediction.mechanism;
+package org.maplibre.mlt.research.encoder.retired;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.VertexRuns;

@@ -1,13 +1,20 @@
-package org.maplibre.mlt.research.encoder.prediction.mechanism;
+package org.maplibre.mlt.research.encoder.retired;
 
 import org.maplibre.mlt.converter.geometry.Vertex;
 import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
+import org.maplibre.mlt.research.encoder.prediction.mechanism.ClassifiedPredictor;
+import org.maplibre.mlt.research.encoder.prediction.mechanism.LineContinuation;
+import org.maplibre.mlt.research.encoder.prediction.mechanism.SegmentQuadCorner;
 
 import java.util.List;
 
 /**
  * {@link SegmentQuadCorner} plus {@link LineContinuation} on long line runs.
+ *
+ * <p>Retired: it was the S2 predictor of the ladder and a layer default, but the tile oracle leaves it out at no
+ * measurable cost (docs/results/tile-oracle.md, "Pruning the grid"). No Prediction selects it any more; the
+ * code is kept here with its mechanism test.
  *
  * <p>The two predictors target disjoint populations, so they stack: a run of exactly four vertices
  * still takes the parallelogram corner, and the 3rd+ vertex of a LineString/MultiLineString run

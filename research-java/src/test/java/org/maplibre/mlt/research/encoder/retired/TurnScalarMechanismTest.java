@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoder.prediction.mechanism;
+package org.maplibre.mlt.research.encoder.retired;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -10,9 +10,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.mlt.converter.encodings.EncodingUtils;
 import org.maplibre.mlt.converter.geometry.Vertex;
-import org.maplibre.mlt.research.encoder.prediction.Prediction;
-import org.maplibre.mlt.research.workshop.PredictionTransform;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
+import org.maplibre.mlt.research.encoder.prediction.mechanism.ClassSegmented;
 
 /**
  * Pins {@code TURN_SCALAR}: four-vertex rings keep {@code QUAD_CORNER}'s parallelogram corner,
@@ -22,7 +21,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
  */
 class TurnScalarMechanismTest {
 
-  private static final ClassifiedPredictor PREDICTOR = Prediction.TURN_SCALAR.predictor();
+  private static final TurnScalarPredictor PREDICTOR = new TurnScalarPredictor();
 
   private static final int POLYGON = 2;
   private static final int LINESTRING = 1;
@@ -111,7 +110,7 @@ class TurnScalarMechanismTest {
     final var ctx =
         new BufferContext(L_SHAPE, List.of(LINESTRING), List.of(), List.of(6), List.of());
     assertEquals(0, TurnScalar.classify(ctx, 6).turns());
-    assertEquals(12, new PredictionTransform(Prediction.TURN_SCALAR).apply(ctx).length);
+    assertEquals(12, ClassSegmented.apply(PREDICTOR, ctx).length);
   }
 
   @Test

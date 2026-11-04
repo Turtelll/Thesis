@@ -1,4 +1,4 @@
-package org.maplibre.mlt.research.encoder.prediction.mechanism;
+package org.maplibre.mlt.research.encoder.retired;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
