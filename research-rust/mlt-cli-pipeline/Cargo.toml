@@ -1,0 +1,72 @@
+[package]
+name = "mlt-cli-pipeline"
+description = "A patched copy of the mlt CLI 0.6.1 (maplibre-tile-spec 062d6c72): convert writes the research pipeline codec as the v2 vertex stream, ui opens MLT .mbtiles"
+version = "0.6.1"
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+# The library and the binary keep the CLI's names, so the copied sources and the patch stay a diff against upstream.
+[lib]
+name = "mlt"
+# upstream's unit tests need its dev-dependencies and fixtures, which this copy does not carry
+test = false
+doctest = false
+
+[[bin]]
+name = "mlt"
+path = "src/main.rs"
+test = false
+
+[features]
+hotpath = ["hotpath/hotpath", "hotpath/tokio", "hotpath/threads", "hotpath/tui"]
+hotpath-alloc = ["hotpath", "hotpath/hotpath-alloc"]
+hotpath-mcp = ["hotpath", "hotpath/hotpath-mcp", "hotpath/hotpath-mcp-meta"]
+hotpath-cloud = ["hotpath", "hotpath/hotpath-cloud"]
+
+[dependencies]
+mlt-pipeline = { path = "../mlt-pipeline" }
+mlt-tile-oracle = { path = "../mlt-tile-oracle" }
+# the patched copy of mlt-core (library name `mlt_core`)
+mlt-core-pipeline = { path = "../mlt-core-pipeline", features = ["unstable-v2"] }
+anyhow.workspace = true
+bytes.workspace = true
+clap.workspace = true
+crossbeam-channel.workspace = true
+crossterm.workspace = true
+flate2.workspace = true
+futures.workspace = true
+geojson.workspace = true
+glob.workspace = true
+globset.workspace = true
+hotpath.workspace = true
+indicatif.workspace = true
+martin-tile-utils.workspace = true
+mbtiles.workspace = true
+mimalloc.workspace = true
+moka.workspace = true
+pmtiles.workspace = true
+ratatui.workspace = true
+rayon.workspace = true
+rstar.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+size_format.workspace = true
+sqlx.workspace = true
+tabled.workspace = true
+thousands.workspace = true
+tilejson.workspace = true
+tokio.workspace = true
+toml.workspace = true
+usize_cast.workspace = true
+walkdir.workspace = true
+xxhash-rust.workspace = true
+
+[lints]
+workspace = true

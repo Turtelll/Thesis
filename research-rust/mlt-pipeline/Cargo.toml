@@ -1,0 +1,17 @@
+[package]
+name = "mlt-pipeline"
+description = "The tile-oracle pipeline encoder of research-java (96 compositions), ported to Rust"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+libm = "0.2"
+rustc-hash.workspace = true
+
+[dev-dependencies]
+proptest = "1.11"
+
+[lints]
+workspace = true

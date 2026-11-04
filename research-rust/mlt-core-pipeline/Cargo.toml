@@ -1,0 +1,60 @@
+[package]
+name = "mlt-core-pipeline"
+description = "A patched copy of mlt-core 0.22.1 (maplibre-tile-spec 062d6c72) whose v2 vertex stream can be written by the research pipeline codec"
+version = "0.22.1"
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+# The library keeps mlt-core's name, so the copied sources and the patch stay a diff against upstream.
+[lib]
+name = "mlt_core"
+# upstream's unit tests need its dev-dependencies, which this copy does not carry
+test = false
+doctest = false
+
+[features]
+default = []
+arbitrary = ["dep:arbitrary", "geo-types/arbitrary"]
+unstable-v2 = []
+__private = []
+__private-v2 = ["__private", "unstable-v2"]
+
+[lints]
+workspace = true
+
+[dependencies]
+mlt-pipeline = { path = "../mlt-pipeline" }
+arbitrary = { workspace = true, optional = true }
+bitvec.workspace = true
+bytemuck.workspace = true
+compact_str.workspace = true
+derive-debug.workspace = true
+enum_dispatch.workspace = true
+fast-mvt.workspace = true
+fastpfor.workspace = true
+fsst-rs.workspace = true
+geo = { workspace = true, features = ["earcut"] }
+geo-types.workspace = true
+hex.workspace = true
+hilbert_2d.workspace = true
+hotpath.workspace = true
+integer-encoding.workspace = true
+num-traits.workspace = true
+num_enum.workspace = true
+rustc-hash.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+strum.workspace = true
+thiserror.workspace = true
+union-find.workspace = true
+usize_cast.workspace = true
+wide.workspace = true
+xxhash-rust.workspace = true
+zigzag.workspace = true

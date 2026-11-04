@@ -27,3 +27,13 @@ __pycache__/
 
 # Data analysis outputs (scans, figures)
 data-analysis/out/
+
+# Map viewer composition scan caches (regenerated on demand)
+tools/map-viewer/cache/
+
+# Rust port build output
+research-rust/target/
+research-rust/target-results/
+
+# MkDocs build output
+site/

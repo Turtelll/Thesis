@@ -1,0 +1,117 @@
+//! `mlt-core` 0.22.1 as pinned by the thesis' `maplibre-tile-spec` submodule (062d6c72), with one patch:
+//! the v2 vertex stream can be written and read by the research pipeline codec (`mlt-pipeline`).
+//! See `research-rust/README.md` for the list of changed places.
+extern crate core;
+
+/// Validates stream metadata in constructors (crate-internal).
+macro_rules! validate_stream {
+    ($stream:expr, $expected:pat $(,)?) => {
+        if !matches!($stream.meta.stream_type, $expected) {
+            return Err($crate::MltError::UnexpectedStreamType2(
+                $stream.meta.stream_type,
+                stringify!($expected),
+                stringify!($stream),
+            ));
+        }
+    };
+}
+
+/// Invokes `$m!` with every data type a property or m-value column can hold.
+///
+/// This is the one place the set of kinds is written down. The value enums spell
+/// their variants out, so a kind missing here fails to compile rather than
+/// silently dropping out of the mappings.
+macro_rules! with_kinds {
+    ($m:ident) => {
+        $m! {
+            scalar { Bool, I8, U8, I32, U32, I64, U64, F32, F64 }
+            string { Str }
+        }
+    };
+}
+
+pub use compact_str;
+pub use fast_mvt;
+pub use geo_types;
+
+pub(crate) mod codecs;
+pub(crate) mod convert;
+pub(crate) mod decoder;
+pub mod dump;
+pub mod encoder;
+pub(crate) mod errors;
+pub(crate) mod layer_writer;
+pub(crate) mod tile;
+pub(crate) mod utils;
+
+pub(crate) use errors::MltRefResult;
+
+pub use crate::convert::{InferredKind, geojson, mvt};
+pub use crate::decoder::{
+    ColNames, ColumnRef, Decoder, FeatureRef, GeometryType, GeometryValues, Layer, Layer01,
+    Layer01FeatureIter, LendingIterator, ParsedId, ParsedLayer, ParsedLayer01, ParsedProperty,
+    ParsedScalar, ParsedSharedDict, ParsedSharedDictItem, ParsedStrings, Parser, PropName,
+    PropNamesIter, PropValueRef, Unknown,
+};
+// Crate-internal re-exports: allow internal modules to use `crate::Lazy` etc.
+// without exposing these implementation details to external users.
+pub(crate) use crate::decoder::{
+    ColumnType, DictRange, DictionaryType, LengthType, OffsetType, RawPresence, RawSharedDict,
+    RawSharedDictItem, StreamType,
+};
+#[cfg(feature = "unstable-v2")]
+pub use crate::decoder::{
+    Layer02, MValueColumn, MValueSpans, MValues, Nested, ParsedInterior, ParsedLayer02, ParsedLeaf,
+    ParsedList, ParsedMValue, ParsedMap, ParsedNested, ParsedNode, ParsedStruct, RawInterior,
+    RawLeaf, RawList, RawMValue, RawMap, RawNested, RawNode, RawStruct,
+};
+pub use crate::errors::{MltError, MltResult};
+pub use crate::layer_writer::{FeatureWriter, LayerWriter};
+pub use crate::tile::{
+    ColumnRole, Extent, PropKind, PropValue, PropertyKey, TileFeature, TileFeatureBuilder,
+    TileLayer, TileLayerBuilder,
+};
+#[cfg(feature = "unstable-v2")]
+pub use crate::tile::{MValue, MValueKey, NestedKey, NestedKind, NestedValue, ZStep};
+pub(crate) use crate::utils::analyze::{Analyze, StatType};
+pub(crate) use crate::utils::lazy_state::{Decode, DecodeState, Lazy, LazyParsed, Parsed};
+pub use crate::utils::{PresenceOptIter, PresentValues};
+
+/// Wire-level encoding metadata - for tile analysis and tooling.
+///
+/// These types describe the physical and logical encoding of streams inside an
+/// MLT tile. Normal tile consumers (parse -> iterate features) do not need this
+/// module; it is intended for tools that inspect or report encoding statistics.
+pub mod wire {
+    #[cfg(feature = "unstable-v2")]
+    pub use crate::decoder::stream::model::XyzLogical;
+    pub use crate::decoder::stream::model::{
+        Alp, BoolLogical, DictionaryType, FastPForKind, FloatLogical, IntEncoding, IntLogical,
+        LengthType, LogicalEncoding, LogicalTechnique, Morton, OffsetType, PhysicalEncoding,
+        RleLayout, RleMeta, StreamMeta, StreamType, ValueKind, VertexLogical,
+    };
+    pub use crate::decoder::{
+        ColumnDecl, ColumnStorage, ColumnType, DictLayout, LayerBytes, StringLayout,
+    };
+    #[cfg(feature = "unstable-v2")]
+    pub use crate::decoder::{GeoLayout, LayerLayout};
+    pub use crate::utils::analyze::{Analyze, StatType};
+}
+
+#[cfg(any(test, feature = "__private"))]
+pub use crate::utils::test_helpers;
+
+/// Private re-exports for benchmarks and integration tests. Not part of the public API.
+#[cfg(any(test, feature = "__private"))]
+#[doc(hidden)]
+pub mod __private {
+    pub use crate::codecs::*;
+    pub use crate::convert::*;
+    pub use crate::decoder::*;
+    pub use crate::errors::*;
+    pub use crate::test_helpers::*;
+    pub use crate::tile::*;
+    pub use crate::utils::analyze::*;
+    pub use crate::utils::lazy_state::*;
+    pub use crate::utils::*;
+}

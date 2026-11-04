@@ -1,0 +1,20 @@
+[package]
+name = "mlt-tile-oracle"
+version = "0.1.0"
+description = "The tile oracle of the research pipeline encoding as the vertex encoder of MapLibre Tile v2, shared by mlt-oracle and the mlt CLI"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+mlt-pipeline = { path = "../mlt-pipeline" }
+# the patched copy of mlt-core (library name `mlt_core`), v2 only
+mlt-core-pipeline = { path = "../mlt-core-pipeline", features = ["unstable-v2"] }
+# the real zlib (level 6), so gzip sizes equal java.util.zip's
+flate2 = { version = "1", default-features = false, features = ["zlib"] }
+rayon = "1.10"
+
+[lints]
+workspace = true
