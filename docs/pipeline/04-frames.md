@@ -30,12 +30,16 @@ When a new ring starts, the frame is seeded with the frame of the decoded ring w
 new ring's first vertex. That neighbour counts as much as a wall 50 units long. As each edge of the new ring
 is decoded, it adds its own vote, so a long ring soon follows its own walls rather than its neighbour's.
 
+![A new ring takes its first frame from the decoded ring whose centroid is nearest its first vertex.](img/frames-neighbour-seed.svg)
+
 The rotated vertices are the ones the corner guess leaves to plain delta: every edge of a ring except its
 start and the predicted fourth corner.
 
 ```
 wall at 30°     plain delta (87, 50)    in the ring frame (100, 0)
 ```
+
+![The same building wall at 30°, written in tile axes (87, 50) and in the ring frame (100, 0).](img/frames-ring-frame.svg)
 
 ### Line frame
 
@@ -54,6 +58,8 @@ differently and are each usually small. The heading is the full direction of the
 incoming edge at 33°, continuation residual (4, 7)    in the heading frame about (7, 4)
 ```
 
+![Heading frame: the continuation residual (4, 7) written along and across the incoming edge becomes about (7, 4).](img/frames-heading.svg)
+
 ## Making a rotation lossless
 
 A rotation of integers normally produces fractions, and rounding would lose information. The frames
@@ -70,6 +76,8 @@ subtracting the same amount, in reverse order. The rotation is therefore a bijec
 integers in, two integers out, nothing to round away and no extra stream. All angles are computed with
 `StrictMath` and IEEE arithmetic, which give identical bits on every machine, so encoder and decoder
 always agree on the frame.
+
+![Three shears, each changing one coordinate by a rounded amount computed from the other, together rotate by a; each is undone exactly by subtracting the same amount.](img/frames-shears.svg)
 
 ## Decoding
 

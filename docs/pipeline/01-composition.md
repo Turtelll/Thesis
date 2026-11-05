@@ -48,6 +48,8 @@ therefore produces tiles that decode the same way.
 | 1 | 4 | predictor code, bit 3 |
 | 1 | 5-7 | unused |
 
+![The header bytes 49 03 of the end-to-end example, bit by bit: QUAD_CORNER, class streams, zigzag, escape width, byte planes.](img/composition-header.svg)
+
 ## The options to choose from
 
 Only options that won their stage remain, which leaves 96 compositions (`CompositionGrids.bestGrid()`):
@@ -59,6 +61,14 @@ Only options that won their stage remain, which leaves 96 compositions (`Composi
 
 The residual map is always zigzag, and the transpose follows the width, since only a fixed width can be
 split into planes.
+
+```mermaid
+flowchart LR
+    r["reorder<br/>none, Hilbert, chain"] -->|"× 3"| p["predictor<br/>8 live codes"]
+    p -->|"× 8"| s["streams<br/>flat or class"]
+    s -->|"× 2"| b["bytes<br/>split varint, or<br/>escape + byte planes"]
+    b -->|"× 2"| n["96 compositions"]
+```
 
 ## How a composition is chosen today
 

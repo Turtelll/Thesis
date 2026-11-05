@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 130" width="760" height="130" role="img" aria-label="Layout of a payload with shared references">
+  <style>
+    .t { fill: #7d8697; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .r { fill: #d64545; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .sm { font-size: 11px; }
+    .h { font-weight: 600; }
+    .m { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+    .s { stroke: #7d8697; }
+    .g { stroke: #8b93a1; }
+  </style>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d64545"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b93a1"/></marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3b82c4"/></marker>
+    <marker id="al" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a9d6f"/></marker>
+  </defs>
+  <rect x="20" y="30" width="60" height="50" rx="4" fill="#8b93a1" fill-opacity="0.15" stroke="#8b93a1" stroke-width="1.5"/>
+  <text class="t" x="50" y="52" text-anchor="middle">header</text>
+  <text class="t sm" x="50" y="68" text-anchor="middle">2 bytes</text>
+  <rect x="84" y="30" width="96" height="50" rx="4" fill="none" stroke="#8b93a1" stroke-width="1.5"/>
+  <text class="t" x="132" y="52" text-anchor="middle">flagsLength</text>
+  <text class="t sm" x="132" y="68" text-anchor="middle">varint</text>
+  <rect x="184" y="30" width="92" height="50" rx="4" fill="#8a63d2" fill-opacity="0.15" stroke="#8a63d2" stroke-width="1.5"/>
+  <text class="t" x="230" y="52" text-anchor="middle">flag bits</text>
+  <text class="t sm" x="230" y="68" text-anchor="middle">MSB first</text>
+  <rect x="280" y="30" width="104" height="50" rx="4" fill="none" stroke="#8b93a1" stroke-width="1.5"/>
+  <text class="t" x="332" y="52" text-anchor="middle">indicesLength</text>
+  <text class="t sm" x="332" y="68" text-anchor="middle">varint</text>
+  <rect x="388" y="30" width="92" height="50" rx="4" fill="#8a63d2" fill-opacity="0.15" stroke="#8a63d2" stroke-width="1.5"/>
+  <text class="t" x="434" y="52" text-anchor="middle">index bits</text>
+  <text class="t sm" x="434" y="68" text-anchor="middle">MSB first</text>
+  <rect x="484" y="30" width="126" height="50" rx="4" fill="none" stroke="#8b93a1" stroke-width="1.5"/>
+  <text class="t" x="547" y="52" text-anchor="middle">valueCount</text>
+  <text class="t sm" x="547" y="68" text-anchor="middle">varint per stream</text>
+  <rect x="614" y="30" width="126" height="50" rx="4" fill="#3b82c4" fill-opacity="0.15" stroke="#3b82c4" stroke-width="1.5"/>
+  <text class="t" x="677" y="52" text-anchor="middle">streams</text>
+  <text class="t sm" x="677" y="68" text-anchor="middle">residuals</text>
+  <path d="M84,90 v8 H610 v-8" fill="none" stroke="#8b93a1" stroke-width="1.5"/>
+  <text class="t sm" x="347" y="116" text-anchor="middle">reference block: only with a shared predictor</text>
+</svg>

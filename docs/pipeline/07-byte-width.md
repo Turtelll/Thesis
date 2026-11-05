@@ -17,6 +17,8 @@ zigzag(n) = (n << 1) ^ (n >> 31)
  0 → 0   -1 → 1   1 → 2   -2 → 3   2 → 4   ...   100 → 200   -30 → 59
 ```
 
+![Zigzag interleaves negative and positive values, so small magnitudes of either sign become small unsigned values.](img/bytes-zigzag.svg)
+
 It is the only residual map. The alternative, subtracting each stream's minimum, made the raw streams 58%
 larger and was worse on every layer (+9,51% gzip against -5,86% for zigzag), so it was removed.
 
@@ -34,6 +36,8 @@ values           5   300     7
 varint           05 | AC 02 | 07
 split varint     05 AC 07 | 02
 ```
+
+![Split varint: the same bytes as a varint, with one head byte per value first and the continuation bytes collected at the end.](img/bytes-split-varint.svg)
 
 A varint stream's length in bytes depends on its values, so it is prefixed with its byte length, unless it is
 the last stream of the payload, which simply takes the rest.
@@ -53,6 +57,8 @@ values       5   300   7   9   1000   12
 main         05  FF    07  09  FF     0C
 exceptions   45, 745 at 2 bytes, as byte planes: 2D E9 | 00 02
 ```
+
+![Escape width: 300 and 1000 become FF markers in the one-byte main stream; their exceptions 45 and 745 follow at two bytes, as byte planes.](img/bytes-escape.svg)
 
 Here six values plus two 2-byte exceptions take 10 bytes, against 12 at a plain 2-byte width.
 

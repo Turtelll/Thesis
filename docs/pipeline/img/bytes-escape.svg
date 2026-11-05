@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 230" width="540" height="230" role="img" aria-label="Escape width: large values become FF markers with exceptions after the main bytes">
+  <style>
+    .t { fill: #7d8697; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .r { fill: #d64545; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .sm { font-size: 11px; }
+    .h { font-weight: 600; }
+    .m { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+    .s { stroke: #7d8697; }
+    .g { stroke: #8b93a1; }
+  </style>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d64545"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b93a1"/></marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3b82c4"/></marker>
+    <marker id="al" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a9d6f"/></marker>
+  </defs>
+  <text class="t" x="20" y="34">values</text>
+  <text class="t" x="20" y="78">main, 1 byte</text>
+  <text class="t" x="20" y="164">exceptions</text>
+  <text class="t sm" x="20" y="180">2 bytes, planes</text>
+  <text class="t m" x="168" y="34" text-anchor="middle">5</text>
+  <rect x="150" y="58" width="36" height="28" rx="4" fill="#3b82c4" fill-opacity="0.15" stroke="#3b82c4" stroke-width="1.5"/>
+  <text class="t m" x="168" y="76.5" text-anchor="middle">05</text>
+  <text class="t m" x="208" y="34" text-anchor="middle" fill="#d64545">300</text>
+  <rect x="190" y="58" width="36" height="28" rx="4" fill="#d64545" fill-opacity="0.15" stroke="#d64545" stroke-width="1.5"/>
+  <text class="t m" x="208" y="76.5" text-anchor="middle">FF</text>
+  <text class="t m" x="248" y="34" text-anchor="middle">7</text>
+  <rect x="230" y="58" width="36" height="28" rx="4" fill="#3b82c4" fill-opacity="0.15" stroke="#3b82c4" stroke-width="1.5"/>
+  <text class="t m" x="248" y="76.5" text-anchor="middle">07</text>
+  <text class="t m" x="288" y="34" text-anchor="middle">9</text>
+  <rect x="270" y="58" width="36" height="28" rx="4" fill="#3b82c4" fill-opacity="0.15" stroke="#3b82c4" stroke-width="1.5"/>
+  <text class="t m" x="288" y="76.5" text-anchor="middle">09</text>
+  <text class="t m" x="328" y="34" text-anchor="middle" fill="#d64545">1000</text>
+  <rect x="310" y="58" width="36" height="28" rx="4" fill="#d64545" fill-opacity="0.15" stroke="#d64545" stroke-width="1.5"/>
+  <text class="t m" x="328" y="76.5" text-anchor="middle">FF</text>
+  <text class="t m" x="368" y="34" text-anchor="middle">12</text>
+  <rect x="350" y="58" width="36" height="28" rx="4" fill="#3b82c4" fill-opacity="0.15" stroke="#3b82c4" stroke-width="1.5"/>
+  <text class="t m" x="368" y="76.5" text-anchor="middle">0C</text>
+  <rect x="190" y="144" width="36" height="28" rx="4" fill="#e07b1a" fill-opacity="0.15" stroke="#e07b1a" stroke-width="1.5"/>
+  <text class="t m" x="208" y="162.5" text-anchor="middle">2D</text>
+  <rect x="230" y="144" width="36" height="28" rx="4" fill="#e07b1a" fill-opacity="0.15" stroke="#e07b1a" stroke-width="1.5"/>
+  <text class="t m" x="248" y="162.5" text-anchor="middle">E9</text>
+  <rect x="284" y="144" width="36" height="28" rx="4" fill="#e07b1a" fill-opacity="0.15" stroke="#e07b1a" stroke-width="1.5"/>
+  <text class="t m" x="302" y="162.5" text-anchor="middle">00</text>
+  <rect x="324" y="144" width="36" height="28" rx="4" fill="#e07b1a" fill-opacity="0.15" stroke="#e07b1a" stroke-width="1.5"/>
+  <text class="t m" x="342" y="162.5" text-anchor="middle">02</text>
+  <line x1="208" y1="90" x2="208" y2="138" stroke="#d64545" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+  <line x1="328" y1="90" x2="252" y2="138" stroke="#d64545" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+  <text class="r sm" x="202" y="116" text-anchor="end">45</text>
+  <text class="r sm" x="300" y="126">745</text>
+  <text class="t sm" x="228" y="192" text-anchor="middle">low bytes</text>
+  <text class="t sm" x="322" y="192" text-anchor="middle">high bytes</text>
+  <text class="t sm" x="20" y="220">6 main bytes + 4 exception bytes = 10, against 12 at a plain 2-byte width</text>
+</svg>

@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 330" width="620" height="330" role="img" aria-label="Quad corner guess: the fourth corner is guessed as p0 + p2 - p1">
+  <style>
+    .t { fill: #7d8697; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .h { font-weight: 600; }
+    .s { stroke: #7d8697; }
+    .g { stroke: #8b93a1; }
+    .gt { fill: #8b93a1; }
+  </style>
+  <defs>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8b93a1"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d64545"/>
+    </marker>
+  </defs>
+
+  <!-- Panel A: exact rectangle -->
+  <text class="t h" x="40" y="24">exact rectangle: residual (0, 0)</text>
+  <polygon points="80,50 200,50 200,210 80,210" fill="none" class="s" stroke-width="2"/>
+  <!-- guess construction: p2 - p1 copied to p0 -->
+  <line x1="92" y1="58" x2="92" y2="198" class="g" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ag)"/>
+  <text class="gt" x="100" y="134" font-size="12" font-family="system-ui, sans-serif">p2 − p1</text>
+  <circle cx="80" cy="210" r="11" fill="none" class="g" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <circle cx="80" cy="50" r="6" fill="#8a63d2"/>
+  <circle cx="200" cy="50" r="6" fill="#3b82c4"/>
+  <circle cx="200" cy="210" r="6" fill="#3b82c4"/>
+  <circle cx="80" cy="210" r="6" fill="#e07b1a"/>
+  <text class="t" x="70" y="42" text-anchor="end">p0 (100,200)</text>
+  <text class="t" x="210" y="42">p1 (130,200)</text>
+  <text class="t" x="210" y="226">p2 (130,240)</text>
+  <text class="t" x="70" y="236" text-anchor="end">p3 = guess</text>
+  <text class="t" x="70" y="252" text-anchor="end">(100,240)</text>
+
+  <!-- Panel B: skewed corner -->
+  <text class="t h" x="340" y="24">not quite a rectangle: small residual</text>
+  <polygon points="380,50 500,50 500,210 404,226" fill="none" class="s" stroke-width="2"/>
+  <line x1="392" y1="58" x2="392" y2="198" class="g" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ag)"/>
+  <text class="gt" x="400" y="134" font-size="12" font-family="system-ui, sans-serif">p2 − p1</text>
+  <circle cx="380" cy="210" r="11" fill="none" class="g" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <line x1="381" y1="210" x2="398" y2="221" stroke="#d64545" stroke-width="2" marker-end="url(#ar)"/>
+  <circle cx="380" cy="50" r="6" fill="#8a63d2"/>
+  <circle cx="500" cy="50" r="6" fill="#3b82c4"/>
+  <circle cx="500" cy="210" r="6" fill="#3b82c4"/>
+  <circle cx="404" cy="226" r="6" fill="#e07b1a"/>
+  <text class="t" x="370" y="42" text-anchor="end">p0</text>
+  <text class="t" x="510" y="42">p1</text>
+  <text class="t" x="510" y="226">p2</text>
+  <text class="t" x="368" y="206" text-anchor="end">guess</text>
+  <text class="t" x="414" y="244">p3</text>
+  <text x="414" y="262" fill="#d64545" font-size="13" font-family="system-ui, sans-serif">residual = p3 − guess</text>
+
+  <!-- Legend -->
+  <g transform="translate(40,296)">
+    <circle cx="6" cy="0" r="6" fill="#8a63d2"/><text class="t" x="18" y="5">START</text>
+    <circle cx="96" cy="0" r="6" fill="#3b82c4"/><text class="t" x="108" y="5">INTERIOR (delta)</text>
+    <circle cx="246" cy="0" r="6" fill="#e07b1a"/><text class="t" x="258" y="5">CORNER</text>
+    <circle cx="342" cy="0" r="9" fill="none" class="g" stroke-width="1.5" stroke-dasharray="3 3"/><text class="t" x="358" y="5">guess</text>
+    <line x1="420" y1="0" x2="446" y2="0" stroke="#d64545" stroke-width="2" marker-end="url(#ar)"/><text class="t" x="454" y="5">residual</text>
+  </g>
+</svg>

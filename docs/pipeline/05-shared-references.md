@@ -37,6 +37,8 @@ ring B              shares the wall a2-a1, rotated to start at a2: b0=a2 b1=a1 b
 B is written as     entry=1, index of a2 | follow=1 | residual of b2 | corner residual of b3
 ```
 
+![Ring B shares a wall with the decoded ring A. B starts at a2: an entry flag and an index replace its start, a follow flag replaces b1, and only b2 and b3 carry residuals.](img/shared-ring-wall.svg)
+
 ### Lines: a dictionary of earlier positions
 
 Lines refer to every distinct position of the earlier line parts in the buffer, kept in a dictionary in
@@ -52,6 +54,8 @@ ends are checked:
 part P1   a b c          dictionary {a, b, c}
 part P2   d e c          reversed to c e d: entry=1, index of c | residual of e | exit=0, residual of d
 ```
+
+![Line part P2 ends at the junction c that P1 already holds. It is reversed to start at c, which is then written as a dictionary index.](img/shared-line-dictionary.svg)
 
 Rings and points in a line layer keep their plain residuals.
 
@@ -71,6 +75,8 @@ the header and the streams carries it:
 ```
 varint flagsLength | flag bits | varint indicesLength | index bits | varint valueCount per stream
 ```
+
+![A payload with shared references: the reference block sits between the header and the streams.](img/shared-payload.svg)
 
 Flags and indices are bit-packed, most significant bit first.
 

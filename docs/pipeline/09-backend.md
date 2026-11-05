@@ -16,6 +16,15 @@ smaller under gzip. A stage is kept only if it makes the compressed tile smaller
 2. The buffers of the tile are concatenated, since one tile is one HTTP response, and compressed once.
 3. The compressed sizes are summed over all tiles of the corpus.
 
+```mermaid
+flowchart LR
+    b1["layer 1<br/>vertex buffer"] --> cat
+    b2["layer 2<br/>vertex buffer"] --> cat
+    bn["…"] --> cat
+    cat["concatenate<br/>one tile = one response"] --> gz["compress once<br/>gzip 6 · Brotli 11 · zstd 19"]
+    gz --> sum["sum over<br/>all tiles"]
+```
+
 gzip at level 6 is the reference, because every client supports it. Brotli (quality 11) and zstd
 (level 19) are reported alongside. Two measurements are used throughout these pages:
 

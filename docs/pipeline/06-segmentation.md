@@ -26,6 +26,8 @@ FLAT            S I I C S I I C S I I C ...
 CLASS           S S S ... | I I I I I I ... | C C C ...
 ```
 
+![The same residuals in vertex order and split into one stream per class: each class stream is homogeneous.](img/segmentation-streams.svg)
+
 Each stream holds two values, `x` and `y`, per vertex assigned to it. Empty streams are skipped. For
 `DELTA` there is only one class, so both options give the same bytes.
 

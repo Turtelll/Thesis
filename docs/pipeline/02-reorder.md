@@ -40,6 +40,10 @@ stored order    F1 F2 F3 F4    mean jump between runs 903,7
 Hilbert order   F3 F1 F4 F2    mean jump between runs 576,7
 ```
 
+![Four features on a 4 × 4 grid (illustrative positions). In stored order the encoder jumps across the tile between features; along the Hilbert curve the jumps are short.](img/reorder-hilbert.svg)
+
+![Ring rotation: the ring keeps its winding but starts at the vertex nearest the end of the previous run, so the start residual is a short jump.](img/reorder-ring-rotation.svg)
+
 ## Decoding
 
 There is nothing to undo. The decoder reads the reordered topology, decodes the vertices in stored order

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 330" width="560" height="330" role="img" aria-label="Heading frame: the continuation residual split into along and across the road">
+  <style>
+    .t { fill: #7d8697; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .r { fill: #d64545; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .sm { font-size: 11px; }
+    .h { font-weight: 600; }
+    .m { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+    .s { stroke: #7d8697; }
+    .g { stroke: #8b93a1; }
+  </style>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d64545"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b93a1"/></marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3b82c4"/></marker>
+    <marker id="al" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a9d6f"/></marker>
+  </defs>
+  <line x1="194.2" y1="127.1" x2="328.4" y2="214.3" stroke="#8b93a1" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <polyline points="60,40 194.2,127.1 360.4,270.3" fill="none" stroke="#7d8697" stroke-width="2.5"/>
+  <line x1="336.8" y1="219.7" x2="420.6" y2="274.2" stroke="#8b93a1" stroke-width="1" stroke-dasharray="5 4" marker-end="url(#ag)"/>
+  <line x1="333.8" y1="205.9" x2="355.6" y2="172.4" stroke="#8b93a1" stroke-width="1" stroke-dasharray="5 4" marker-end="url(#ag)"/>
+  <line x1="328.4" y1="214.3" x2="376.5" y2="245.5" stroke="#d64545" stroke-width="1.2" stroke-dasharray="3 3"/>
+  <line x1="376.5" y1="245.5" x2="360.4" y2="270.3" stroke="#d64545" stroke-width="1.2" stroke-dasharray="3 3"/>
+  <line x1="328.4" y1="214.3" x2="356.9" y2="264.2" stroke="#d64545" stroke-width="2" marker-end="url(#ar)"/>
+  <circle cx="328.4" cy="214.3" r="9" fill="none" class="g" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <circle cx="60" cy="40" r="6" fill="#8a63d2"/>
+  <circle cx="194.2" cy="127.1" r="6" fill="#3b82c4"/>
+  <circle cx="360.4" cy="270.3" r="6" fill="#2a9d6f"/>
+  <text class="t sm" x="60" y="28" text-anchor="middle">p[i−2]</text>
+  <text class="t sm" x="206.2" y="121.1">p[i−1]</text>
+  <text class="t sm" x="344.4" y="216.3">guess</text>
+  <text class="t sm" x="348.4" y="284.3" text-anchor="end">p[i]</text>
+  <text class="t sm" x="425.7" y="281.5">along</text>
+  <text class="t sm" x="360" y="165.6" text-anchor="middle">across</text>
+  <text class="r sm" x="364.5" y="232">7</text>
+  <text class="r sm" x="375.8" y="264.9">4</text>
+  <text class="t" x="310" y="60">incoming edge at 33°</text>
+  <text class="t" x="310" y="80">residual in tile axes</text>
+  <text class="r m" x="468" y="80">(4, 7)</text>
+  <text class="t" x="310" y="100">in the heading frame</text>
+  <text class="r m" x="468" y="100">≈ (7, 4)</text>
+  <text class="t sm" x="310" y="126">x: the step grew or shrank</text>
+  <text class="t sm" x="310" y="142">y: the road bent sideways</text>
+</svg>

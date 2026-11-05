@@ -39,6 +39,8 @@ guess       previous      p0            p1            p0 + p2 - p1 = (100,240)
 residual    p0 - previous (30,0)        (0,40)        (0,0)
 ```
 
+![Quad corner guess: p2 − p1 is copied to p0, giving the guess for p3. For an exact rectangle the guess is p3; otherwise only a small residual is left.](img/prediction-quad-corner.svg)
+
 ### Line continuation
 
 A road tends to continue in the direction it was going, with a similar step length. From the third vertex
@@ -51,6 +53,8 @@ vertices    p0=(0,0)  p1=(10,2)  p2=(21,4)        p3=(31,7)
 guess       previous  p0         2·p1 - p0=(20,4)  2·p2 - p1=(32,6)
 residual    p0        (10,2)     (1,0)             (-1,1)
 ```
+
+![Line continuation: the last edge is extended to guess the next vertex; the residual is how far the road bent or changed its step.](img/prediction-line-continuation.svg)
 
 Only line parts of at least six vertices are continued. On shorter parts and on polygon rings the
 continuation guess measured worse than plain delta. Classes: `START`, `INTERIOR` (delta: the second vertex

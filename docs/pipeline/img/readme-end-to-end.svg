@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 300" width="680" height="300" role="img" aria-label="One rectangular building from vertices to the 14 payload bytes">
+  <style>
+    .t { fill: #7d8697; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .r { fill: #d64545; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .sm { font-size: 11px; }
+    .h { font-weight: 600; }
+    .m { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+    .s { stroke: #7d8697; }
+    .g { stroke: #8b93a1; }
+  </style>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d64545"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b93a1"/></marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3b82c4"/></marker>
+    <marker id="al" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a9d6f"/></marker>
+  </defs>
+  <text class="t h" x="30" y="22">1 · classes and residuals</text>
+  <polygon points="60,56 120,56 120,136 60,136" fill="none" stroke="#7d8697" stroke-width="2"/>
+  <circle cx="60" cy="56" r="6" fill="#8a63d2"/>
+  <circle cx="120" cy="56" r="6" fill="#3b82c4"/>
+  <circle cx="120" cy="136" r="6" fill="#3b82c4"/>
+  <circle cx="60" cy="136" r="6" fill="#e07b1a"/>
+  <text class="t sm" x="52" y="50" text-anchor="end">p0</text>
+  <text class="t sm" x="128" y="50">p1</text>
+  <text class="t sm" x="128" y="152">p2</text>
+  <text class="t sm" x="52" y="152" text-anchor="end">p3</text>
+  <text class="t sm" x="186" y="50">stream</text>
+  <text class="t sm" x="310" y="50">residuals</text>
+  <text class="t sm" x="470" y="50">after zigzag</text>
+  <circle cx="192" cy="76" r="6" fill="#8a63d2"/>
+  <text class="t" x="204" y="80">START</text>
+  <text class="t m" x="310" y="80">100 200</text>
+  <text class="t" x="440" y="80">→</text>
+  <text class="t m" x="470" y="80">200 400</text>
+  <circle cx="192" cy="106" r="6" fill="#3b82c4"/>
+  <text class="t" x="204" y="110">INTERIOR</text>
+  <text class="t m" x="310" y="110">30 0  0 40</text>
+  <text class="t" x="440" y="110">→</text>
+  <text class="t m" x="470" y="110">60 0  0 80</text>
+  <circle cx="192" cy="136" r="6" fill="#e07b1a"/>
+  <text class="t" x="204" y="140">CORNER</text>
+  <text class="t m" x="310" y="140">0 0</text>
+  <text class="t" x="440" y="140">→</text>
+  <text class="t m" x="470" y="140">0 0</text>
+  <text class="t h" x="30" y="192">2 · payload, 14 bytes</text>
+  <text class="t sm" x="68" y="214" text-anchor="middle">header</text>
+  <rect x="30" y="222" width="36" height="28" rx="4" fill="#8b93a1" fill-opacity="0.15" stroke="#8b93a1" stroke-width="1.5"/>
+  <text class="t m" x="48" y="240.5" text-anchor="middle">49</text>
+  <rect x="70" y="222" width="36" height="28" rx="4" fill="#8b93a1" fill-opacity="0.15" stroke="#8b93a1" stroke-width="1.5"/>
+  <text class="t m" x="88" y="240.5" text-anchor="middle">03</text>
+  <text class="t sm" x="202" y="214" text-anchor="middle">START</text>
+  <rect x="124" y="222" width="36" height="28" rx="4" fill="#8a63d2" fill-opacity="0.15" stroke="#8a63d2" stroke-width="1.5"/>
+  <text class="t m" x="142" y="240.5" text-anchor="middle">04</text>
+  <text class="t sm" x="142" y="266" text-anchor="middle">desc</text>
+  <rect x="164" y="222" width="36" height="28" rx="4" fill="#8a63d2" fill-opacity="0.15" stroke="#8a63d2" stroke-width="1.5"/>
+  <text class="t m" x="182" y="240.5" text-anchor="middle">C8</text>
+  <text class="t sm" x="182" y="266" text-anchor="middle">200</text>
+  <rect x="204" y="222" width="36" height="28" rx="4" fill="#8a63d2" fill-opacity="0.15" stroke="#8a63d2" stroke-width="1.5"/>
+  <text class="t m" x="222" y="240.5" text-anchor="middle">FF</text>
+  <text class="t sm" x="222" y="266" text-anchor="middle">esc</text>
+  <rect x="244" y="222" width="36" height="28" rx="4" fill="#8a63d2" fill-opacity="0.15" stroke="#8a63d2" stroke-width="1.5"/>
+  <text class="t m" x="262" y="240.5" text-anchor="middle">91</text>
+  <text class="t sm" x="262" y="266" text-anchor="middle">145</text>
+  <text class="t sm" x="396" y="214" text-anchor="middle">INTERIOR</text>
+  <rect x="298" y="222" width="36" height="28" rx="4" fill="#3b82c4" fill-opacity="0.15" stroke="#3b82c4" stroke-width="1.5"/>
+  <text class="t m" x="316" y="240.5" text-anchor="middle">00</text>
+  <text class="t sm" x="316" y="266" text-anchor="middle">desc</text>
+  <rect x="338" y="222" width="36" height="28" rx="4" fill="#3b82c4" fill-opacity="0.15" stroke="#3b82c4" stroke-width="1.5"/>
+  <text class="t m" x="356" y="240.5" text-anchor="middle">3C</text>
+  <text class="t sm" x="356" y="266" text-anchor="middle">60</text>
+  <rect x="378" y="222" width="36" height="28" rx="4" fill="#3b82c4" fill-opacity="0.15" stroke="#3b82c4" stroke-width="1.5"/>
+  <text class="t m" x="396" y="240.5" text-anchor="middle">00</text>
+  <text class="t sm" x="396" y="266" text-anchor="middle">0</text>
+  <rect x="418" y="222" width="36" height="28" rx="4" fill="#3b82c4" fill-opacity="0.15" stroke="#3b82c4" stroke-width="1.5"/>
+  <text class="t m" x="436" y="240.5" text-anchor="middle">00</text>
+  <text class="t sm" x="436" y="266" text-anchor="middle">0</text>
+  <rect x="458" y="222" width="36" height="28" rx="4" fill="#3b82c4" fill-opacity="0.15" stroke="#3b82c4" stroke-width="1.5"/>
+  <text class="t m" x="476" y="240.5" text-anchor="middle">50</text>
+  <text class="t sm" x="476" y="266" text-anchor="middle">80</text>
+  <text class="t sm" x="570" y="214" text-anchor="middle">CORNER</text>
+  <rect x="512" y="222" width="36" height="28" rx="4" fill="#e07b1a" fill-opacity="0.15" stroke="#e07b1a" stroke-width="1.5"/>
+  <text class="t m" x="530" y="240.5" text-anchor="middle">00</text>
+  <text class="t sm" x="530" y="266" text-anchor="middle">desc</text>
+  <rect x="552" y="222" width="36" height="28" rx="4" fill="#e07b1a" fill-opacity="0.15" stroke="#e07b1a" stroke-width="1.5"/>
+  <text class="t m" x="570" y="240.5" text-anchor="middle">00</text>
+  <text class="t sm" x="570" y="266" text-anchor="middle">0</text>
+  <rect x="592" y="222" width="36" height="28" rx="4" fill="#e07b1a" fill-opacity="0.15" stroke="#e07b1a" stroke-width="1.5"/>
+  <text class="t m" x="610" y="240.5" text-anchor="middle">00</text>
+  <text class="t sm" x="610" y="266" text-anchor="middle">0</text>
+  <text class="t sm" x="30" y="290">FF marks a value too large for one byte; 145 = 400 − 255 follows as its exception.</text>
+</svg>

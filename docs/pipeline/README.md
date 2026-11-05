@@ -164,6 +164,8 @@ The decoder reads the header, derives from the topology that the ring has four v
 `START INTERIOR INTERIOR CORNER`, so 2 + 4 + 2 values), reads the three streams, undoes zigzag and walks the
 vertices, adding each residual to the same guess.
 
+![The building from the example: its four vertices fall into three classes, each class is one stream, and the streams become 14 bytes behind the 2-byte header.](img/readme-end-to-end.svg)
+
 ## The pages
 
 1. [Compositions](01-composition.md): what a composition is and how one is chosen.

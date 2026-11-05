@@ -29,6 +29,8 @@ NONE                2C 01 05 00 10 00 03 00
 INTERLEAVED_PLANES  2C 05 10 03 | 01 00 00 00
 ```
 
+![The same eight bytes value by value and as byte planes: the low bytes come first, the high plane is almost all zeros.](img/transpose-planes.svg)
+
 Under escape, the main stream is one byte per value, so planes and no planes give the same bytes there.
 The planes act where values are wider: on the exception list of an escape stream, which is always written as
 planes, and on streams where the escape does not pay and the values are written at two or four bytes.

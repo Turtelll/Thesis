@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 250" width="640" height="250" role="img" aria-label="Line continuation guess: the last edge is extended, the residual is the change of the edge">
+  <style>
+    .t { fill: #7d8697; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .s { stroke: #7d8697; }
+    .g { stroke: #8b93a1; }
+    .r { fill: #d64545; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+  </style>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d64545"/>
+    </marker>
+  </defs>
+  <!-- 1 unit = 16 px, p0 at (50,40), y down as in tile coordinates -->
+
+  <!-- dashed extensions of the last edge -->
+  <line x1="210" y1="72" x2="370" y2="104" class="g" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <line x1="386" y1="104" x2="562" y2="136" class="g" stroke-width="1.5" stroke-dasharray="5 4"/>
+
+  <!-- the line part -->
+  <polyline points="50,40 210,72 386,104 546,152" fill="none" class="s" stroke-width="2.5"/>
+
+  <!-- guesses -->
+  <circle cx="370" cy="104" r="9" fill="none" class="g" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <circle cx="562" cy="136" r="9" fill="none" class="g" stroke-width="1.5" stroke-dasharray="3 3"/>
+
+  <!-- residuals (guess -> actual) -->
+  <line x1="370" y1="104" x2="384" y2="104" stroke="#d64545" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="562" y1="136" x2="549" y2="149" stroke="#d64545" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- vertices -->
+  <circle cx="50" cy="40" r="6" fill="#8a63d2"/>
+  <circle cx="210" cy="72" r="6" fill="#3b82c4"/>
+  <circle cx="386" cy="104" r="6" fill="#2a9d6f"/>
+  <circle cx="546" cy="152" r="6" fill="#2a9d6f"/>
+
+  <text class="t" x="50" y="26" text-anchor="middle">p0 (0,0)</text>
+  <text class="t" x="210" y="56" text-anchor="middle">p1 (10,2)</text>
+  <text class="t" x="400" y="92">p2 (21,4)</text>
+  <text class="t" x="356" y="130" text-anchor="end">guess (20,4)</text>
+  <text class="r" x="356" y="146" text-anchor="end">residual (1,0)</text>
+  <text class="t" x="562" y="118" text-anchor="middle">guess (32,6)</text>
+  <text class="t" x="532" y="176" text-anchor="end">p3 (31,7)</text>
+  <text class="r" x="532" y="192" text-anchor="end">residual (−1,1)</text>
+
+  <!-- Legend -->
+  <g transform="translate(40,228)">
+    <circle cx="6" cy="0" r="6" fill="#8a63d2"/><text class="t" x="18" y="5">START</text>
+    <circle cx="96" cy="0" r="6" fill="#3b82c4"/><text class="t" x="108" y="5">INTERIOR (delta)</text>
+    <circle cx="246" cy="0" r="6" fill="#2a9d6f"/><text class="t" x="258" y="5">LINE_INTERIOR</text>
+    <line x1="370" y1="0" x2="396" y2="0" class="g" stroke-width="1.5" stroke-dasharray="5 4"/><text class="t" x="404" y="5">last edge, extended</text>
+  </g>
+</svg>

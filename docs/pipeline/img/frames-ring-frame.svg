@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 260" width="620" height="260" role="img" aria-label="A wall at 30 degrees: (87, 50) in tile axes, (100, 0) in the ring frame">
+  <style>
+    .t { fill: #7d8697; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .r { fill: #d64545; font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .sm { font-size: 11px; }
+    .h { font-weight: 600; }
+    .m { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+    .s { stroke: #7d8697; }
+    .g { stroke: #8b93a1; }
+  </style>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d64545"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b93a1"/></marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3b82c4"/></marker>
+    <marker id="al" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a9d6f"/></marker>
+  </defs>
+  <text class="t h" x="30" y="26">tile axes: (87, 50)</text>
+  <polygon points="90,56 228.6,136 196.6,191.4 58,111.4" fill="#8b93a1" fill-opacity="0.08" stroke="#8b93a1" stroke-width="1.5"/>
+  <line x1="90" y1="56" x2="228.6" y2="136" stroke="#3b82c4" stroke-width="3"/>
+  <circle cx="90" cy="56" r="5" fill="#3b82c4"/>
+  <circle cx="228.6" cy="136" r="5" fill="#3b82c4"/>
+  <line x1="90" y1="56" x2="226.6" y2="56" stroke="#d64545" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <line x1="228.6" y1="56" x2="228.6" y2="130" stroke="#d64545" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <text class="r" x="159.3" y="48" text-anchor="middle">x = 87</text>
+  <text class="r" x="236.6" y="100">y = 50</text>
+  <text class="t h" x="340" y="26">ring frame: (100, 0)</text>
+  <polygon points="400,56 538.6,136 506.6,191.4 368,111.4" fill="#8b93a1" fill-opacity="0.08" stroke="#8b93a1" stroke-width="1.5"/>
+  <line x1="400" y1="56" x2="538.6" y2="136" stroke="#3b82c4" stroke-width="3"/>
+  <circle cx="400" cy="56" r="5" fill="#3b82c4"/>
+  <circle cx="538.6" cy="136" r="5" fill="#3b82c4"/>
+  <line x1="400" y1="56" x2="573.2" y2="156" stroke="#8b93a1" stroke-width="1" stroke-dasharray="5 4" marker-end="url(#ag)"/>
+  <line x1="400" y1="56" x2="365" y2="116.6" stroke="#8b93a1" stroke-width="1" stroke-dasharray="5 4" marker-end="url(#ag)"/>
+  <line x1="408" y1="42.1" x2="400" y2="56" stroke="#8b93a1" stroke-width="1" stroke-dasharray="5 4"/>
+  <text class="t" x="585.3" y="167">x′</text>
+  <text class="t" x="354" y="134.7" text-anchor="end">y′</text>
+  <text class="r" x="481.3" y="84">x′ = 100, y′ = 0</text>
+  <text class="t sm" x="30" y="244">Same wall, same building: only the axes the residual is written in change.</text>
+</svg>
