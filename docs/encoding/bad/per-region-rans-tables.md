@@ -1,4 +1,6 @@
-# Per-region rANS tables (`RANSSEG`, `SegmentedRansCodec`)
+# Per-region rANS tables
+
+**Code names:** `RANSSEG`, `SegmentedRansCodec`
 
 > **Verdict: Rejected.** +9,62% on the corpus (retired corpus, rANS bytes); a wash even with sparse tables.
 > Never measured under the headline metric: rANS itself is [out of scope](../out-of-scope/rans-entropy-coder.md).

@@ -1,4 +1,6 @@
-# Class streams (`CLASS` segmentation, pipeline S3)
+# Class streams
+
+**Code names:** `CLASS` segmentation, pipeline S3
 
 > **Verdict: Kept.** -5,86% gzip on the tileset against -4,65% for the same residuals interleaved
 > (`building` -8,69% vs -5,01%), with nothing signalled.

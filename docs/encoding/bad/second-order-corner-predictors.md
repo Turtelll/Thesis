@@ -1,4 +1,6 @@
-# Second-order corner predictors (Stage 0 probe)
+# Second-order corner predictors
+
+**Code names:** Stage 0 probe
 
 > **Verdict: Rejected (probe, no encoder).** Both candidates are worse than plain delta on the quads they were
 > meant for; never measured under the headline metric.

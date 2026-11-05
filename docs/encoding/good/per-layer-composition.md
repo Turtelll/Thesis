@@ -1,4 +1,6 @@
-# Per-layer composition (`PipelineRegistry.forLayer` / `LayerCompositions`)
+# Per-layer composition
+
+**Code names:** `PipelineRegistry.forLayer` / `LayerCompositions`
 
 > **Verdict: Kept.** -11,36% gzip on the tileset, the result of the thesis pipeline; within 0,65% of a free
 > per-(tile, layer) oracle, with nothing signalled beyond the 2-byte header.

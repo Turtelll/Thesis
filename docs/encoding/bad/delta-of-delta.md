@@ -1,4 +1,6 @@
-# Delta-of-delta and reset variants (`DOD_*`, `DELTA_RESET_*`)
+# Delta-of-delta and reset variants
+
+**Code names:** `DOD_*`, `DELTA_RESET_*`
 
 > **Verdict: Rejected.** All six variants +9,4% to +14,1% (retired corpus, FastPFOR bytes); not re-run under
 > the headline metric (no code left).

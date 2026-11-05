@@ -1,4 +1,6 @@
-# Quad corner (`QUAD_CORNER`, formerly `SEGMENT_QUAD_CORNER`)
+# Quad corner
+
+**Code names:** `QUAD_CORNER`, formerly `SEGMENT_QUAD_CORNER`
 
 > **Verdict: Kept.** -4,79% gzip on the tileset (`building` -5,02%) as the only change to the
 > predictor; the base every polygon predictor of the pipeline is built on.
@@ -63,7 +65,7 @@ fixed): **tileset -4,79%** (plain `DELTA` -3,97%), **`building` -5,02%** (plain 
 
 **Decisive case for inclusion:** the corner rule doubles the `building` gain of plain delta at zero signalling
 cost, and the win grows once the corner residuals get their own stream (-6,07% tileset with class streams).
-Every later polygon predictor ([ring frame prior](quad-corner-frame.md),
+Every later polygon predictor ([ring frame prior](ring-frame-prior.md),
 [shared ring vertices](shared-ring-vertices.md)) is quad corner plus one more idea, and on the full stack (S8)
 plain `QUAD_CORNER` is still the best single composition (-6,78% gzip).
 

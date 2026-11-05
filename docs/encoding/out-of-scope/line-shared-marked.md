@@ -1,4 +1,6 @@
-# Shared line vertices via marked table (`LINE_CONTINUATION_SHARED_MARKED`)
+# Shared line vertices via a marked table
+
+**Code names:** `LINE_CONTINUATION_SHARED_MARKED`
 
 > **Verdict: Out of scope (decode-speed variant).** -2,15% gzip on the tileset against -2,62% for the
 > dictionary; faster to decode, but the thesis optimises size, so it was not ported to the pipeline.
@@ -34,7 +36,7 @@ only the table differs:
 **Headline** (gzip per tile vs `DELTA_ZIGZAG_VARINT`, `munich-plantiler`, old encoding set): **tileset
 `_MARKED` -2,15%** against **`_DICT` -2,62%**.
 
-**Decisive case — why it is out of scope:** it loses to the [dictionary](../good/line-shared-dictionary.md) on
+**Decisive case — why it is out of scope:** it loses to the [dictionary](../good/shared-line-vertices.md) on
 every line layer (52.404 B, 0,47% of tile gzip; +3,13% / +2,55% on `transportation`, FastPFOR /
 `_SEG`), so it is only worth having for its decode speed: 1,15x–1,24x
 the FastPFOR baseline against 1,59x–1,85x for the dictionary. The thesis target is compressed size, so the marked

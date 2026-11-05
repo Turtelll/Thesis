@@ -1,4 +1,6 @@
-# Fixed byte widths (`MIN_FIXED`, `FORCE_4`)
+# Fixed byte widths
+
+**Code names:** `MIN_FIXED`, `FORCE_4`
 
 > **Verdict: Rejected.** `MIN_FIXED` +12,27% gzip, `FORCE_4` +35,18% on the tileset; even with byte planes
 > both stay behind the escape width.

@@ -1,4 +1,6 @@
-# Split varint (`VARINT_SPLIT`, pipeline S0/S6)
+# Split varint
+
+**Code names:** `VARINT_SPLIT`, pipeline S0/S6
 
 > **Verdict: Kept.** -0,87% gzip against plain Varint for the same values, size unchanged before compression;
 > the varint terminal of the pipeline.
@@ -45,7 +47,7 @@ set, pull bytes from the tail cursor (starting at offset `n`) until a byte witho
 (`VARINT_XY` +0,58%, `BYTESPLIT` +3,87%, `RAW` +41,63% gzip); it stacks with the predictors
 (`QUAD_CORNER_SHARED_VARINT` -3,07% → `_VARINT_SPLIT` -3,78%). The tile oracle picks it on 45,5% of buffers,
 and a grid with only split varint loses the whole oracle gain, so it stays next to
-[escape width](escape-width.md).
+[escape width](escape-byte-width.md).
 
 Supporting figures (same metric):
 

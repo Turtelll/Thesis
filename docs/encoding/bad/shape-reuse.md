@@ -1,4 +1,6 @@
-# Shape reuse (WP5-E5.1 feasibility scan)
+# Shape reuse
+
+**Code names:** WP5-E5.1 feasibility scan
 
 > **Verdict: Rejected (feasibility scan, no encoder).** At most 3,76% of rings find their shape in a 16-ring
 > window, far below the 20% gate; never measured under the headline metric.

@@ -1,4 +1,6 @@
-# Per-buffer selection by trial compression (`Selector`, `--step selector`, per-buffer oracle)
+# Per-buffer selection by trial compression
+
+**Code names:** `Selector`, `--step selector`, per-buffer oracle
 
 > **Verdict: Rejected.** Choosing the smallest composition per buffer makes the tiles *larger*: -3,52% gzip
 > against -3,63% for always using `DEFAULT`.

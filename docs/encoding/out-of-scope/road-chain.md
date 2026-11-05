@@ -1,4 +1,6 @@
-# Road chaining (`LINE_CONTINUATION_ROAD_CHAIN`)
+# Road chaining
+
+**Code names:** `LINE_CONTINUATION_ROAD_CHAIN`
 
 > **Verdict: Out of scope (frozen in the consolidation).** `transportation` -8,38% gzip, but the joins add only
 > 8.612 B over plain road order, and the pipeline's `transportation` default (-12,06%) is far ahead without them.
@@ -48,7 +50,7 @@ order without joins; tileset -2,60%.
 points, road order 0,24, joins 0,31 (8.612 B). Only 10,61% of line vertices are in roads of 2+ features (1,15
 features per road). The pipeline's `transportation` default (feature chaining + references + frame + heading,
 -12,06%) uses the order without any join, so road chaining was frozen in the consolidation (code at git tag
-`pre-consolidation`), together with its [lossy merge](road-merge-lossy.md).
+`pre-consolidation`), together with its [lossy merge](lossy-road-merge.md).
 
 Supporting figures (same metric, `transportation`, old encoding set):
 

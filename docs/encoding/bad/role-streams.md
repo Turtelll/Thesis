@@ -1,4 +1,6 @@
-# Role streams (`ROLE`, `ROLE_CLASS` segmentation)
+# Role streams
+
+**Code names:** `ROLE`, `ROLE_CLASS` segmentation
 
 > **Verdict: Rejected.** `ROLE_CLASS` -5,46% gzip on the tileset against -5,86% for plain class streams; the
 > extra split costs more than it separates.

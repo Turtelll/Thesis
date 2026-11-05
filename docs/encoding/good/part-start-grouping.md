@@ -1,4 +1,6 @@
-# Part-start grouping (`PART_START_SEG`, formerly `SEGMENT_PAIR`)
+# Part-start grouping
+
+**Code names:** `PART_START_SEG`, formerly `SEGMENT_PAIR`
 
 > **Verdict: Kept under FastPFOR, then retired.** Under the headline metric -1,41% gzip on the tileset, never
 > ahead of line continuation; its idea lives on in the [class streams](class-streams.md).

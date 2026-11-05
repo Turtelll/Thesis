@@ -1,4 +1,6 @@
-# Line continuation (`LINE_CONTINUATION`)
+# Line continuation
+
+**Code names:** `LINE_CONTINUATION`
 
 > **Verdict: Kept** as the base of every line predictor. `transportation` -4,88% gzip against -3,82% for
 > plain delta; as layer default superseded by its frame, heading and dictionary variants.
@@ -67,8 +69,8 @@ Supporting figures:
   (`service` +0,78% the exception).
 - Per zoom: -1,4% to -4,9% bits on every zoom; FastPFOR bytes -0,3% to -2,3% z4–z11, ~-0,1% z12–z14.
   Chicago: +0,2% bits / +0,3% bytes (grid streets).
-- Superseded on `transportation` by [shared line vertices via dictionary](line-shared-dictionary.md),
-  [line frame prior](line-frame.md) and [heading frame](line-heading.md).
+- Superseded on `transportation` by [shared line vertices via dictionary](shared-line-vertices.md),
+  [line frame prior](line-frame-prior.md) and [heading frame](line-heading-frame.md).
 
 Source: `research-java/docs/results/line-continuation.md`, `line-continuation-by-zoom.md`,
 `openzl-pipeline.md`.

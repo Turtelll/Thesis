@@ -1,4 +1,6 @@
-# rANS tables shared across buffers (probe)
+# rANS tables shared across buffers
+
+**Code names:** probe
 
 > **Verdict: Rejected (probe).** Sharing tables per tile saves less than sparse per-buffer tables; never
 > measured under the headline metric: rANS itself is [out of scope](../out-of-scope/rans-entropy-coder.md).

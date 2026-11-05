@@ -1,4 +1,6 @@
-# Shared ring vertices (`QUAD_CORNER_SHARED`)
+# Shared ring vertices
+
+**Code names:** `QUAD_CORNER_SHARED`
 
 > **Verdict: Kept.** -5,58% gzip on the tileset against -3,36% for quad corner alone in the same layout;
 > the references are part of the polygon layer default.
@@ -65,7 +67,7 @@ layout. A per-layer gzip figure was not reported for this layout.
 **Decisive case for inclusion:** the references add 2,2 points on the tileset, and the same step is worth
 249.754 B gzip (2,22 points) in the pipeline. The per-buffer fallback (plain quad corner when the references
 do not pay) means a buffer never gets larger. Its frame variant `QUAD_CORNER_SHARED_FRAME` is the layer
-default of `building`, `landcover`, `landuse` and `water` ([ring frame prior](quad-corner-frame.md)).
+default of `building`, `landcover`, `landuse` and `water` ([ring frame prior](ring-frame-prior.md)).
 
 Supporting figures:
 

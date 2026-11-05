@@ -1,4 +1,6 @@
-# Recency-coded references (`_RECENT`)
+# Recency-coded references
+
+**Code names:** `_RECENT`
 
 > **Verdict: Rejected.** `QUAD_CORNER_SHARED_RECENT_VARINT` -3,03% gzip against -3,07% with the packed
 > indices; no gain.

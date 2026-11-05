@@ -1,4 +1,6 @@
-# Turn scalar (`TURN_SCALAR`, Stage 0 probe and encoder)
+# Turn scalar
+
+**Code names:** `TURN_SCALAR`, Stage 0 probe and encoder
 
 > **Verdict: Rejected.** `building` -7,09% gzip in the pipeline against -9,20% for quad corner; +0,30% on the
 > tileset (split varints). Retired by the tile oracle.
@@ -12,7 +14,7 @@ should cost one value (how far along the rotated direction) instead of a 2D resi
 from the ring's winding, so it does not have to be signalled.
 
 ## Intention
-The [signalled turn](right-angle-turn.md) failed because the edge length still cost a full 2D residual. Coding
+The [signalled turn](signalled-right-angle-turn.md) failed because the edge length still cost a full 2D residual. Coding
 the turn as one scalar along the rotated direction (plus a small correction across it) should halve the cost of
 every right-angle vertex in the larger building outlines that quad corner does not reach.
 
@@ -49,7 +51,7 @@ Supporting figures:
 - *Not under the headline metric* — encoder (current corpus, even `n > 4` only, bytes vs `QUAD_CORNER`):
   `building` +11,8% FastPFOR / +3,2% `_SEG`, `landcover` +17,5% / +17,1%, `landuse` +15,7% / +14,6%, `water`
   +15,8% / +15,7%.
-- Combined with shared references: [shared references + turn scalar](shared-turn-scalar.md).
+- Combined with shared references: [shared references + turn scalar](shared-references-plus-turn-scalar.md).
 
 Source: `research-java/docs/results/failed/turn-scalar.md`, `failed/turn-scalar-encoder.md`,
 `revisit-varint-split.md`, `tile-oracle.md`.

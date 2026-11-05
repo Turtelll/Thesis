@@ -1,4 +1,6 @@
-# rANS entropy coder (`*_RANS`)
+# rANS entropy coder
+
+**Code names:** `*_RANS`
 
 > **Verdict: Out of scope (not browser-native).** -27,16% on the corpus (retired corpus, rANS bytes), but a
 > browser cannot decode it natively and it does not combine with gzip; never measured under the headline metric.

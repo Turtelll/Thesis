@@ -1,4 +1,6 @@
-# Canonical ring start (`QUAD_CORNER_SHARED_RING_CANONICAL`, `RING_CANONICAL_THEN_FEATURE`)
+# Canonical ring start
+
+**Code names:** `QUAD_CORNER_SHARED_RING_CANONICAL`, `RING_CANONICAL_THEN_FEATURE`
 
 > **Verdict: Out of scope (superseded in the consolidated pipeline).** -7,34% gzip on the tileset with feature
 > chaining, 0,07 points better than chaining alone; the pipeline's ring rotation (`_ROT`) does the job better.
@@ -35,7 +37,7 @@ varints): **`QUAD_CORNER_SHARED_RING_CANONICAL_REORDER` -7,34%** against **-7,27
 
 **Decisive case — why it is not in the pipeline:** the canonical start alone is worth 7.713 B (0,07%) over
 feature chaining, all of it on `building`, and the pipeline already rotates rings for a different, stronger
-reason: [Hilbert reorder](../good/hilbert-reorder.md)'s `_ROT` starts each ring at the vertex nearest the
+reason: [Hilbert reorder](../good/hilbert-curve-order.md)'s `_ROT` starts each ring at the vertex nearest the
 previous run's end. On `building` that gives 3.214.369 B gzip against 3.276.195 B for the old canonical +
 chain + frame row. So the canonical start was frozen in the consolidation (code at git tag
 `pre-consolidation`); `CANON_CHAIN` stays only as a reference row.

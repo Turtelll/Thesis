@@ -1,4 +1,6 @@
-# Upstream componentwise delta2 (`DELTA2_ZIGZAG`, maplibre-tile-spec #1806)
+# Upstream componentwise delta2
+
+**Code names:** `DELTA2_ZIGZAG`, maplibre-tile-spec #1806
 
 > **Verdict: Rejected.** +9,94% gzip on the tileset, worse on every layer; smaller than plain delta on 0 of
 > 673 buffers.

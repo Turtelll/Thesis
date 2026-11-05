@@ -1,4 +1,6 @@
-# MultiLineString part chaining (`_PART_CHAIN`, `_PART_CHAIN_REV`, `CHAIN_CONTINUATION`)
+# MultiLineString part chaining
+
+**Code names:** `_PART_CHAIN`, `_PART_CHAIN_REV`, `CHAIN_CONTINUATION`
 
 > **Verdict: Out of scope (workshop only, never promoted).** `transportation` -4,85% gzip in the workshop, but
 > the joins it was built for never occur, and its remaining gain is the restart order that feature chaining
