@@ -1,4 +1,4 @@
-# 9. Byte planes (S7)
+# 8. Byte planes (S7)
 
 ## The idea
 
@@ -9,7 +9,7 @@ Written as planes, all low bytes first and then all high bytes, the high plane b
 that costs the compressor almost nothing, and the low plane becomes one homogeneous byte stream.
 
 This only works for fixed-width values, where byte `b` of every value is in the same place. That is why the
-[escape width](08-byte-width.md) exists: it is a fixed width that is as small as the split varint.
+[escape width](07-byte-width.md) exists: it is a fixed width that is as small as the split varint.
 
 ## The encodings
 

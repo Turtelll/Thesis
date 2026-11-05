@@ -1,4 +1,4 @@
-# 3. Reorder (S1)
+# 2. Reorder (S1)
 
 ## The idea
 

@@ -1,4 +1,4 @@
-# 10. Backend compression and measurement (S8)
+# 9. Backend compression and measurement (S8)
 
 ## The idea
 
@@ -40,7 +40,7 @@ Decompress the tile, then decode each buffer from its header, running the stages
 - Per tile, not per buffer. Buffers compressed together share the compressor's window, so a buffer that
   looks like its neighbours compresses better. That is why choosing the best composition for each buffer
   on its own loses on the delivered tile, and why every search is done on whole tiles
-  ([compositions](02-composition.md)).
+  ([compositions](01-composition.md)).
 - One configuration for all compressors. No stage decision flipped between gzip, Brotli and zstd; the
   compressor only moves the level (on the geometry buffers, gzip -9,95%, Brotli -15,97%, zstd -11,68% for
   the best single composition).

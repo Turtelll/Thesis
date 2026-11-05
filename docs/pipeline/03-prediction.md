@@ -1,4 +1,4 @@
-# 4. Prediction (S2)
+# 3. Prediction (S2)
 
 ## The idea
 
@@ -11,7 +11,7 @@ guess, the smaller and more repetitive the residuals, and the fewer bytes the co
 Different vertices deserve different guesses. Every predictor therefore gives each vertex a class, computed
 from the topology alone: the first vertex of a ring, an ordinary vertex, the fourth corner of a rectangle.
 The class picks the guess, and later decides which stream the residual goes to
-([segmentation](07-segmentation.md)). Because both sides compute the classes, no label is ever written.
+([segmentation](06-segmentation.md)). Because both sides compute the classes, no label is ever written.
 
 A vertex without a geometric guess is predicted by the previous vertex of the buffer, even across feature
 boundaries. The chain of differences never restarts, so there are no absolute seed values in the payload.
@@ -61,9 +61,9 @@ of a part, short parts, rings and points) and `LINE_INTERIOR` (continued).
 A predictor is one of the guesses above, optionally combined with two further ideas, each with a page of its
 own:
 
-- [frames](05-frames.md) rotate the residual into the direction of the wall or the road, so one of its
+- [frames](04-frames.md) rotate the residual into the direction of the wall or the road, so one of its
   two components is near zero;
-- [shared references](06-shared-references.md) replace a vertex that an earlier ring or line already holds
+- [shared references](05-shared-references.md) replace a vertex that an earlier ring or line already holds
   by a pointer to it.
 
 Eight combinations are live. The code is the value in the payload header.
@@ -95,7 +95,7 @@ Measured when the stage was added (Hilbert order, split varint, geometry buffers
 delta + varint): `DELTA` -3,97%, `QUAD_CORNER` -4,79%, `LINE_CONTINUATION` -3,83%. Over the whole corpus
 the corner guess wins only narrowly, because the best guess depends on the layer: corners for buildings,
 continuation for roads, delta for points. That is the reason the predictor is chosen per layer
-([compositions](02-composition.md)).
+([compositions](01-composition.md)).
 
 On their own layers the gains are larger, and grow with the ideas added on top:
 

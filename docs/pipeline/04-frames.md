@@ -1,4 +1,4 @@
-# 5. Frames: rotating the residual (S2)
+# 4. Frames: rotating the residual (S2)
 
 ## The idea
 
@@ -14,8 +14,8 @@ its last edge pointed. A frame is this predicted direction, and the residual is 
 written.
 
 Frames change no guess. They only change the coordinate system a residual is written in, so they combine
-with every guess of the [prediction](04-prediction.md) page and with the
-[shared references](06-shared-references.md).
+with every guess of the [prediction](03-prediction.md) page and with the
+[shared references](05-shared-references.md).
 
 ## The encodings
 

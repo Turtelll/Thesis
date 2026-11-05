@@ -1,4 +1,4 @@
-# 6. Shared references (S2)
+# 5. Shared references (S2)
 
 ## The idea
 
@@ -13,7 +13,7 @@ A reference costs a flag bit and a short index, which is far less than a residua
 referenced still counts as decoded, so guesses and frames after it work as before.
 
 References are added on top of a guess. Each shared predictor is the plain predictor of the
-[prediction](04-prediction.md) page plus references: `QUAD_CORNER_SHARED` and `QUAD_CORNER_SHARED_FRAME`
+[prediction](03-prediction.md) page plus references: `QUAD_CORNER_SHARED` and `QUAD_CORNER_SHARED_FRAME`
 for rings, `LINE_CONTINUATION_SHARED_FRAME_HEADING` for lines.
 
 ## The encodings

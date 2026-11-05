@@ -1,4 +1,4 @@
-# 8. From residuals to bytes: zigzag and byte width (S4, S6)
+# 7. From residuals to bytes: zigzag and byte width (S4, S6)
 
 ## The idea
 
@@ -73,7 +73,7 @@ and replace each marker by `255 + exception`. Then undo zigzag with `(v >>> 1) ^
 
 Measured when the stage was added (gzip, against plain delta + varint): plain varint -4,55%, split varint
 -5,86%, escape -5,90%. Escape alone is level with the split varint; it earns its place because it is a fixed
-width, which is what the [byte planes](09-transpose.md) need.
+width, which is what the [byte planes](08-transpose.md) need.
 
 Both are kept, and the choice depends on the layer: the tile oracle picks the split varint on 53% of the
 layers and escape with byte planes on 47%. A search limited to the split varint loses the whole gain the tile

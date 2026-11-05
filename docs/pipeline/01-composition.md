@@ -1,4 +1,4 @@
-# 2. Compositions: how the stages are chosen
+# 1. Compositions: how the stages are chosen
 
 ## The idea
 
@@ -53,7 +53,7 @@ therefore produces tiles that decode the same way.
 Only options that won their stage remain, which leaves 96 compositions (`CompositionGrids.bestGrid()`):
 
 - 3 reorders: none, Hilbert, chain;
-- 8 predictors (the table on the [prediction](04-prediction.md) page);
+- 8 predictors (the table on the [prediction](03-prediction.md) page);
 - 2 segmentations: flat or class streams;
 - 2 byte layouts: split varint, or escape width with byte planes.
 

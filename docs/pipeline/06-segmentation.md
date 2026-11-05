@@ -1,4 +1,4 @@
-# 7. Segmentation (S3)
+# 6. Segmentation (S3)
 
 ## The idea
 
@@ -9,8 +9,8 @@ statistics. Written into separate streams, each stream is homogeneous: a stream 
 zeros, a stream of ring starts holds only jumps.
 
 The split costs nothing, because the class of every vertex is known to both sides from the topology
-([input](01-input.md)). Neither the class labels nor the stream lengths are written. Segmentation moves
-residuals around; it does not change any of them.
+streams, which the decoder reads before the vertex buffer. Neither the class labels nor the stream lengths
+are written. Segmentation moves residuals around; it does not change any of them.
 
 ## The encodings
 
@@ -35,8 +35,8 @@ data into more pieces than the extra homogeneity pays for.
 ## Decoding
 
 The decoder computes the class of every vertex and so the length of every stream, decodes each stream
-(the [byte](08-byte-width.md) and [transpose](09-transpose.md) stages), then walks the vertices in order,
-each taking the next value from its own stream. With [shared references](06-shared-references.md), the
+(the [byte](07-byte-width.md) and [transpose](08-transpose.md) stages), then walks the vertices in order,
+each taking the next value from its own stream. With [shared references](05-shared-references.md), the
 referenced vertices leave their streams, which is why that block writes the stream lengths explicitly.
 
 ## What it is worth

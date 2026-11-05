@@ -109,7 +109,7 @@ Prediction is the largest step. The escape width alone gains almost nothing; it 
 planes after it need a fixed width. The reorder looks large on the geometry, but it permutes the property
 columns too and costs more there than it saves here, so `DEFAULT` drops it again. Choosing the composition
 per layer or per tile instead of one for everything takes the vertex buffers further, to -11,36% and
--11,94% ([compositions](02-composition.md)).
+-11,94% ([compositions](01-composition.md)).
 
 ```
 ./gradlew research --args="measure --step ladder --by-zoom"
@@ -126,12 +126,12 @@ composition was chosen never matters to the decoder. Today there are three ways 
   makes the whole gzipped tile smallest;
 - one fixed composition for every layer.
 
-The [compositions](02-composition.md) page explains each, with the search loop of the tile oracle.
+The [compositions](01-composition.md) page explains each, with the search loop of the tile oracle.
 
 ## Rules every stage follows
 
 - Nothing derivable is written. The decoder reads the topology before the vertex buffer, and from it
-  derives the runs, the class of every vertex and the length of every stream. Only two lengths are ever
+  derives the runs (one per ring or line part), the class of every vertex and the length of every stream. Only two lengths are ever
   written: the byte length of a varint stream that is not the last one, and the stream lengths of a buffer
   with shared references.
 - Lossless. Every composition round-trips every buffer, checked by the harness and by the test suite. The
@@ -166,16 +166,15 @@ vertices, adding each residual to the same guess.
 
 ## The pages
 
-1. [Input](01-input.md): the vertex buffer, the topology streams and the runs derived from them.
-2. [Compositions](02-composition.md): what a composition is and how one is chosen.
-3. [Reorder](03-reorder.md): emit close features next to each other.
-4. [Prediction](04-prediction.md): guess each vertex from the ones before it.
-5. [Frames](05-frames.md): write residuals in the direction of the wall or road.
-6. [Shared references](06-shared-references.md): point back at repeated vertices.
-7. [Segmentation](07-segmentation.md): one stream per kind of residual.
-8. [Zigzag and byte width](08-byte-width.md): from residuals to bytes.
-9. [Byte planes](09-transpose.md): group the bytes of fixed-width values.
-10. [Backend](10-backend.md): the compressor and how sizes are measured.
+1. [Compositions](01-composition.md): what a composition is and how one is chosen.
+2. [Reorder](02-reorder.md): emit close features next to each other.
+3. [Prediction](03-prediction.md): guess each vertex from the ones before it.
+4. [Frames](04-frames.md): write residuals in the direction of the wall or road.
+5. [Shared references](05-shared-references.md): point back at repeated vertices.
+6. [Segmentation](06-segmentation.md): one stream per kind of residual.
+7. [Zigzag and byte width](07-byte-width.md): from residuals to bytes.
+8. [Byte planes](08-transpose.md): group the bytes of fixed-width values.
+9. [Backend](09-backend.md): the compressor and how sizes are measured.
 
 The stage numbers S1 to S8 are the order in which the stages were built and measured. S5, dividing a stream
 by the greatest common divisor of its values, fired on 0,02% of the values and was removed; the later
