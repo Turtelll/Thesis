@@ -49,6 +49,6 @@ Measured when the stage was added (against plain delta + varint): escape without
 -8,09% Brotli, -6,98% zstd; with interleaved planes -6,51%, -8,79%, -7,93%. A small stage, but a consistent
 one under all three compressors.
 
-Further reading: [byte-plane transpose](../encoding/good/byte-plane-transpose.md),
-[x/y-separating transposes](../encoding/bad/xy-separating-transposes.md),
+Further reading: [byte-plane transpose](../encoding/good/byte-planes.md),
+[x/y-separating transposes](../encoding/bad/xy-split-byte-planes.md),
 [S7 results](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/openzl-pipeline.md#s7-byte-plane-transpose).

@@ -180,6 +180,6 @@ In the code: `registry/LayerCompositions.java`, `registry/CompositionGrids.java`
 
 Further reading: [per-layer composition](../encoding/good/per-layer-composition.md),
 [per-buffer selection](../encoding/bad/per-buffer-selection.md),
-[raw-size search](../encoding/bad/raw-size-search.md),
+[raw-size search](../encoding/bad/search-on-raw-size.md),
 [tile oracle results](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/tile-oracle.md),
 [MLT v2 results](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/mlt-v2-rust-port.md).

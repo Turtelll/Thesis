@@ -81,6 +81,6 @@ The Morton curve loses to Hilbert; `CHAIN` wins on line layers and loses on poin
 the pipeline the reorder is the largest single step on the geometry buffers, and the property columns
 take most of it back.
 
-Further reading: [Hilbert reorder](../encoding/good/hilbert-reorder.md),
-[feature chaining](../encoding/good/feature-chaining-reorder.md),
+Further reading: [Hilbert reorder](../encoding/good/hilbert-curve-order.md),
+[feature chaining](../encoding/good/feature-chaining.md),
 [S1 results](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/openzl-pipeline.md#s1-reorder).

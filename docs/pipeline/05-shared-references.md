@@ -66,6 +66,17 @@ gain, the header names the plain predictor (`QUAD_CORNER`, `QUAD_CORNER_FRAME`,
 `LINE_CONTINUATION_FRAME_HEADING`). A layer without shared vertices therefore pays nothing, and no mode byte
 is needed.
 
+### Residuals instead of positions
+
+The same idea one stage later: instead of the vertex, share the pair that is written after prediction and the
+frame. `QUAD_CORNER_SHARED_FRAME_RESIDUAL_WINDOW` and its eleven siblings
+(`encoder/reference/ResidualReferences.java`) replace a pair that one of the last 16 pairs of its stream already
+held by a flag and a 4-bit index (`WINDOW`), or a whole run that repeats an earlier one (`ALIGNED`, `RUN`). A
+per-stream enable mask, chosen by trial encodes, keeps streams whose pairs never repeat free of flag bits, and
+the fallback chain (residual candidate, position-shared base, plain base) keeps a buffer from growing. It works
+on `building` at z14 (gzip -4,8% against `QUAD_CORNER_SHARED_FRAME`), costs Brotli and zstd about 1%, and does
+nothing on the other layers, so it is not a default: [shared residual references](../encoding/bad/shared-residual-references.md).
+
 ## What the payload carries
 
 References are the one place where the decoder cannot derive everything from the topology: which vertices
@@ -97,6 +108,6 @@ decoded vertex. Rotated rings and reversed parts are emitted as they are.
   the chain order, which places connected parts next to each other.
 
 Further reading: [shared ring vertices](../encoding/good/shared-ring-vertices.md),
-[line dictionary](../encoding/good/line-shared-dictionary.md),
+[line dictionary](../encoding/good/shared-line-vertices.md),
 [shared vertices](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/shared-vertices.md),
 [line shared vertices](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/line-shared-vertices.md).

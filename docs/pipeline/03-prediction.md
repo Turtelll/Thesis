@@ -117,5 +117,5 @@ the vertices, say which classes have a guess, compute the guess from the decoded
 
 Further reading: [quad corner](../encoding/good/quad-corner.md),
 [line continuation](../encoding/good/line-continuation.md); guesses that did not pay, such as
-[delta of delta](../encoding/bad/delta-of-delta.md), [right-angle turns](../encoding/bad/right-angle-turn.md)
+[delta of delta](../encoding/bad/delta-of-delta.md), [right-angle turns](../encoding/bad/signalled-right-angle-turn.md)
 and [turn scalar](../encoding/bad/turn-scalar.md).

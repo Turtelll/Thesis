@@ -107,6 +107,6 @@ this cost is reported, not optimised.
 In the code: `encoder/prediction/mechanism/FramePrior.java` (frame, neighbour grid, shears) and the
 `FramedPredictor` in `encoder/prediction/Prediction.java` (which vertices are framed).
 
-Further reading: [ring frame](../encoding/good/quad-corner-frame.md),
-[line frame](../encoding/good/line-frame.md), [heading](../encoding/good/line-heading.md),
+Further reading: [ring frame](../encoding/good/ring-frame-prior.md),
+[line frame](../encoding/good/line-frame-prior.md), [heading](../encoding/good/line-heading-frame.md),
 [orientation prior results](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/orientation-prior.md).

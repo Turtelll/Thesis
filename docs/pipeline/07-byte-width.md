@@ -88,6 +88,6 @@ oracle has over the per-layer default (+0,64%), and `housenumber` would end abov
 In the code: `encoder/stream/ResidualMap.java`, `ByteWidth.java`, `StreamCodec.java`, `IntCodec.java`.
 
 Further reading: [split varint](../encoding/good/split-varint.md),
-[escape width](../encoding/good/escape-width.md),
+[escape width](../encoding/good/escape-byte-width.md),
 [fixed byte widths](../encoding/bad/fixed-byte-width.md),
 [S6 results](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/openzl-pipeline.md#s6-byte-width).
