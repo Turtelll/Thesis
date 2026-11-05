@@ -1,15 +1,25 @@
 # Shared ring vertices (`QUAD_CORNER_SHARED`)
 
-## encoding target:
-building, landcover, landuse, water (Polygon)
+> **Verdict: Kept.** -5,58% gzip on the tileset against -3,36% for quad corner alone in the same layout;
+> the references are part of the polygon layer default.
 
-## Idea of the encoding
+## Encoding target
+building, landcover, landuse, water (Polygon).
+
+## Idea
 Neighbouring polygons repeat each other's vertices exactly: row houses share walls, landcover and landuse
-polygons share borders. Delta coding cannot see this because the repeat is far away in the buffer. Instead
-of coding such a vertex again, point back at the earlier ring that already holds it. Rings are rotated so
-the shared stretch comes first, which means one "is this a repeat?" question per ring is enough to find
-most repeats; then the shared wall is walked backwards along the neighbour (two same-wound neighbours walk
-a shared wall in opposite directions).
+polygons share borders. Delta coding cannot see this because the repeat is far away in the buffer. Instead of
+coding such a vertex again, point back at the earlier ring that already holds it. Rings are rotated so the
+shared stretch comes first, which means one "is this a repeat?" question per ring is enough to find most
+repeats; then the shared wall is walked backwards along the neighbour (two same-wound neighbours walk a shared
+wall in opposite directions).
+
+## Intention
+A vertex the decoder already has should cost almost nothing, yet plain delta pays a full residual for it, and
+for a ring start even a long jump. At z14, 23,55% of `building` vertices sit at a position another ring also
+has. A short index into the last few rings plus one follow bit per shared vertex should be far cheaper than
+those residuals. Rotating the ring start onto the shared stretch is free (ring rotation does not change the
+geometry) and puts the repeats where one flag can catch them.
 
 ## How the encoding works
 `QUAD_CORNER` plus references (`encoder/reference/RingReferences.java`, window `WINDOW = 4` rings):
@@ -47,8 +57,23 @@ B written:  entry=1 idx(a2) | follow=1 (a1) | residual b2 | corner residual b3
 5. All other vertices: `QUAD_CORNER` prediction + next residual of its class stream.
 6. The rotated ring is emitted as is (ring rotation is geometry-equivalent).
 
-## results
-**Current corpus `munich-plantiler` (FastPFOR era):**
+## Results
+**Headline** (gzip per tile vs `DELTA_ZIGZAG_VARINT`, `munich-plantiler`, segmented split varints):
+**tileset -5,58%** (`QUAD_CORNER_SHARED_SEG_VARINT_SPLIT`) against **-3,36%** for `QUAD_CORNER` in the same
+layout. A per-layer gzip figure was not reported for this layout.
+
+**Decisive case for inclusion:** the references add 2,2 points on the tileset, and the same step is worth
+249.754 B gzip (2,22 points) in the pipeline. The per-buffer fallback (plain quad corner when the references
+do not pay) means a buffer never gets larger. Its frame variant `QUAD_CORNER_SHARED_FRAME` is the layer
+default of `building`, `landcover`, `landuse` and `water` ([ring frame prior](quad-corner-frame.md)).
+
+Supporting figures:
+
+- Same layout, gzip / Brotli / zstd: `QUAD_CORNER_SHARED_SEG_VARINT_SPLIT` -5,58% / -6,79% / -6,53%.
+- OpenZL pipeline: old pipeline `QUAD_CORNER` → `QUAD_CORNER_SHARED` worth 220.167 B Brotli (1,96 points) /
+  249.754 B gzip (2,22 points).
+- *Not under the headline metric* — current corpus, FastPFOR era, bytes vs the same codec without
+  references:
 
 | layer | `SHARED_FASTPFOR` vs `QC_FASTPFOR` | `SHARED_VARINT` | `SHARED_SEG` vs `QC_SEG` |
 |---|---|---|---|
@@ -62,11 +87,8 @@ B written:  entry=1 idx(a2) | follow=1 (a1) | residual b2 | corner residual b3
   `DELTA_ZIGZAG`).
 - Sharing: building z14 23,55% of vertices shared (12,06% addressable), z13 0,03%. Shared runs: 51,3% length
   2; 61,5% of shared pairs walk the source backwards.
-- **General-purpose compression, per tile vs `DELTA_ZIGZAG_VARINT`:** `QUAD_CORNER_SHARED_SEG_VARINT_SPLIT`
-  -5,58% gzip / -6,79% Brotli / -6,53% zstd.
-- **OpenZL pipeline:** old pipeline `QUAD_CORNER` → `QUAD_CORNER_SHARED` worth 220.167 B Brotli (1,96
-  points) / 249.754 B gzip (2,22 points).
 - Decode (allocation-free state): `_SHARED_SEG_FASTPFOR` 1,27x, worst bucket 2,93x; marginal step over
   `QUAD_CORNER_SEG` 1,20x.
-- Followed by the frame variant `QUAD_CORNER_SHARED_FRAME` (layer default of building, landcover, landuse,
-  water): ring frame prior.
+
+Source: `research-java/docs/results/shared-vertices.md`, `general-purpose-compression.md`,
+`openzl-pipeline.md`; the -3,36% is computed from the gzip byte totals in `revisit-varint-split.md`.

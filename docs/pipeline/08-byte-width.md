@@ -1,64 +1,87 @@
-# 8. S6 Byte width
+# 8. From residuals to bytes: zigzag and byte width (S4, S6)
 
-## What it does
-Turns a stream of unsigned values into bytes. 87% of residuals fit in one byte and none needs more than two,
-so the question is how to pay for the few large ones.
+## The idea
 
-## Options
-`encoder/stream/ByteWidth.java`, `StreamCodec.java`, `IntCodec.java`; header byte 1 bits 0-3.
+After prediction the streams hold signed integers, and most of them are small: 87% of the residuals fit in
+one byte, and none needs more than two. Turning them into bytes takes two decisions. First, the sign has to
+be folded in so that small negative values stay small. Second, the few large values have to be paid for
+without spoiling the many small ones, because a compressor does best on a long run of uniform single bytes.
 
-| option | bytes | status |
-|---|---|---|
-| `VARINT` (0) | LEB128 varint per value | baseline anchor |
-| `VARINT_SPLIT` (1) | first byte of every varint, then all continuation bytes | used |
-| `MIN_FIXED` (2) | narrowest of 1/2/4 bytes holding the stream's maximum | lost |
-| `ESCAPE` (3) | 1 byte per value, `0xFF` marks an exception stored separately | used |
-| `FORCE_4` (4) | 4 bytes per value | test only |
+## Zigzag (S4)
 
-## How it works
-**Split varint.** `heads` holds one byte per value (low 7 bits, continuation bit if more follow), `tails` all
-continuation bytes in value order; output `heads ‖ tails`. The first block becomes a clean run of small
-symbols.
+Zigzag interleaves negative and positive values, so the magnitude decides the size, not the sign:
 
 ```
-values 5 300 7    varint 05 | AC 02 | 07    split 05 AC 07 | 02
+zigzag(n) = (n << 1) ^ (n >> 31)
+
+ 0 → 0   -1 → 1   1 → 2   -2 → 3   2 → 4   ...   100 → 200   -30 → 59
 ```
 
-A varint stream's byte length depends on its values, so it is prefixed by `varint bodyLength` unless it is
-the last non-empty stream, which takes the rest of the payload.
+It is the only residual map. The alternative, subtracting each stream's minimum, made the raw streams 58%
+larger and was worse on every layer (+9,51% gzip against -5,86% for zigzag), so it was removed.
 
-**Escape width.** One descriptor byte, then the body:
+## Byte width (S6)
 
-```
-descriptor  bits 0-1  main width (0 = 1 B, 1 = 2 B, 2 = 4 B)
-            bit  2    escape flag
-            bits 3-4  exception width (same codes)
-```
+### Split varint
 
-1. Compute the stream's minimal width `w`, the number of values ≥ 255 and the width of the largest
-   `value - 255`.
-2. If `w > 1` and `n + exceptions · exceptionWidth < n · w`: escape. Main stream of `n` single bytes,
-   `0xFF` where the value is ≥ 255; then the exceptions `value - 255` at their width, as byte planes.
-3. Otherwise plain `MIN_FIXED` at width `w`.
+A varint writes 7 bits per byte and sets the top bit when more bytes follow, so small values take one byte
+and large ones two or more. The split varint writes the same bytes in a different order: first one byte per
+value (the low 7 bits and the continuation bit), then all continuation bytes. The first block becomes a
+clean run of small symbols, and the rare extra bytes are collected at the end.
 
 ```
-values 5 300 7 1000    main 05 FF 07 FF    exceptions 45, 745 at 2 B as planes: 2D E9 | 00 02
+values           5   300     7
+varint           05 | AC 02 | 07
+split varint     05 AC 07 | 02
 ```
 
-No length is written: `n` follows from the topology, the exception count from the `0xFF` markers.
+A varint stream's length in bytes depends on its values, so it is prefixed with its byte length, unless it is
+the last stream of the payload, which simply takes the rest.
 
-## How the decoder works
-Varint: read `n` heads, pull continuation bytes from the tail cursor. Escape: read the descriptor and `n`
-main bytes (through the transpose, step 9), count the markers, read that many exceptions, replace each
-marker by `255 + exception`.
+### Escape width
 
-## Why
-History (gzip vs `DELTA_ZIGZAG_VARINT`): `VARINT` -4,55%, `VARINT_SPLIT` -5,86%, `ESCAPE` -5,90%,
-`MIN_FIXED` +12,27%, `FORCE_4` +35,18%. Escape alone is level with split varint; it is kept because it is a
-fixed width, which the byte-plane transpose needs (step 9). Under Brotli split varint is chosen more often;
-the per-layer default uses both.
+Escape writes every value in one byte and moves the large ones out of the way. A value of 255 or more is
+replaced by the marker `0xFF` in the main stream, and `value - 255` is stored in a separate exception list
+after it. One descriptor byte in front says how wide the main values and the exceptions are:
 
-More: [../encoding/good/split-varint.md](../encoding/good/split-varint.md),
-[../encoding/good/escape-width.md](../encoding/good/escape-width.md),
-[../encoding/bad/fixed-byte-width.md](../encoding/bad/fixed-byte-width.md),
-[openzl-pipeline.md#s6-byte-width](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/openzl-pipeline.md#s6-byte-width).
+```
+descriptor   bits 0-1  main width (0 = 1 byte, 1 = 2 bytes, 2 = 4 bytes)
+             bit  2    escape flag
+             bits 3-4  exception width (same codes)
+
+values       5   300   7   9   1000   12
+main         05  FF    07  09  FF     0C
+exceptions   45, 745 at 2 bytes, as byte planes: 2D E9 | 00 02
+```
+
+Here six values plus two 2-byte exceptions take 10 bytes, against 12 at a plain 2-byte width.
+
+The escape is only used when it is smaller than writing every value at the width of the largest one;
+otherwise the stream is written at that plain fixed width. No count is written: the number of values
+follows from the topology, the number of exceptions from the markers.
+
+Two other widths were measured and lost: the narrowest fixed width holding the stream's maximum
+(+12,27% gzip), and four bytes per value (+35,18%). The plain varint is kept as the baseline anchor.
+
+## Decoding
+
+Split varint: read one head byte per value and pull continuation bytes from the tail when the top bit is
+set. Escape: read the descriptor and the main bytes, count the `0xFF` markers, read that many exceptions,
+and replace each marker by `255 + exception`. Then undo zigzag with `(v >>> 1) ^ -(v & 1)`.
+
+## What it is worth
+
+Measured when the stage was added (gzip, against plain delta + varint): plain varint -4,55%, split varint
+-5,86%, escape -5,90%. Escape alone is level with the split varint; it earns its place because it is a fixed
+width, which is what the [byte planes](09-transpose.md) need.
+
+Both are kept, and the choice depends on the layer: the tile oracle picks the split varint on 53% of the
+layers and escape with byte planes on 47%. A search limited to the split varint loses the whole gain the tile
+oracle has over the per-layer default (+0,64%), and `housenumber` would end above the plain baseline.
+
+In the code: `encoder/stream/ResidualMap.java`, `ByteWidth.java`, `StreamCodec.java`, `IntCodec.java`.
+
+Further reading: [split varint](../encoding/good/split-varint.md),
+[escape width](../encoding/good/escape-width.md),
+[fixed byte widths](../encoding/bad/fixed-byte-width.md),
+[S6 results](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/openzl-pipeline.md#s6-byte-width).

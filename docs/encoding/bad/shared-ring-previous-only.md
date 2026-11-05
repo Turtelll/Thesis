@@ -1,12 +1,19 @@
 # Shared ring vertices, previous ring only (`QUAD_CORNER_SHARED_PREV`, `_PREVOFF`)
 
-## encoding target:
-building, landcover, landuse (Polygon)
+> **Verdict: Rejected.** +0,17% (`_PREV`) and +0,86% (`_PREVOFF`) against the 4-ring window, same layout
+> (uncompressed Varint bytes); not measured under the headline metric.
 
-## Idea of the encoding
-46,7% of shared building positions come from the immediately previous polygon. So drop the 4-ring window
-and address only the previous ring: a narrower index (an offset into one ring), and optionally no entry
-flag at all.
+## Encoding target
+building, landcover, landuse (Polygon).
+
+## Idea
+46,7% of shared building positions come from the immediately previous polygon. So drop the 4-ring window and
+address only the previous ring: a narrower index (an offset into one ring), and optionally no entry flag at
+all.
+
+## Intention
+Nearly half the hits come from one ring, so a smaller candidate set should make the index narrower for those,
+and dropping the entry flag (`_PREVOFF`) would save one bit per ring.
 
 ## How the encoding works
 Same as shared ring vertices (rotation, follow flags unchanged) with a
@@ -20,8 +27,16 @@ As for the shared ring encoding, but the candidate set is the previous ring only
 an offset; `_PREVOFF` reads the offset directly and treats the value `n` as "no reference, read a
 residual".
 
-## results
-Current corpus `munich-plantiler`, bytes vs the 4-ring window, same layout and codec:
+## Results
+**Headline:** *not measured under the headline metric* (current corpus, uncompressed bytes vs the 4-ring
+window `QUAD_CORNER_SHARED`, same layout and codec): interleaved Varint **`_PREV` +0,17%, `_PREVOFF` +0,86%**.
+
+**Decisive case against:** the other 53,3% of hits are lost or need a full residual, and that costs more than
+the narrower index saves: the window earns its index bits. Without the entry flag every miss pays a full
+offset. It is larger under every codec and layout tried; `_PREV` was smallest on 98 buffers, `_PREVOFF` on 1.
+Code removed.
+
+Supporting figures (*bytes vs the 4-ring window*):
 
 | row | `_SHARED` | `_PREV` | `_PREVOFF` |
 |---|---|---|---|
@@ -29,5 +44,6 @@ Current corpus `munich-plantiler`, bytes vs the 4-ring window, same layout and c
 | `_SEG` FastPFOR | 11.285.111 | +0,17% | +0,99% |
 | interleaved Varint | 12.940.767 | +0,17% | +0,86% |
 
-All-in mean bits 5,51 / 5,52 / 5,61. The window earns its index bits; without the flag every miss pays a
-full offset. `_PREV` smallest on 98 buffers, `_PREVOFF` on 1. Code removed.
+- All-in mean bits 5,51 / 5,52 / 5,61.
+
+Source: `research-java/docs/results/shared-vertices.md`.

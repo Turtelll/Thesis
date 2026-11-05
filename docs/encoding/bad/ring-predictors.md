@@ -1,12 +1,19 @@
 # Predictors for > 4-vertex rings (edge continuation, rotation, staircase)
 
-## encoding target:
-landcover, water, landuse, building (Polygon), rings with more than 4 vertices (27% of rings)
+> **Verdict: Rejected (probe).** No rule beats plain delta on large rings once its choice is paid for; never
+> built as an encoding, so never measured under the headline metric.
 
-## Idea of the encoding
-Quad corner only fires on exactly-four-vertex rings. For larger rings a model might still beat plain delta: keep
-the last edge going (collinear runs), turn it by 90° (rectilinear outlines), or alternate the turn direction like a
-staircase so it never has to be signalled.
+## Encoding target
+landcover, water, landuse, building (Polygon), rings with more than 4 vertices (27% of rings).
+
+## Idea
+Quad corner only fires on exactly-four-vertex rings. For larger rings a model might still beat plain delta:
+keep the last edge going (collinear runs), turn it by 90° (rectilinear outlines), or alternate the turn
+direction like a staircase so it never has to be signalled.
+
+## Intention
+27% of rings, and most of the vertices of `landcover` and `water`, get no prediction from quad corner. A
+probe over the candidate rules was meant to find one worth building before writing an encoder.
 
 ## How the encoding works
 Probe only (`RingPriorCli`, `BuildingShapeCli`), zigzag bit widths over interior vertices of > 4-vertex rings:
@@ -20,8 +27,17 @@ Probe only (`RingPriorCli`, `BuildingShapeCli`), zigzag bit widths over interior
 Not built (except fixed rot90, see fixed 90° turn). A decoder would recompute each
 prediction from decoded predecessors.
 
-## results
-Retired corpus `munich.mbtiles`, mean residual bits per interior vertex:
+## Results
+**Headline:** *not measured under the headline metric* (probe only, mean residual bits per interior vertex,
+retired corpus `munich.mbtiles`). Best rule on `building`: rot-best **7,78 bits** against **8,81** for
+plain delta, but only with a free per-vertex choice.
+
+**Decisive case against:** no single rule wins without a choice: continuation is worse than delta everywhere, and
+rotation only wins with a free per-vertex choice. Paying for that choice is fatal: under 1,2% of residuals are ≤ 1 bit on every layer, and a 4-way choice costs
+2 bits, so even the free oracle over all rules is net negative. The staircase (no signal) is worse than delta
+(9,39 vs 8,81 bits) because turns alternate only 51,7% of the time.
+
+Supporting figures (*retired corpus, mean residual bits*):
 
 | predictor | corpus | building | landcover | water |
 |---|---|---|---|---|
@@ -30,8 +46,8 @@ Retired corpus `munich.mbtiles`, mean residual bits per interior vertex:
 | `R` rot-best (free choice) | 10,04 | 7,78 | 11,64 | 10,26 |
 | best{B,C,R} free oracle | 8,69 | 6,92 | 9,93 | 8,80 |
 
-- Under 1,2% of residuals ≤ 1 bit on every layer; a 4-way choice costs 2 bits, so even the free oracle is net
-  negative.
-- Staircase on `building`: 9,39 bits (worse than 8,81); turns alternate sign only 51,7% of the time.
-- Parity split, `building`: n=6 fixed rot90-ccw 9,13 → 8,22 bits, n=8 8,89 → 8,57; 0,0% of 5- and 7-vertex rings
-  are fully right-angled. This opened fixed rot90 (a weak byte win, later retired).
+- Parity split, `building`: n=6 fixed rot90-ccw 9,13 → 8,22 bits, n=8 8,89 → 8,57; 0,0% of 5- and 7-vertex
+  rings are fully right-angled. This opened [fixed rot90](../good/rot90-fixed.md) (a weak byte win, later
+  retired).
+
+Source: `research-java/docs/results/failed/ring-predictors.md`.

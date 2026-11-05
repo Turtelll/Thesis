@@ -1,40 +1,56 @@
-# 1. Input: VertexBuffer and topology streams
+# 1. The input: vertex buffer and topology
 
-## What it does
-Turns an `.mbtiles` tileset into the unit every later step works on: one `VertexBuffer` per (tile, layer),
-plus the topology streams MLT writes in front of it. The extraction is a verbatim copy of what
-`maplibre-tile-spec`'s `GeometryEncoder` produces, so the pipeline encodes exactly the buffer MLT would
+## The idea
+
+MLT stores the geometry of a layer in two parts. The topology streams say how the geometry is
+structured: the type of every feature, how many polygons, parts and rings it has, and how many vertices
+each ring or line part holds. The vertex buffer holds the coordinates themselves, one `x, y` pair per
+vertex, in feature order.
+
+The pipeline only re-encodes the vertex buffer. The topology streams stay exactly as stock MLT writes
+them, and the decoder reads them before it reads the vertices. That ordering is what the whole pipeline
+leans on: anything that can be computed from the topology is known to both sides and never has to be
+written.
+
+## What the encoder receives
+
+`research-java/.../extraction/` cuts every `.mbtiles` tile into one buffer per layer, a verbatim copy of
+what MLT's own `GeometryEncoder` produces, so the pipeline encodes exactly the buffer MLT would
 ([mlt-fidelity.md](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/mlt-fidelity.md)).
 
-## How it works
-`research-java/.../extraction/` (`MbtilesExtraction`, `VertexBufferExtractor`, `ExtractionWriter`):
+- The vertex buffer: absolute tile coordinates as `[x0, y0, x1, y1, ...]`. Polygon rings drop their
+  closing vertex, since it repeats the first.
+- The topology: `geometryTypes`, `numGeometries`, `numParts`, `numRings`.
 
-- **Vertex buffer** (`<z>_<x>_<y>_<layer>.bin`): interleaved little-endian `int32` `[x0, y0, x1, y1, ...]`,
-  absolute tile coordinates, not delta coded. Polygon rings drop their closing vertex (it repeats the first).
-- **Topology** (`.json` sidecar): `geometryTypes`, `numGeometries`, `numParts`, `numRings`, `vertexCount`,
-  `tileExtent`. A `manifest.json` indexes the run.
-- In the encoder both arrive as one `BufferContext` (`buffer/Encoding.java`): the vertices and the four
-  topology streams.
+In the encoder both arrive together as one `BufferContext` (`buffer/Encoding.java`).
 
-## Runs: what every later step derives from the topology
-`buffer/VertexRuns.java` cuts the buffer into **runs** (rings, line parts, points) from the topology alone:
+## Runs: the structure every stage derives
 
-- a column with any (Multi)Polygon: `numRings` holds vertices per ring, `numParts` rings per polygon;
-- a column without polygons: `numParts` holds vertices per line string;
-- points contribute to neither stream, so they have no run boundaries.
+From the topology alone, `buffer/VertexRuns.java` cuts the buffer into runs: one run per polygon ring
+or line part, while points have no runs at all.
 
-If the derived runs do not cover the buffer exactly, the result is one run over the whole buffer, and every
-structural mechanism degrades to plain delta instead of guessing. `VertexRunIndex` is the per-vertex view
-(which run, position in it).
+```
+topology    2 polygons, numParts = [1, 2], numRings = [4, 5, 4]
+vertices    a a a a | b b b b b | c c c c
+runs        ring 1    ring 2      ring 3 (hole of the second polygon)
+```
 
-Since the decoder reads the topology streams before the vertex buffer, the runs, the class of every vertex
-(step 4) and the value count of every stream (step 6) are known on both sides without being written.
+From the runs, every later stage computes what it needs on both sides of the wire:
 
-## Command
+- the class of every vertex (first vertex of a ring, fourth corner, continued road vertex, see
+  [prediction](04-prediction.md)),
+- which stream each residual goes to and how many values every stream holds (see
+  [segmentation](07-segmentation.md)),
+- where a ring starts and ends, which the frames and shared references need.
+
+If the topology does not cover the buffer exactly, the buffer is treated as one run, and every
+structural predictor quietly falls back to plain delta instead of guessing.
+
+## Corpus
 
 ```
 ./gradlew research --args="extract --mbtiles ../data/MVT/<tileset>.mbtiles --out ../data/extracted"
 ```
 
-Baseline corpus: `data/MVT/munich-plantiler.mbtiles` → `data/extractedBaseline` (358 tiles, 4.368 buffers,
-16 layers).
+All figures in these pages come from `munich-plantiler.mbtiles` (Munich, Planetiler 0.10.2): 358 tiles,
+16 layers, 4.368 (tile, layer) buffers, extracted to `data/extractedBaseline`.

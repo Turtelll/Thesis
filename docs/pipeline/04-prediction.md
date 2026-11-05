@@ -1,73 +1,117 @@
-# 4. S2 Prediction
+# 4. Prediction (S2)
 
-## What it does
-Replaces every vertex by its **residual** `p[i] - pred(i)`, where the prediction is computed from vertices
-the decoder already has. A good prediction makes residuals small and repetitive.
+## The idea
 
-## How it works
-Every predictor is a `ClassifiedPredictor` (`encoder/prediction/mechanism/ClassifiedPredictor.java`):
+A vertex is rarely surprising. It lies close to the vertex drawn before it, and map geometry has shape:
+buildings have right angles, roads keep their direction. Instead of storing a vertex, the encoder stores
+how far it is from a guess, the residual `p[i] - guess(i)`. The guess may only use vertices the decoder
+has already decoded, so the decoder can make the same guess and add the residual back. The better the
+guess, the smaller and more repetitive the residuals, and the fewer bytes the compressor needs.
 
-- `classify(topology)`: a class per vertex, from the topology only (e.g. run start, interior, corner);
-- `hasPrediction(class)`: whether the class has a geometric prediction;
-- `predictX/predictY(class, i, decoded)`: the prediction, reading only vertices before `i`;
-- `regionOrder()`: the order of the class streams (step 6).
+Different vertices deserve different guesses. Every predictor therefore gives each vertex a class, computed
+from the topology alone: the first vertex of a ring, an ordinary vertex, the fourth corner of a rectangle.
+The class picks the guess, and later decides which stream the residual goes to
+([segmentation](07-segmentation.md)). Because both sides compute the classes, no label is ever written.
 
-A vertex without a geometric prediction is predicted by the **previous vertex of the buffer**, whatever
-feature it belongs to: the delta chain is continuous, there are no reset seeds. The residual loop is in
-`Segmentation.split`/`join` (`encoder/segmentation/Segmentation.java`).
+A vertex without a geometric guess is predicted by the previous vertex of the buffer, even across feature
+boundaries. The chain of differences never restarts, so there are no absolute seed values in the payload.
 
-## Predictors
-`encoder/prediction/Prediction.java`; the code is the value in the header.
+## The guesses
 
-| code | predictor | prediction |
+### Delta
+
+The guess is the previous vertex: `residual = p[i] - p[i-1]`. One class. This is what stock MLT does, and it
+remains the best choice where there is no shape to exploit, as in point layers (`poi`, `housenumber`).
+
+### Quad corner
+
+Most buildings are rectangles, and a rectangle is fully determined by three of its corners. In a run of
+exactly four vertices (a closed ring without its repeated closing vertex), the fourth corner is guessed to
+complete the parallelogram of the first three: `guess = p0 + p2 - p1`. For an exact rectangle the
+residual is `(0, 0)`.
+
+Classes: `START` (first vertex of a run), `INTERIOR` (delta) and `CORNER` (the guessed fourth vertex).
+
+```
+vertices    p0=(100,200)  p1=(130,200)  p2=(130,240)  p3=(100,240)
+class       START         INTERIOR      INTERIOR      CORNER
+guess       previous      p0            p1            p0 + p2 - p1 = (100,240)
+residual    p0 - previous (30,0)        (0,40)        (0,0)
+```
+
+### Line continuation
+
+A road tends to continue in the direction it was going, with a similar step length. From the third vertex
+of a line part on, the guess extends the last edge: `guess = p[i-1] + (p[i-1] - p[i-2])`. The residual is
+then the change of the edge: how much the road bent and how much the step grew or shrank.
+
+```
+the first four vertices of a line part of six or more
+vertices    p0=(0,0)  p1=(10,2)  p2=(21,4)        p3=(31,7)
+guess       previous  p0         2·p1 - p0=(20,4)  2·p2 - p1=(32,6)
+residual    p0        (10,2)     (1,0)             (-1,1)
+```
+
+Only line parts of at least six vertices are continued. On shorter parts and on polygon rings the
+continuation guess measured worse than plain delta. Classes: `START`, `INTERIOR` (delta: the second vertex
+of a part, short parts, rings and points) and `LINE_INTERIOR` (continued).
+
+## From guesses to predictors
+
+A predictor is one of the guesses above, optionally combined with two further ideas, each with a page of its
+own:
+
+- [frames](05-frames.md) rotate the residual into the direction of the wall or the road, so one of its
+  two components is near zero;
+- [shared references](06-shared-references.md) replace a vertex that an earlier ring or line already holds
+  by a pointer to it.
+
+Eight combinations are live. The code is the value in the payload header.
+
+| code | predictor | guess | frame | shared references |
+|---|---|---|---|---|
+| 0 | `DELTA` | previous vertex | | |
+| 1 | `QUAD_CORNER` | quad corner | | |
+| 5 | `QUAD_CORNER_FRAME` | quad corner | ring frame | |
+| 7 | `QUAD_CORNER_SHARED` | quad corner | | ring references |
+| 8 | `QUAD_CORNER_SHARED_FRAME` | quad corner | ring frame | ring references |
+| 2 | `LINE_CONTINUATION` | line continuation | | |
+| 11 | `LINE_CONTINUATION_FRAME_HEADING` | line continuation | line frame and heading | |
+| 13 | `LINE_CONTINUATION_SHARED_FRAME_HEADING` | line continuation | line frame and heading | line references |
+
+The missing codes belonged to predictors the tile oracle never needed (for example a turn-angle predictor
+and a corner guess on lines). They were retired, and their codes are not reused, so a payload never changes
+meaning.
+
+## Decoding
+
+The decoder derives the classes from the topology, then walks the vertices in order: it takes the next
+residual from the vertex's stream, undoes the frame rotation if the vertex is framed, and adds the guess,
+computed from the vertices it has already decoded.
+
+## What it is worth
+
+Measured when the stage was added (Hilbert order, split varint, geometry buffers, gzip, against plain
+delta + varint): `DELTA` -3,97%, `QUAD_CORNER` -4,79%, `LINE_CONTINUATION` -3,83%. Over the whole corpus
+the corner guess wins only narrowly, because the best guess depends on the layer: corners for buildings,
+continuation for roads, delta for points. That is the reason the predictor is chosen per layer
+([compositions](02-composition.md)).
+
+On their own layers the gains are larger, and grow with the ideas added on top:
+
+| layer | predictor | gzip against plain delta + varint |
 |---|---|---|
-| 0 | `DELTA` | previous vertex, one class |
-| 1 | `QUAD_CORNER` | 4th vertex of a 4-vertex run: parallelogram corner `p0 + p2 - p1` |
-| 2 | `LINE_CONTINUATION` | 3rd+ vertex of a line run of ≥ 6 vertices: `p[i-1] + (p[i-1] - p[i-2])` |
-| 5 | `QUAD_CORNER_FRAME` | `QUAD_CORNER`, ring edges coded in a predicted frame |
-| 11 | `LINE_CONTINUATION_FRAME_HEADING` | `LINE_CONTINUATION`, line edges in a predicted frame, continuation residual in the heading frame |
-| 7, 8, 13 | `*_SHARED*` | the predictor above plus references, step 5 |
+| `building` | `QUAD_CORNER` | -9,20% |
+| `building` | `QUAD_CORNER_FRAME` | -12,69% |
+| `transportation` | `LINE_CONTINUATION` | -5,23% |
+| `transportation` | `LINE_CONTINUATION_FRAME_HEADING` | -6,89% |
+| `transportation` | `LINE_CONTINUATION_SHARED_FRAME_HEADING`, chain order | -12,06% |
 
-**`QUAD_CORNER`** (`SegmentQuadCorner`). Classes `START` (first vertex of a run), `INTERIOR`, `CORNER`
-(4th vertex of a run of exactly 4). An exact parallelogram has corner residual `(0, 0)`.
+In the code (`encoder/prediction/Prediction.java`, `mechanism/SegmentQuadCorner.java`,
+`mechanism/LineContinuation.java`) every guess implements one interface, `ClassifiedPredictor`: classify
+the vertices, say which classes have a guess, compute the guess from the decoded prefix.
 
-**`LINE_CONTINUATION`** (`LineContinuation`). Classes `START`, `INTERIOR` (2nd vertex of a run, every vertex
-of a short line run, all ring and point vertices), `LINE_INTERIOR` (continued). Gated by geometry type and
-run length (`MIN_LINE_RUN_LENGTH = 6`): shorter runs and polygons got worse with continuation.
-
-```
-line run p0..p4:  p0-q   p1-p0   p2-(2p1-p0)   p3-(2p2-p1)   p4-(2p3-p2)
-class             START  INTER.  LINE          LINE          LINE
-```
-
-**Frame** (`FramePrior`, `QUAD_CORNER_FRAME`). Walls of neighbouring buildings share angles. The plain-delta
-edges of a ring (not its start, not a predicted corner) are rotated into a frame: the dominant wall
-direction (mod 90°) of the decoded ring whose centroid is nearest the new ring's start, refined by the
-ring's own decoded edges. A wall at 30° turns `(87, 50)` into `(100, 0)`. The rotation is three integer
-lifting shears, an exact bijection, so the stream still holds two values per vertex. Nothing is signalled.
-
-**Heading** (`LINE_CONTINUATION_FRAME_HEADING`). The same frame on the plain edges of line runs, and the
-residual of a continued vertex rotated into the direction of the incoming edge `p[i-1] - p[i-2]`:
-x becomes the along-track change, y the sideways bend.
-
-## How the decoder works
-Derive the classes from the topology, then walk the vertices in order: read the next residual of the
-vertex's class stream, undo the frame rotation if the vertex is framed, add the prediction computed from
-the vertices already decoded.
-
-## Why
-History (S2 on the Hilbert base, split varint, vs `DELTA_ZIGZAG_VARINT`, gzip): `DELTA` -3,97%,
-`QUAD_CORNER` -4,79%, `LINE_CONTINUATION` -3,83%. The best predictor follows the geometry (corners for
-buildings, continuation for roads, delta for points), hence the per-layer choice (step 2). Today `DEFAULT`'s
-predictor is `QUAD_CORNER_SHARED_FRAME` (-8,41% gzip at the S2 stage).
-
-Retired codes, never reused: 3 `QUAD_CORNER_LINE`, 4 `TURN_SCALAR`, 6 `QUAD_CORNER_LINE_FRAME`,
-9 `LINE_CONTINUATION_FRAME`, 10 `LINE_CONTINUATION_HEADING`, 12 `LINE_CONTINUATION_SHARED`
-(`encoder/retired/`, [tile-oracle.md](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/tile-oracle.md)).
-
-More: [../encoding/good/quad-corner.md](../encoding/good/quad-corner.md),
-[../encoding/good/line-continuation.md](../encoding/good/line-continuation.md),
-[../encoding/good/quad-corner-frame.md](../encoding/good/quad-corner-frame.md),
-[../encoding/good/line-frame.md](../encoding/good/line-frame.md),
-[../encoding/good/line-heading.md](../encoding/good/line-heading.md); failed predictors in
-the *Encoding → bad* section.
+Further reading: [quad corner](../encoding/good/quad-corner.md),
+[line continuation](../encoding/good/line-continuation.md); guesses that did not pay, such as
+[delta of delta](../encoding/bad/delta-of-delta.md), [right-angle turns](../encoding/bad/right-angle-turn.md)
+and [turn scalar](../encoding/bad/turn-scalar.md).

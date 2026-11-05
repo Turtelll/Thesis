@@ -1,12 +1,21 @@
 # Escape byte width (`ESCAPE`, pipeline S6)
 
-## encoding target:
-all layers; byte terminal of every stream (needed for the byte-plane transpose)
+> **Verdict: Kept.** On its own level with split varint (-5,90% vs -5,86% gzip); kept because it is the
+> fixed-width terminal the byte planes need (-6,51% with them).
 
-## Idea of the encoding
+## Encoding target
+all layers; byte terminal of every stream (needed for the [byte-plane transpose](byte-plane-transpose.md)).
+
+## Idea
 87% of residuals fit in one byte, none needs more than two. Give every value exactly one byte and mark the rare
-large ones with an escape byte `0xFF`; the large values go into a small side stream. Every value then has the same
-width, which is what a byte-plane transpose needs, without paying two bytes for all values.
+large ones with an escape byte `0xFF`; the large values go into a small side stream. Every value then has the
+same width, which is what a byte-plane transpose needs, without paying two bytes for all values.
+
+## Intention
+A byte-plane transpose only works on fixed-width values, but a plain fixed width is priced by the stream's
+largest value: two bytes for everything (+12,27% gzip). The escape keeps the common case at one byte and pays
+extra only for the 12,76% of values that need it, so the stream gets the fixed width the transpose needs at
+roughly the size of a varint.
 
 ## How the encoding works
 `encoder/stream/StreamCodec.java`, per stream after zigzag:
@@ -28,8 +37,16 @@ Read the descriptor. Without escape: read `n` values at the main width (laid out
 read `n` main bytes, count the `0xFF` markers → number of exceptions, read them at the exception width, and replace
 each marker by `255 + exception` in order. `n` comes from the topology.
 
-## results
-Current corpus `munich-plantiler`, S6 (`QUAD_CORNER_LINE`, `CLASS`), per tile vs `DELTA_ZIGZAG_VARINT`:
+## Results
+**Headline** (gzip per tile vs `DELTA_ZIGZAG_VARINT`, `munich-plantiler`, pipeline step S6, `QUAD_CORNER_LINE`,
+`CLASS`): **tileset -5,90%** with `ESCAPE` against **-5,86%** `VARINT_SPLIT`; plain fixed width (`MIN_FIXED`)
+**+12,27%**.
+
+**Decisive case for inclusion:** escape alone is a tie with split varint, but it is the only fixed-width
+terminal that does not lose to varint, and the planes built on it add 0,6 points (S7: -6,51%). The tile oracle
+uses escape + planes on 29,3% of buffers (53,4% of bytes) and plain escape on 25,3%.
+
+Supporting figures (same metric):
 
 | row | gzip | Brotli 9 | zstd 19 |
 |---|---|---|---|
@@ -39,7 +56,8 @@ Current corpus `munich-plantiler`, S6 (`QUAD_CORNER_LINE`, `CLASS`), per tile vs
 | `MIN_FIXED` | +12,27% | +5,96% | +4,58% |
 | `FORCE_4` | +35,18% | +16,00% | +20,41% |
 
-- Level with split varint alone (-0,03 points in the ladder); its value is that it enables the byte planes (S7:
-  -6,51%).
+- Level with split varint alone (-0,03 points in the ladder).
 - Probe: 12,76% of 10.717.858 values ≥ 255, none > 65.535.
 - Tile oracle: escape + planes on 29,3% of buffers (53,4% of bytes, drop cost +0,160%), plain escape on 25,3%.
+
+Source: `research-java/docs/results/openzl-pipeline.md`, `tile-oracle.md`.

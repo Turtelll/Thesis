@@ -1,12 +1,18 @@
 # Standard deltas learned per tile (`TILE_STD_DELTA_*`)
 
-## encoding target:
-all layers of a tile together
+> **Verdict: Rejected.** Best row +7,48% gzip on the tileset; a larger vocabulary is worse.
 
-## Idea of the encoding
-Instead of a fixed global token vocabulary (which lost), learn it from the data: per tile, over all layers, the K most
-frequent deltas become a vocabulary stored once in the tile, and every delta is written as a sum of vocabulary entries
-plus a remainder, so the layers of a tile repeat the same tokens.
+## Encoding target
+all layers of a tile together.
+
+## Idea
+Instead of a fixed global token vocabulary (which lost), learn it from the data: per tile, over all layers,
+the K most frequent deltas become a vocabulary stored once in the tile, and every delta is written as a sum of
+vocabulary entries plus a remainder, so the layers of a tile repeat the same tokens.
+
+## Intention
+The [fixed vocabulary](standard-delta-uint16.md) may have lost because its standard lengths do not match the
+data. A vocabulary learned per tile matches the tile's own frequent edges, so frequent deltas become one token and only small remainders are left.
 
 ## How the encoding works
 - Deltas as `DELTA_ZIGZAG` (continuous). Vocabulary: top K by count among deltas with a component ≥ 16
@@ -21,8 +27,16 @@ plus a remainder, so the layers of a tile repeat the same tokens.
 Read the tile's vocabulary; per buffer read the step tokens and remainders; each delta = sum of the referenced entries
 + remainder; integrate.
 
-## results
-Current corpus `munich-plantiler`, per tile vs `DELTA_ZIGZAG_VARINT`:
+## Results
+**Headline** (gzip per tile vs `DELTA_ZIGZAG_VARINT`, `munich-plantiler`): best row
+**`TILE_STD_DELTA_VECTOR_K1_SINGLE_VARINT_SPLIT` +7,48%** (tileset).
+
+**Decisive case against:** the token that says which vocabulary entry a delta uses costs more than the shorter
+remainder saves: the order-0 entropy is still 15,1% above the baseline, and the token stream is 3–15× the
+baseline bytes before compression. More vocabulary is strictly worse (K1 < K4 < K16), so the idea does not
+improve by tuning.
+
+Supporting figures (same metric):
 
 | row | gzip | Brotli 9 | zstd 19 |
 |---|---|---|---|
@@ -31,5 +45,4 @@ Current corpus `munich-plantiler`, per tile vs `DELTA_ZIGZAG_VARINT`:
 | `VECTOR_K1_VARINT_SPLIT` (uncapped) | +14,17% | +9,40% | +7,31% |
 | `SCALAR_K16_UINT16_PLANES` | +52,23% | +39,55% | +24,91% |
 
-More vocabulary is worse (K1 < K4 < K16); the step token per delta costs more than the shorter remainders save (order-0
-still 15,1% above baseline). Token stream 3–15× the baseline bytes raw. Regression.
+Source: `research-java/docs/results/failed/tile-standard-delta.md`.

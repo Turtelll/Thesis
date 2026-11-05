@@ -1,17 +1,29 @@
 # Quad corner (`QUAD_CORNER`, formerly `SEGMENT_QUAD_CORNER`)
 
-## encoding target:
-building (Polygon), also every other polygon layer (landcover, landuse, water, park, aeroway); lines and points pass through as plain delta
+> **Verdict: Kept.** -4,79% gzip on the tileset (`building` -5,02%) as the only change to the
+> predictor; the base every polygon predictor of the pipeline is built on.
 
-## Idea of the encoding
-Most buildings are a single ring of exactly four vertices, and many of those quads are
-parallelograms (rotated rectangles). Once three corners are known, the fourth is almost
-determined: it is where the parallelogram closes. So instead of storing the full edge from the
-third to the fourth corner, store only how far the real fourth corner is from the "closing"
-corner. For an exact parallelogram that difference is zero, for the rest it is small.
+## Encoding target
+building (Polygon), also every other polygon layer (landcover, landuse, water, park, aeroway); lines and
+points pass through as plain delta.
 
-The same encoding keeps three kinds of residual apart (run starts, ordinary vertices, predicted
-corners) so a compressor sees each population on its own.
+## Idea
+Most buildings are a single ring of exactly four vertices, and many of those quads are parallelograms
+(rotated rectangles). Once three corners are known, the fourth is almost determined: it is where the
+parallelogram closes. So instead of storing the full edge from the third to the fourth corner, store only
+how far the real fourth corner is from that "closing" point. For an exact parallelogram the difference is
+zero, for the rest it is small.
+
+The encoding also keeps three kinds of residual apart (run starts, ordinary vertices, predicted corners), so
+a compressor sees each population on its own.
+
+## Intention
+Plain delta treats every vertex alike, so the fourth corner of a rectangle costs as much as any other edge,
+although the decoder already holds everything needed to guess it. Buildings are the largest polygon layer and
+quads are their dominant shape (on the retired corpus 75,7% of building rings had 4 vertices, 40,7% of those
+exact parallelograms), so a corner rule that is exactly right a large part of the time should turn many of
+those residuals into `(0, 0)`, the cheapest symbol a compressor can get. Nothing is signalled: whether a
+vertex is a corner follows from the ring length the decoder already knows.
 
 ## How the encoding works
 Mechanism: `encoder/prediction/mechanism/SegmentQuadCorner.java` (a `ClassifiedPredictor`).
@@ -45,16 +57,24 @@ stream:     START       INTERIOR    INTERIOR    CORNER   (≈0 for parallelogram
    and add it to the prediction — `p[i-1]` for `START`/`INTERIOR`, `p[i-3] + p[i-1] - p[i-2]` for `CORNER`,
    computed from already-decoded vertices.
 
-## results
-- **Retired corpus `munich.mbtiles` (FastPFOR):** `SEGMENT_QUAD_CORNER_FASTPFOR` -6,1% corpus, -12,2%
-  `building`, -8,0% POLYGON vs `DELTA_ZIGZAG_FASTPFOR`; standalone (interleaved) `QUAD_CORNER` only -1,6%
-  corpus / -7,1% building. Interleaved, the corner's -9,6% per-value bit saving was -0,0% in bytes: the
-  win needs the separate corner stream.
+## Results
+**Headline** (gzip per tile vs `DELTA_ZIGZAG_VARINT`, `munich-plantiler`, pipeline step S2, every other stage
+fixed): **tileset -4,79%** (plain `DELTA` -3,97%), **`building` -5,02%** (plain `DELTA` -2,54%).
+
+**Decisive case for inclusion:** the corner rule doubles the `building` gain of plain delta at zero signalling
+cost, and the win grows once the corner residuals get their own stream (-6,07% tileset with class streams).
+Every later polygon predictor ([ring frame prior](quad-corner-frame.md),
+[shared ring vertices](shared-ring-vertices.md)) is quad corner plus one more idea, and on the full stack (S8)
+plain `QUAD_CORNER` is still the best single composition (-6,78% gzip).
+
+Supporting figures:
+
+- Pipeline, S8 stack: `QUAD_CORNER` -6,78% gzip / -11,96% Brotli / -8,20% zstd.
+- *Not under the headline metric* — retired corpus `munich.mbtiles`, FastPFOR bytes vs
+  `DELTA_ZIGZAG_FASTPFOR`: `SEGMENT_QUAD_CORNER_FASTPFOR` -6,1% corpus, -12,2% `building`, -8,0% POLYGON;
+  interleaved `QUAD_CORNER` only -1,6% corpus / -7,1% `building`. Interleaved, the corner's -9,6% per-value
+  bit saving was -0,0% in bytes: under FastPFOR the win needed the separate corner stream.
 - Corpus properties (retired corpus): 99,5% of buildings have one ring, 75,7% of rings have 4 vertices,
   40,7% of those are exact parallelograms, 4,2% axis-aligned.
-- **Current corpus `munich-plantiler`, OpenZL pipeline (per tile, vs `DELTA_ZIGZAG_VARINT` gzip):** S2
-  `QUAD_CORNER` -4,79% gzip (vs `DELTA` -3,97%), `building` -5,02% vs -2,54%; with class streams -6,07%
-  gzip. On the S8 stack the best single composition is plain `QUAD_CORNER`: -6,78% gzip / -11,96% Brotli /
-  -8,20% zstd.
-- Basis of the frame and shared-reference predictors that replaced it as layer default
-  (ring frame prior, shared ring vertices).
+
+Source: `research-java/docs/results/openzl-pipeline.md`, `segment-quad-corner.md`.

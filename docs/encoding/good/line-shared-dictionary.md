@@ -1,13 +1,24 @@
 # Shared line vertices via dictionary (`LINE_CONTINUATION_SHARED_DICT`)
 
-## encoding target:
-transportation, waterway, transportation_name (LineString / MultiLineString)
+> **Verdict: Kept.** In the pipeline the references take `transportation` from -9,19% to -12,06% gzip
+> (`CHAIN` order); part of the `transportation` default.
 
-## Idea of the encoding
+## Encoding target
+transportation, waterway, transportation_name (LineString / MultiLineString).
+
+## Idea
 Roads meet at junctions: 38,7% of `transportation` vertices sit at a position that occurs more than once in
-the buffer, and 74% of those are the start or end of a line part. When a part starts or ends where an
-earlier part already had a vertex, point at that earlier position instead of coding a long jump across the
-tile. If only the end of a part is a junction, flip the part so the junction comes first.
+the buffer, and 74% of those are the start or end of a line part. When a part starts or ends where an earlier
+part already had a vertex, point at that earlier position instead of coding a long jump across the tile. If
+only the end of a part is a junction, flip the part so the junction comes first.
+
+## Intention
+A part start is the most expensive residual of a line buffer (a jump), and at a junction it repeats a position
+the decoder already holds. A flag per part end plus an index into all earlier line positions should cost far
+less than the jump. Unlike ring references, which only look back 4 rings, junctions can be anywhere in the
+buffer, so the dictionary keeps every earlier line position; the index grows with log2 of its size. Flipping a
+part whose end is the junction is free in geometry terms (a line part read backwards covers the same points)
+but drops the line's direction.
 
 ## How the encoding works
 `LineContinuation` plus references (`encoder/reference/LineReferences.java`). Per line part, in buffer
@@ -39,8 +50,23 @@ part P2: d e c   →  reversed to c e d:  entry=1 idx(c) | residual e | exit=0, 
 4. All other vertices: line continuation prediction + residual.
 5. Insert every decoded line vertex into the dictionary. Reversed parts are emitted reversed.
 
-## results
-**Current corpus `munich-plantiler`, FastPFOR era**, bytes vs same codec/layout `LINE_CONTINUATION`:
+## Results
+**Headline** (gzip per tile vs `DELTA_ZIGZAG_VARINT`, `munich-plantiler`, `transportation`, pipeline,
+`LINE_CONTINUATION_SHARED_FRAME_HEADING` vs the same predictor without references): **`CHAIN` -9,19% →
+-12,06%**, Hilbert -6,89% → -11,59%, no reorder -4,97% → -10,75%.
+
+**Decisive case for inclusion:** 3 to 6 points on `transportation` under every order, the largest single gain
+on the line layers. On the joint tile (geometry + properties, ids regenerated) `CHAIN` + references is -5,14%
+gzip against the previous default, so `forLayer("transportation")` = `CHAIN` +
+`LINE_CONTINUATION_SHARED_FRAME_HEADING`. The cheaper [marked-table variant](../out-of-scope/line-shared-marked.md)
+loses on every line layer.
+
+Supporting figures:
+
+- Older encoding set, same metric: `LINE_CONTINUATION_SHARED_DICT_VARINT` -1,27%,
+  `_VARINT_SPLIT` -2,27% tileset; `transportation` with the old reorder `_SHARED_DICT` -9,49%.
+- *Not under the headline metric* — current corpus, FastPFOR era, bytes vs same codec/layout
+  `LINE_CONTINUATION`:
 
 | segment | `_DICT_FASTPFOR` | `_DICT_VARINT` | `_DICT_SEG` | `_DICT_SEG` vs `DELTA_ZIGZAG_FASTPFOR` |
 |---|---|---|---|---|
@@ -53,8 +79,5 @@ part P2: d e c   →  reversed to c e d:  entry=1 idx(c) | residual e | exit=0, 
 - By zoom largest at z12: -12,95% / -9,67%.
 - All-in mean bits only -3,0% (6,19 vs 6,39): bytes are the right judge.
 - Decode `_SEG` 1,44x–1,47x baseline (after dropping follow state); 1,85x/1,59x in a later run.
-- **OpenZL pipeline** (`LINE_CONTINUATION_SHARED_FRAME_HEADING`, Munich `transportation`, per tile gzip vs
-  `DELTA_ZIGZAG_VARINT`): no reorder -4,97% → -10,75%, Hilbert -6,89% → -11,59%, `CHAIN` -9,19% → -12,06%.
-  Joint tile (geometry + properties), ids regenerated: `CHAIN` + references -5,14% gzip vs previous default.
-  Now `forLayer("transportation")` = `CHAIN` + `LINE_CONTINUATION_SHARED_FRAME_HEADING`.
-- **General-purpose compression, `transportation` per tile gzip:** `_SHARED_DICT` -9,49%.
+
+Source: `research-java/docs/results/line-shared-vertices.md`, `general-purpose-compression.md`.

@@ -1,12 +1,20 @@
 # MultiLineString part chaining (`_PART_CHAIN`, `_PART_CHAIN_REV`, `CHAIN_CONTINUATION`)
 
-## encoding target:
-transportation (MultiLineString)
+> **Verdict: Out of scope (workshop only, never promoted).** `transportation` -4,85% gzip in the workshop, but
+> the joins it was built for never occur, and its remaining gain is the restart order that feature chaining
+> already provides.
 
-## Idea of the encoding
+## Encoding target
+transportation (MultiLineString).
+
+## Idea
 Part order inside a MultiLineString carries no meaning. If parts that meet at a shared vertex were stored end
 to start, each joined start would be a `(0, 0)` delta and continuation could run straight through the join.
 Even without joins, ordering the parts so each starts near the previous one's end shortens the jumps.
+
+## Intention
+Feature chaining reorders whole features; inside a MultiLineString the parts keep the tiler's order. Chaining
+the parts too should remove the jump between parts and let line continuation run across them.
 
 ## How the encoding works
 `GeometryReorder.PART_CHAIN` / `_REV`, feature order kept, only MultiLineStrings with ≥ 2 parts; only the
@@ -23,9 +31,18 @@ run-length stream is permuted within each feature:
 No change for the order (the permuted part lengths are in the topology). `CHAIN_CONTINUATION` detects a join
 as "part start equals previous vertex" on the decoded prefix and applies the continuation prediction.
 
-## results
-Current corpus `munich-plantiler`, `transportation`, workshop (interleaved Varint), per-tile gzip vs
-`DELTA_ZIGZAG_VARINT`:
+## Results
+**Headline** (gzip per tile vs `DELTA_ZIGZAG_VARINT`, `munich-plantiler`, `transportation`, workshop,
+interleaved Varint): **`LINE_CONTINUATION_PART_CHAIN_REV` -4,85%** against **`LINE_CONTINUATION` -1,37%**;
+without reversal -3,24%.
+
+**Decisive case — why it is out of scope:** the joins never happen: 0 of 220.720 part boundaries start on the
+previous part's end, before or after chaining (the tiler already merges them), so `CHAIN_CONTINUATION` adds
+nothing. The whole gain is the restart order (mean part-start jump 650 → 514 → 438), and 1,6 points of it
+come from `_REV`, which reverses line direction. The workshop rows were never promoted to the benchmark or the
+pipeline.
+
+Supporting figures (same metric, workshop, interleaved Varint):
 
 | row | all | z14 |
 |---|---|---|
@@ -35,8 +52,4 @@ Current corpus `munich-plantiler`, `transportation`, workshop (interleaved Varin
 | `CHAIN_CONTINUATION_PART_CHAIN_REV` | -4,86% | -4,92% |
 | `REORDER_CHAIN` (feature chaining) | -3,64% | -2,58% |
 
-- **The joins never happen:** 0 of 220.720 part boundaries start on the previous part's end, before or after
-  chaining (the tiler already merges them). `CHAIN_CONTINUATION` adds nothing. The whole gain is the restart
-  order: mean part-start jump 650 → 514 → 438.
-- Workshop only, never promoted to the benchmark or the pipeline; `_REV` reverses line direction (worth 1,6
-  points).
+Source: `research-java/docs/results/line-part-chain.md`.

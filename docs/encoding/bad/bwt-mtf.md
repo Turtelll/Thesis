@@ -1,11 +1,21 @@
 # Burrows–Wheeler and move-to-front before the compressor (`*_INT_*`, `*_BYTE_*`, `BwtMtfCodec`)
 
-## encoding target:
-all layers; stage between the residual streams and gzip/Brotli/zstd
+> **Verdict: Rejected.** All 48 rows lose to their plain predictor; the best stage row is -4,73% gzip where
+> the same predictor without the stage is -7,27%.
 
-## Idea of the encoding
-OpenZL puts a BWT and MTF in front of the general-purpose compressor: BWT sorts symbols by their following context, MTF
-turns that locality into small ranks and zero runs, so the entropy coder models the stream more cheaply.
+## Encoding target
+all layers; stage between the residual streams and gzip/Brotli/zstd.
+
+## Idea
+OpenZL puts a BWT and MTF in front of the general-purpose compressor: BWT sorts symbols by their following
+context, MTF turns that locality into small ranks and zero runs, so the entropy coder models the stream more
+cheaply.
+
+## Intention
+gzip only sees a 32 KB window and models bytes with a static Huffman code per block; BWT + MTF is how bzip2
+gets context modelling out of a simple entropy coder. If the residual streams contain repeating contexts
+gzip cannot exploit, a BWT stage in front should expose them as runs of small MTF ranks. It was tried both on
+whole integers (`INT_*`) and on bytes (`BYTE_*`).
 
 ## How the encoding works
 `BwtMtfCodec` wraps `VARINT_SPLIT` with a stage `MTF`, `BWT` or `BWT_MTF`, in one of two domains:
@@ -17,8 +27,18 @@ BWT over a unique sentinel, primary index as one varint in front. 8 predictors �
 Read the primary index, invert MTF (rank → symbol with the same move-to-front list), invert BWT (LF mapping from the
 primary index), then decode `VARINT_SPLIT` (order of the two steps by domain).
 
-## results
-Current corpus `munich-plantiler`, gzip per tile vs `DELTA_ZIGZAG_VARINT`:
+## Results
+**Headline** (gzip per tile vs `DELTA_ZIGZAG_VARINT`, `munich-plantiler`): best stage row
+`QUAD_CORNER_SHARED_REORDER_INT_BWT` **-4,73%** against **-7,27%** for the same predictor without the stage;
+on plain `DELTA_ZIGZAG` `INT_MTF` is **+8,74%** against -0,87%.
+
+**Decisive case against:** every one of the 48 rows is larger than its plain predictor under every compressor.
+MTF raises byte entropy (+5 to +9 points gzip), and BWT destroys the sequential context that the predictors
+and class streams create: a residual's neighbours in the stream are exactly the vertices it was predicted from.
+BWT also cannot replace segmentation (interleaved `QUAD_CORNER` + `INT_BWT` +0,38% gzip vs segmented plain
+-3,36%).
+
+Supporting figures (same metric):
 
 | predictor | plain | INT_MTF | INT_BWT | INT_BWT_MTF | BYTE_MTF | BYTE_BWT | BYTE_BWT_MTF |
 |---|---|---|---|---|---|---|---|
@@ -27,7 +47,7 @@ Current corpus `munich-plantiler`, gzip per tile vs `DELTA_ZIGZAG_VARINT`:
 | `QUAD_CORNER_SHARED` reordered | **-7,27%** | +0,15% | -4,73% | +1,05% | -1,89% | -4,59% | -0,71% |
 | `LINE_CONTINUATION_SHARED_DICT` | -2,62% | +3,97% | -0,89% | +4,68% | +2,23% | -0,82% | +2,88% |
 
-- All 48 rows lose to their plain predictor under every compressor. Best stage row
-  `QUAD_CORNER_SHARED_REORDER_INT_BWT` -4,73% gzip / -10,73% Brotli / -6,26% zstd vs -7,27% / -13,44% / -8,61%.
-- MTF raises byte entropy (+5 to +9 points gzip); BWT destroys the sequential context. Does not replace segmentation
-  (interleaved `QUAD_CORNER` + `INT_BWT` +0,38% gzip vs segmented plain -3,36%). Retired.
+- Best stage row `QUAD_CORNER_SHARED_REORDER_INT_BWT` -4,73% gzip / -10,73% Brotli / -6,26% zstd vs plain
+  -7,27% / -13,44% / -8,61%.
+
+Source: `research-java/docs/results/failed/bwt-mtf.md`.

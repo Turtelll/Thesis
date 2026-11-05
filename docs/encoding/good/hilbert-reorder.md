@@ -1,13 +1,24 @@
 # Hilbert reorder with ring rotation (`HILBERT_CENTROID_ROT_MP`, pipeline S1)
 
-## encoding target:
-all layers with derivable runs; largest effect on poi (Point), transportation (LineString), building, landcover (Polygon)
+> **Verdict: Kept, per layer.** -4,05% gzip on the tileset against -0,81% without reorder (geometry only);
+> not in `DEFAULT`, because the reordered property columns cost more than the geometry saves on the whole tile.
 
-## Idea of the encoding
+## Encoding target
+all layers with derivable runs; largest effect on poi (Point), transportation (LineString), building,
+landcover (Polygon).
+
+## Idea
 Sort the features of a buffer along a space-filling curve, so consecutive features are spatially close and the
-jump from one run to the next is short. Additionally rotate each polygon ring to start at the vertex nearest to
-where the previous run ended, and sort the members of each MultiPoint along the curve. Feature order and ring
-start carry no information, so nothing is transmitted.
+jump from one run to the next is short. Additionally rotate each polygon ring to start at the vertex nearest
+to where the previous run ended, and sort the members of each MultiPoint along the curve. Feature order and
+ring start carry no information, so nothing is transmitted.
+
+## Intention
+The jump from the end of one feature to the start of the next is the largest residual in almost every buffer
+(mean 903,7 units without reorder), and the tiler's feature order is not chosen to keep it small. A
+space-filling curve keeps neighbours in 2D close in the 1D order, which shortens every jump at once without
+any per-feature decision. The MLT spec allows features to be sorted, so the decoder needs no change. The risk is the other columns of the tile: properties are stored in the same order, and their runs and ascending
+ids break when features are sorted by position.
 
 ## How the encoding works
 `encoder/reorder/Reorder.java` (pre-pass):
@@ -24,8 +35,18 @@ start carry no information, so nothing is transmitted.
 No change: it reads the reordered topology and decodes the vertices in stored order (the decoder is told which
 reorder to assume via `Composition.reorder`, but nothing is undone).
 
-## results
-Current corpus `munich-plantiler`, S1 (split varint, `DELTA`), per tile vs `DELTA_ZIGZAG_VARINT`:
+## Results
+**Headline** (gzip per tile vs `DELTA_ZIGZAG_VARINT`, `munich-plantiler`, pipeline step S1, split varint,
+`DELTA`, geometry only): **tileset -4,05%** against **-0,81%** without reorder; **`poi` -19,60%**.
+
+**Decisive case for inclusion — and against making it the default:** it is the best reorder on the geometry
+(Hilbert beats Morton, ring rotation adds 0,5 points), and the tile oracle picks it on 45,9% of buffers, with
+the highest drop cost of any option (+2,204%). But it also reorders the property columns: on the whole MLT
+tile it costs +2,48% gzip (+413.000 B, +2,4% of the tile), so `DEFAULT` has no reorder and only the fitted
+[per-layer compositions](per-layer-composition.md) use it, layer by layer, where the geometry gain outweighs
+the property cost.
+
+Supporting figures (same metric, geometry only):
 
 | row | gzip | Brotli 9 | zstd 19 | mean jump |
 |---|---|---|---|---|
@@ -37,10 +58,11 @@ Current corpus `munich-plantiler`, S1 (split varint, `DELTA`), per tile vs `DELT
 | `HILBERT_START_VC` (vertex-class sort) | -3,54% | -5,15% | -4,81% | 594,3 |
 | **`HILBERT_CENTROID_ROT_MP`** | **-4,05%** | **-5,85%** | **-5,30%** | 576,7 |
 
-- Hilbert beats Morton; ring rotation +0,5 points; `_MP` +0,08 points. `poi` -19,60%.
-- **Property cost** (whole tile MLT): +2,48% gzip, props-only +13,39%; feature ids stop ascending (96% → 50% on
-  `transportation`) and category runs break. End to end the reorder loses (+413.000 B, +2,4% of the tile), so
-  `DEFAULT` has no reorder; S8 `GEOMETRY_BEST` -6,58% vs `DEFAULT` -3,63% gzip (geometry only).
-- Today `HILBERT_CENTROID_ROT_MP` is the reorder of every fitted `forLayer` composition except the `CHAIN` layers
-  (`transportation`, `transportation_name`, `waterway`, `water`, `aeroway`); tile oracle picks it on 45,9% of
-  buffers, drop cost +2,204%.
+- Ring rotation +0,5 points; `_MP` +0,08 points.
+- Property cost (whole-tile MLT, a different metric): +2,48% gzip, props-only +13,39%; feature ids stop
+  ascending (96% → 50% on `transportation`) and category runs break. S8 `GEOMETRY_BEST` -6,58% vs `DEFAULT`
+  -3,63% gzip (geometry only).
+- Reorder of every fitted `forLayer` composition except the `CHAIN` layers (`transportation`,
+  `transportation_name`, `waterway`, `water`, `aeroway`, see [feature chaining](feature-chaining-reorder.md)).
+
+Source: `research-java/docs/results/openzl-pipeline.md`, `reordering.md`, `tile-oracle.md`.
