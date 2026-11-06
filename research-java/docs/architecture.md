@@ -30,11 +30,15 @@ backends, extraction or the command line.
   a stream.
 - **`encoder/reorder/`** — S1, not in the payload: `Reorder` (the geometry orders) and
   `GeometryReorder` (what applies them).
-- **`encoder/prediction/`** — S2: `Prediction`, the predictor ordinal the header carries.
+- **`encoder/prediction/`** — S2: `Prediction`, the predictor code the header carries.
   **`encoder/prediction/mechanism/`** holds the mechanisms the predictions are built from, each a
   self-contained idea with its own mechanism test: `ClassifiedPredictor` (a per-vertex class plus what
-  each class predicts), `SegmentQuadCorner`, `QuadCornerLine`, `LineContinuation`, `TurnScalar` and the
+  each class predicts), `SegmentQuadCorner`, `LineContinuation` and the
   ring/line frame prior `FramePrior`. Nothing here is an `Encoding`.
+- **`encoder/retired/`** — predictors and options the tile oracle showed to be dead weight, kept as code
+  and tests but not reachable from `Prediction`, the grids or the registry: `QuadCornerLine`,
+  `TurnScalar` and `TurnScalarPredictor` (docs/results/tile-oracle.md, `Retiring the options`). It may
+  use `prediction`/`prediction.mechanism`; nothing outside may use it.
 - **`encoder/reference/`** — the shared-reference block: `RingReferences` and `LineReferences` (the
   references to an earlier ring's or line part's positions).
 - **`encoder/segmentation/`** — S3: `Segmentation`, how the residuals are split into streams and
@@ -51,9 +55,9 @@ backends, extraction or the command line.
 - **`registry/`** — the compositions. `PipelineRegistry` holds the stage chain (`AFTER_S0` ...
   `DEFAULT`, the end-to-end choice), the step switch (`step(name)`), `ladder()` and `all()`.
   `LayerCompositions` is the per-layer default (`forLayer`) and the only place where the MVT layer
-  names appear, as constants. `CompositionGrids` holds the fit grid, the 48-row oracle grid, the
-  252-composition `bestGrid()` of the per-(tile, layer) oracle and the selectors' trial sets.
-  `StepRows` builds the multi-row steps (`turn`, `frame`, `shared`, `framelayers`, `framelines`,
+  names appear, as constants. `CompositionGrids` holds the fit grid, the 32-row oracle grid, the
+  96-composition `bestGrid()` of the per-(tile, layer) oracle and the selectors' trial sets.
+  `StepRows` builds the multi-row steps (`frame`, `shared`, `framelayers`, `framelines`,
   `linesshared`, S3, S6-S8).
 
 **Above the encoder**
@@ -197,8 +201,8 @@ research-java/
       reorder/                Reorder, GeometryReorder
       reference/              RingReferences, LineReferences
       prediction/             Prediction
-        mechanism/            ClassifiedPredictor, SegmentQuadCorner, QuadCornerLine, LineContinuation,
-                                TurnScalar, FramePrior
+        mechanism/            ClassifiedPredictor, SegmentQuadCorner, LineContinuation, FramePrior
+      retired/                QuadCornerLine, TurnScalar, TurnScalarPredictor
       segmentation/           Segmentation
       stream/                 StreamCodec, ResidualMap, ByteWidth, Transpose, IntCodec, PayloadBytes
       format/                 Composition, PayloadHeader, PipelineEncoding

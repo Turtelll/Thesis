@@ -17,7 +17,7 @@ use super::{ContainerFormat, Reencoder, encode_one, update_mlt_pmtiles_metadata}
 use crate::convert::bbox::{BboxFilter, clip_bounds, clip_center};
 use crate::convert::common::{
     ENCODE_CACHE_BYTES, EncodedTile, MAX_TILE_CACHE_TRACK_SIZE_BYTES, PmTilesGeography, TileStats,
-    encode_tile, make_encode_cache, make_progress_bar,
+    compress_tile, encode_tile, make_encode_cache, make_progress_bar,
 };
 
 /// Narrows a tileset's geography to the box a `--bbox` conversion kept.
@@ -50,7 +50,8 @@ pub async fn convert(
 ) -> AnyResult<()> {
     match output {
         (output, ContainerFormat::Mbtiles) => {
-            convert_mbtiles_to_mbtiles(input, output, dst_type, reencoder, clip).await
+            convert_mbtiles_to_mbtiles(input, output, dst_type, reencoder, tile_compression, clip)
+                .await
         }
         (output, ContainerFormat::Pmtiles) => {
             convert_mbtiles_to_pmtiles(input, output, reencoder, tile_compression, clip).await
@@ -109,6 +110,7 @@ async fn convert_mbtiles_to_mbtiles(
     output: &Path,
     dst_type: Option<MbtType>,
     reencoder: &Reencoder,
+    tile_compression: Compression,
     clip: Option<Bounds>,
 ) -> AnyResult<()> {
     let (encoding, src_type, mut metadata, total) = get_metadata(input).await?;
@@ -128,8 +130,9 @@ async fn convert_mbtiles_to_mbtiles(
         sizes_ref
             .bytes_in
             .fetch_add(u64::from_usize(data.len()), Ordering::Relaxed);
+        // PATCH (research-rust): each tile is compressed here, before the transcoder merges it into the archive.
         let result = encode_one(&data, encoding, &reencoder)
-            .map(|(data, _raw_mvt_size)| data)
+            .and_then(|(data, _raw_mvt_size)| compress_tile(&data, tile_compression))
             .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { format!("{e:#}").into() });
         match &result {
             Ok(encoded) => {
@@ -171,6 +174,19 @@ async fn convert_mbtiles_to_mbtiles(
     let mut dst_conn = dst.open_or_new().await?;
     dst.set_metadata_value(&mut dst_conn, "format", Format::Mlt.metadata_format_value())
         .await?;
+    // PATCH (research-rust): brotli has no magic bytes, so the archive names its tile compression (as .pmtiles
+    // metadata does); a source `compression` key described the MVT tiles.
+    match tile_compression.content_encoding() {
+        Some(name) => {
+            dst.set_metadata_value(&mut dst_conn, "compression", name)
+                .await?;
+        }
+        None => {
+            sqlx::query("DELETE FROM metadata WHERE name = 'compression'")
+                .execute(&mut dst_conn)
+                .await?;
+        }
+    }
     // The copied hash describes the source's tiles, so it would fail every validation of these.
     dst.update_agg_tiles_hash(&mut dst_conn).await?;
     // The copied geography still describes the whole source archive.

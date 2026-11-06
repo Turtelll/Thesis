@@ -28,8 +28,8 @@ import java.util.function.UnaryOperator;
  * #withReorder} puts one in front of the predictor rows ({@code --reorder}). {@link #partChainRows()}
  * chain the parts inside each MultiLineString instead ({@link GeometryReorder#PART_CHAIN}).
  *
- * <p>{@code QUAD_CORNER_FRAME} and {@code QUAD_CORNER_LINE_FRAME} are the pipeline's ring-frame
- * predictors ({@link Prediction}) through its own {@code FLAT} split: a frame rotates the residual, so
+ * <p>{@code QUAD_CORNER_FRAME} is the pipeline's ring-frame
+ * predictor ({@link Prediction}) through its own {@code FLAT} split: a frame rotates the residual, so
  * it is not a {@link Predictor} rule, but its residual pairs are one per vertex like the others'.
  * They compose with {@code --reorder} like any known row; a new rule cannot be framed from here.
  *
@@ -70,9 +70,7 @@ public final class Workshop {
                 deltaRow(),
                 predictionRow(Prediction.QUAD_CORNER),
                 predictionRow(Prediction.LINE_CONTINUATION),
-                predictionRow(Prediction.QUAD_CORNER_LINE),
-                predictionRow(Prediction.QUAD_CORNER_FRAME),
-                predictionRow(Prediction.QUAD_CORNER_LINE_FRAME));
+                predictionRow(Prediction.QUAD_CORNER_FRAME));
     }
 
     private static Row predictionRow(Prediction prediction) {

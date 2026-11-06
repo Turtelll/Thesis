@@ -38,10 +38,12 @@ public final class PipelineRegistry {
     static final Composition AFTER_S1 = AFTER_S0.withReorder(Reorder.HILBERT_CENTROID_ROT_MP);
 
     /**
-     * S2: {@code QUAD_CORNER_LINE}, the one predictor within 0,3 points of the best choice on every
-     * layer (the per-layer choice is the selector's).
+     * S2: {@code QUAD_CORNER_SHARED_FRAME}, the predictor with the smallest total over the corpus among the ones the
+     * pipeline still has (-8,41% gzip, measure --step s2; the per-layer choice is {@link LayerCompositions}'s).
+     * It replaced {@code QUAD_CORNER_LINE} when that one was retired (docs/results/tile-oracle.md, "Pruning the
+     * grid"), which makes every stage after S2, and {@link #DEFAULT}, differ from the figures of docs/results/openzl-pipeline.md.
      */
-    static final Composition AFTER_S2 = AFTER_S1.withPredictor(Prediction.QUAD_CORNER_LINE);
+    static final Composition AFTER_S2 = AFTER_S1.withPredictor(Prediction.QUAD_CORNER_SHARED_FRAME);
 
     /** S3: one stream per predictor class (-1,2 points over FLAT); the role split and class sort lose. */
     static final Composition AFTER_S3 = AFTER_S2.withSegmentation(Segmentation.CLASS);
@@ -98,7 +100,7 @@ public final class PipelineRegistry {
                 new Stage("identity (plain varint)", Composition.IDENTITY),
                 new Stage("S0 split varint", AFTER_S0),
                 new Stage("S1 + Hilbert reorder", AFTER_S1),
-                new Stage("S2 + QUAD_CORNER_LINE", AFTER_S2),
+                new Stage("S2 + QUAD_CORNER_SHARED_FRAME", AFTER_S2),
                 new Stage("S3 + class streams", AFTER_S3),
                 new Stage("S6 + escape width", AFTER_S6),
                 new Stage("S7 + byte planes (GEOMETRY_BEST)", AFTER_S7),
@@ -107,7 +109,7 @@ public final class PipelineRegistry {
 
     /** The step names, in order. */
     public static List<String> steps() {
-        return List.of("s0", "s1", "s2", "s3", "s4", "s6", "s7", "s8", "selector", "turn", "frame", "framelayers",
+        return List.of("s0", "s1", "s2", "s3", "s4", "s6", "s7", "s8", "selector", "frame", "framelayers",
                 "shared", "framelines", "linesshared");
     }
 
@@ -128,8 +130,6 @@ public final class PipelineRegistry {
             // the fixed rows the per-buffer selection is measured against; the selectors themselves
             // need a compressor and are built by MeasureHarness
             case "selector" -> List.of(row(DEFAULT), row(GEOMETRY_BEST));
-            // not a step of the build-up: TURN_SCALAR beside QUAD_CORNER, for the building layer
-            case "turn" -> StepRows.turnRows();
             // not a step of the build-up: the ring frame beside QUAD_CORNER, for the building layer
             case "frame" -> StepRows.frameRows();
             // the ring frame on every layer, under each layer terminal

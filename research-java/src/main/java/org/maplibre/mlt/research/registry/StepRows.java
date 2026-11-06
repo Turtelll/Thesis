@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * The rows of the registry's steps that are more than one change to the previous winner: the
- * predictor grids beside their plain rows ({@code turn}, {@code frame}, {@code shared},
+ * predictor grids beside their plain rows ({@code frame}, {@code shared},
  * {@code framelayers}, {@code framelines}, {@code linesshared}) and the S3, S6, S7 and S8 rows.
  */
 final class StepRows {
@@ -23,34 +23,10 @@ final class StepRows {
     }
 
     /**
-     * {@code TURN_SCALAR} against {@code QUAD_CORNER} on the same terminal (S8's {@link PipelineRegistry#DEFAULT}),
-     * per segmentation, without and then with the {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder,
-     * then on the {@code building} layer's own composition ({@link LayerCompositions#forLayer}: Hilbert reorder,
-     * class streams, escape width). The side value (the edge-length scalar) is a stream of its own
-     * under every segmentation, so the rows show what separating the near-zero corrections from the
-     * scalars is worth, and what the reorder adds on top.
-     */
-    static List<Encoding> turnRows() {
-        final var rows = new ArrayList<Encoding>();
-        for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
-            for (final var predictor : List.of(Prediction.QUAD_CORNER, Prediction.TURN_SCALAR)) {
-                for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS, Segmentation.ROLE_CLASS)) {
-                    rows.add(PipelineRegistry.row(PipelineRegistry.DEFAULT.withReorder(reorder).withPredictor(predictor).withSegmentation(segmentation)));
-                }
-            }
-        }
-        // LayerCompositions.forLayer(LayerCompositions.BUILDING) uses the ring frame and shared references; QUAD_CORNER is the plain reference
-        final var building = LayerCompositions.forLayer(LayerCompositions.BUILDING);
-        rows.add(PipelineRegistry.row(building.withPredictor(Prediction.QUAD_CORNER)));
-        rows.add(PipelineRegistry.row(building.withPredictor(Prediction.TURN_SCALAR)));
-        return rows;
-    }
-
-    /**
      * The ring frame beside its plain predictor on the {@code building} layer: {@code QUAD_CORNER}
      * against {@code QUAD_CORNER_FRAME}, per segmentation, without and then with the
      * {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder, then the frame on the layer's own composition
-     * ({@link LayerCompositions#forLayer}, which uses the frame) with the other terminals and with the line predictor. The
+     * ({@link LayerCompositions#forLayer}, which uses the frame) with the other terminals. The
      * rows after the grid are the previous default ({@code QUAD_CORNER}), the current one, then variants. Rows that equal a grid row (the planes terminal is
      * {@link PipelineRegistry#DEFAULT}'s) are not repeated: a duplicate name is summed twice by the benchmark.
      */
@@ -68,8 +44,7 @@ final class StepRows {
         final var building = LayerCompositions.forLayer(LayerCompositions.BUILDING);
         rows.add(PipelineRegistry.row(building.withPredictor(Prediction.QUAD_CORNER)));
         rows.add(PipelineRegistry.row(building.withPredictor(Prediction.QUAD_CORNER_FRAME)));
-        rows.add(PipelineRegistry.row(building.withPredictor(Prediction.QUAD_CORNER_LINE_FRAME)));
-        rows.add(PipelineRegistry.row(building.withPredictor(Prediction.QUAD_CORNER_FRAME).withWidth(ByteWidth.VARINT_SPLIT)));
+        rows.add(PipelineRegistry.row(building.withPredictor(Prediction.QUAD_CORNER_FRAME).withWidth(ByteWidth.VARINT_SPLIT).withTranspose(Transpose.NONE)));
         rows.add(PipelineRegistry.row(building.withPredictor(Prediction.QUAD_CORNER_FRAME).withReorder(Reorder.HILBERT_CENTROID_ROT)));
         return rows;
     }
@@ -100,8 +75,8 @@ final class StepRows {
     }
 
     /**
-     * The ring frame on every layer, not just {@code building}: the four quad-corner predictors
-     * (plain and framed, with and without the line rule) under each (segmentation, width, transpose) the
+     * The ring frame on every layer, not just {@code building}: the plain and the framed quad-corner predictor
+     * under each (segmentation, width, transpose) the
      * fitted layers use, all with {@link Reorder#HILBERT_CENTROID_ROT_MP}. Read the by-layer table: a layer
      * compares the rows of its own terminal. The rows are layer-independent, so a layer without rings
      * (or whose predictor is not a quad-corner one) shows the frame doing nothing.
@@ -115,8 +90,7 @@ final class StepRows {
                 LayerCompositions.composition(Prediction.QUAD_CORNER, Segmentation.CLASS, ByteWidth.VARINT_SPLIT, Transpose.NONE),
                 LayerCompositions.composition(Prediction.QUAD_CORNER, Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE));
         for (final var terminal : terminals) {
-            for (final var predictor : List.of(Prediction.QUAD_CORNER, Prediction.QUAD_CORNER_FRAME,
-                    Prediction.QUAD_CORNER_LINE, Prediction.QUAD_CORNER_LINE_FRAME)) {
+            for (final var predictor : List.of(Prediction.QUAD_CORNER, Prediction.QUAD_CORNER_FRAME)) {
                 rows.add(PipelineRegistry.row(terminal.withPredictor(predictor)));
             }
         }
@@ -124,9 +98,8 @@ final class StepRows {
     }
 
     /**
-     * The frame on line parts: {@code LINE_CONTINUATION} against {@code LINE_CONTINUATION_FRAME}, the
-     * heading rotation of the continued vertices ({@code _HEADING}) and both ({@code _FRAME_HEADING}), per
-     * segmentation, without and then with the {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder, on the
+     * The frame on line parts: {@code LINE_CONTINUATION} against {@code LINE_CONTINUATION_FRAME_HEADING} (the frame
+     * and the heading rotation of the continued vertices), per segmentation, without and then with the {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder, on the
      * terminal {@code transportation} uses (escape width, byte planes: {@link LayerCompositions#forLayer}) and on the
      * one {@code transportation_name} and {@code waterway} use (split varint, no planes). The rows are
      * layer-independent, so read the by-layer table: a layer without line parts shows the frame doing
@@ -139,8 +112,7 @@ final class StepRows {
                 LayerCompositions.forLayer(LayerCompositions.WATERWAY));
         for (final var terminal : terminals) {
             for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
-                for (final var predictor : List.of(Prediction.LINE_CONTINUATION, Prediction.LINE_CONTINUATION_FRAME,
-                        Prediction.LINE_CONTINUATION_HEADING, Prediction.LINE_CONTINUATION_FRAME_HEADING)) {
+                for (final var predictor : List.of(Prediction.LINE_CONTINUATION, Prediction.LINE_CONTINUATION_FRAME_HEADING)) {
                     for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
                         rows.add(PipelineRegistry.row(terminal.withReorder(reorder).withPredictor(predictor)
                                 .withSegmentation(segmentation)));
@@ -152,7 +124,7 @@ final class StepRows {
     }
 
     /**
-     * The references to earlier line parts' positions ({@link Prediction#LINE_CONTINUATION_SHARED}) beside
+     * The references to earlier line parts' positions ({@link Prediction#LINE_CONTINUATION_SHARED_FRAME_HEADING}) beside
      * their plain predictors: {@code LINE_CONTINUATION} and the frame and heading one {@code transportation}
      * uses, each without and with the references, per segmentation, without and then with the
      * {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder, on the terminal {@code transportation} uses (escape
@@ -168,7 +140,7 @@ final class StepRows {
         for (final var terminal : terminals) {
             for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
                 for (final var predictor : List.of(
-                        Prediction.LINE_CONTINUATION, Prediction.LINE_CONTINUATION_SHARED,
+                        Prediction.LINE_CONTINUATION,
                         Prediction.LINE_CONTINUATION_FRAME_HEADING,
                         Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING)) {
                     for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {

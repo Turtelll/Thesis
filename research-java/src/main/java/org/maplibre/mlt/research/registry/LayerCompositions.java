@@ -62,7 +62,7 @@ public final class LayerCompositions {
      * {@link Reorder#CHAIN}). Predictor, segmentation, terminal and reorder were fitted on the Munich
      * corpus with {@code ./gradlew research --args="measure --step fit"} ("best fixed composition per layer":
      * every predictor incl. the ring frame, shared references and heading x flat/class streams x the
-     * three byte terminals x Hilbert or chain); {@code building} and {@code transportation} are as before
+     * two byte terminals x Hilbert or chain; the retired predictors and the plain escape terminal are out of the grid, docs/results/tile-oracle.md); {@code transportation} is as before
      * ({@code transportation} was fitted on geometry plus property columns). The chain layers are those
      * where {@code --step fit} picks it and {@code pipelineTileSize --modes NONE,HILBERT_CENTROID_ROT_MP,CHAIN
      * --by-layer} shows the chain's property columns no larger than Hilbert's net of the geometry gain:
@@ -72,7 +72,7 @@ public final class LayerCompositions {
      */
     private static final Map<String, Composition> BY_LAYER = Map.ofEntries(
             // (the layers on CHAIN_LAYERS carry .withReorder(Reorder.CHAIN) below)
-            Map.entry(PLACE, composition(Prediction.QUAD_CORNER_LINE,
+            Map.entry(PLACE, composition(Prediction.QUAD_CORNER_FRAME,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
             // the greedy chain, not Hilbert, and the references to earlier line parts' positions: fitted on
             // geometry plus property columns compressed together (docs/results/line-shared-vertices.md)
@@ -86,7 +86,7 @@ public final class LayerCompositions {
             Map.entry(LANDUSE, composition(Prediction.QUAD_CORNER_SHARED_FRAME,
                     Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
             Map.entry(WATER, composition(Prediction.QUAD_CORNER_SHARED_FRAME,
-                    Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.NONE).withReorder(Reorder.CHAIN)),
+                    Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES).withReorder(Reorder.CHAIN)),
             Map.entry(PARK, composition(Prediction.QUAD_CORNER_SHARED,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
             Map.entry(BOUNDARY, composition(Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING,
@@ -94,14 +94,14 @@ public final class LayerCompositions {
             Map.entry(POI, composition(Prediction.DELTA,
                     Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
             Map.entry(BUILDING, composition(Prediction.QUAD_CORNER_SHARED_FRAME,
-                    Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.NONE)),
+                    Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
             Map.entry(WATER_NAME, composition(Prediction.LINE_CONTINUATION,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
-            Map.entry(HOUSENUMBER, composition(Prediction.QUAD_CORNER_LINE,
+            Map.entry(HOUSENUMBER, composition(Prediction.LINE_CONTINUATION,
                     Segmentation.FLAT, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
             Map.entry(WATERWAY, composition(Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE).withReorder(Reorder.CHAIN)),
-            Map.entry(MOUNTAIN_PEAK, composition(Prediction.LINE_CONTINUATION_HEADING,
+            Map.entry(MOUNTAIN_PEAK, composition(Prediction.LINE_CONTINUATION_FRAME_HEADING,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
             Map.entry(AEROWAY, composition(Prediction.QUAD_CORNER_SHARED_FRAME,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE).withReorder(Reorder.CHAIN)),

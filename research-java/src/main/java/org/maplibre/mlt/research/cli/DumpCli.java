@@ -27,6 +27,7 @@ public final class DumpCli {
         var limit = 0;
         String layer = null;
         var serial = false;
+        String grid = null;
         for (var i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--in" -> in = args[++i];
@@ -34,12 +35,14 @@ public final class DumpCli {
                 case "--limit-tiles" -> limit = Integer.parseInt(args[++i]);
                 case "--layer" -> layer = args[++i];
                 case "--serial" -> serial = true;
+                case "--grid" -> grid = args[++i];
                 default -> throw new IllegalArgumentException("Unknown argument: " + args[i]
                         + "\nUsage: [--in <dir>] [--out <dir>] [--limit-tiles <n>] [--layer <name>] [--serial]"
+                        + " [--grid best]"
                         + " | --diff <oldDir> <newDir> [--rows a,b] [--allow-removed a,b] [--max-buffers <n>]");
             }
         }
-        return new GoldenDump.Options(in, out, limit, layer, serial);
+        return new GoldenDump.Options(in, out, limit, layer, serial, grid);
     }
 
     static GoldenDiff.Options parseDiff(String[] args) {

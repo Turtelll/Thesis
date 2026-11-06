@@ -86,6 +86,15 @@ public final class MeasureHarness {
         // --step best: the per-(tile, layer) oracles over the 252-row grid; the grid is encoded once per tile
         // by the search, so it is not among the rows encoded per buffer
         final var bestStep = opts.step.equals("best") && opts.rows == null;
+        if (opts.exclude != null && !bestStep) {
+            throw new IllegalArgumentException("--exclude applies to --step best only");
+        }
+        // --exclude takes options out of the grid, for both the alone oracle's rows and the tile oracle's candidates
+        final var grid = bestStep ? prunedGrid(opts.exclude) : List.<Composition>of();
+        if (bestStep) {
+            rows.clear();
+            grid.forEach(config -> rows.add(new PipelineEncoding(config)));
+        }
         final var encodings = new ArrayList<Encoding>(baselines);
         if (!bestStep) {
             encodings.addAll(rows);
@@ -103,11 +112,13 @@ public final class MeasureHarness {
         final var tileSelectors = tileStep ? tileSelectors(compressors, opts.trials) : List.<TileSelector>of();
         final var tileOracles = bestStep
                 ? compressors.stream()
-                        .map(compressor -> TileSelector.oracle(compressor.label(), compressor::size,
-                                CompositionGrids.bestGrid()))
+                        .map(compressor -> TileSelector.oracle(compressor.label(), compressor::size, grid))
                         .toList()
                 : List.<TileSelector>of();
         final var aloneOracle = bestStep ? new OracleReport(rows, compressors) : null;
+        if (aloneOracle != null) {
+            aloneOracle.trackDropCost();
+        }
         // what the first tile selector (trial compression under gzip unless --trials says otherwise) chose,
         // against what cheap rules and the compression-free selectors would have chosen
         final var correlation = tileSelectors.isEmpty() ? null : new ChoiceCorrelation(tileSelectors.get(0).name());
@@ -243,10 +254,12 @@ public final class MeasureHarness {
         if (bestStep) {
             aloneOracle.printCompositions();
             aloneOracle.printByLayer();
+            aloneOracle.printDropCost();
             final var gridNames = rows.stream().map(Encoding::name).toList();
             aloneOracle.printBestFixedPerLayer((layer, candidate) -> true,
-                    layer -> gridNames.indexOf(new PipelineEncoding(LayerCompositions.forLayer(layer)).name()),
-                    "per layer");
+                    // a default excluded from the grid is compared with the grid's first row instead
+                    layer -> Math.max(0, gridNames.indexOf(new PipelineEncoding(LayerCompositions.forLayer(layer)).name())),
+                    opts.exclude == null ? "per layer" : "per layer (first row if excluded)");
             final var shown = new ArrayList<>(baselineNames);
             shown.add(OracleReport.PER_LAYER);
             final var tileOracleNames = tileOracles.stream().map(TileSelector::name).toList();
@@ -455,6 +468,7 @@ public final class MeasureHarness {
                 final var search = searches.get(c);
                 final var aloneChoice = search.alone().get(b);
                 final var tileChoice = search.tile().get(b);
+                alone.recordTileChoice(c, tileChoice.config());
                 if (!aloneChoice.config().equals(oracles.get(c).candidates().get(chosen[c]))) {
                     throw new IllegalStateException(where + ": the oracle report and the search disagree on the"
                             + " alone-best composition");
@@ -539,6 +553,39 @@ public final class MeasureHarness {
             }
         }
         return rows;
+    }
+
+    /**
+     * {@link CompositionGrids#bestGrid} without the compositions that use an excluded option. An option is
+     * named as {@link OracleReport#optionsOf} spells it ({@code TURN_SCALAR}, {@code CHAIN}, {@code CLASS},
+     * {@code VARINT_SPLIT}, ..); one that is no option of the grid, or a set that leaves no composition, is an
+     * error. A layer whose default {@link LayerCompositions#forLayer} is excluded is listed: the tile
+     * oracle then starts it from the nearest candidate (its descent never ends larger than its start).
+     */
+    private static List<Composition> prunedGrid(String exclude) {
+        final var grid = CompositionGrids.bestGrid();
+        if (exclude == null || exclude.isBlank()) {
+            return grid;
+        }
+        final var excluded = new LinkedHashSet<>(List.of(exclude.split(",")));
+        final var known = new LinkedHashSet<String>();
+        grid.forEach(config -> known.addAll(OracleReport.optionsOf(config)));
+        for (final var name : excluded) {
+            if (!known.contains(name)) {
+                throw new IllegalArgumentException("--exclude " + name + " is no option of the grid; known: " + known);
+            }
+        }
+        final var kept = grid.stream()
+                .filter(config -> OracleReport.optionsOf(config).stream().noneMatch(excluded::contains))
+                .toList();
+        if (kept.isEmpty()) {
+            throw new IllegalArgumentException("--exclude " + excluded + " leaves no composition");
+        }
+        final var lost = LayerCompositions.fittedLayers().stream().sorted()
+                .filter(layer -> !kept.contains(LayerCompositions.forLayer(layer))).toList();
+        System.out.printf("grid: %d of %d compositions, excluded %s; layers whose default is out of the grid: %s%n",
+                kept.size(), grid.size(), excluded, lost.isEmpty() ? "none" : lost);
+        return kept;
     }
 
     private static List<Encoding> rowsFor(Options opts) {
@@ -779,7 +826,8 @@ public final class MeasureHarness {
             String trials,
             String featuresCsv,
             boolean sizeAll,
-            String search) {
+            String search,
+            String exclude) {
 
         /**
          * The per-buffer best of the step's rows instead of a table row per composition; always on for

@@ -18,13 +18,12 @@ import org.maplibre.mlt.research.encoder.stream.IntCodec;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoder.prediction.Prediction;
 import org.maplibre.mlt.research.baseline.VertexTransform;
-import org.maplibre.mlt.research.encoder.prediction.mechanism.QuadCornerLine;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.SegmentQuadCorner;
 
 /**
  * Pins the workshop's plumbing: the {@code DELTA} rule is the baseline transform, the
  * midpoint-reflect and context-delta ports predict what the originals do (only without their
- * regions), the turn-scalar pairs leave out exactly the along scalars, and a rule reading ahead of
+ * regions), and a rule reading ahead of
  * {@code i} does not round-trip.
  */
 class WorkshopTest {
@@ -77,7 +76,7 @@ class WorkshopTest {
 
   @Test
   void ringFrameRowsRoundTripAndAreTheFrameOfThePipelinePredictors() {
-    for (var name : List.of("QUAD_CORNER_FRAME", "QUAD_CORNER_LINE_FRAME")) {
+    for (var name : List.of("QUAD_CORNER_FRAME")) {
       var row = known(name);
       var ctx = rings();
       var encoded = row.encoding().encode(ctx);
@@ -92,9 +91,6 @@ class WorkshopTest {
   void ringFrameRowsRotateRingEdgesAndLeaveLinesAlone() {
     // lines carry no ring: the frame changes nothing, the rows equal their plain predictors
     var lines = lines();
-    assertArrayEquals(
-        new PredictionTransform(Prediction.QUAD_CORNER_LINE).apply(lines),
-        known("QUAD_CORNER_LINE_FRAME").residuals().apply(lines).pairs());
     assertArrayEquals(
         new PredictionTransform(Prediction.QUAD_CORNER).apply(lines),
         known("QUAD_CORNER_FRAME").residuals().apply(lines).pairs());

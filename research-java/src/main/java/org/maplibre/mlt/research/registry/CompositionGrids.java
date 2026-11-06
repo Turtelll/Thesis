@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * The grids of compositions the measurement chooses among: the fit grid {@code forLayer} is fitted on,
- * the 48-row oracle grid, the 252-composition grid of {@code --step best} and the trial sets of the
+ * the 32-row oracle grid, the 96-composition grid of {@code --step best} and the trial sets of the
  * selectors. A grid is a list of {@link Composition}s (or rows over them); the registry's steps and
  * the per-layer defaults are elsewhere.
  */
@@ -25,8 +25,8 @@ public final class CompositionGrids {
 
     /**
      * The grid {@link LayerCompositions#forLayer} is fitted on: every predictor (the ring frame, shared references and
-     * heading rotation included; {@code TURN_SCALAR} is left out, it lost) x flat or class streams x the
-     * three byte terminals x the given reorders ({@code --step fit}: {@link Reorder#HILBERT_CENTROID_ROT_MP}
+     * heading rotation included) x flat or class streams x the
+     * two byte terminals (escape with planes, split varint) x the given reorders ({@code --step fit}: {@link Reorder#HILBERT_CENTROID_ROT_MP}
      * and the greedy {@link Reorder#CHAIN}; {@code --step fithilbert}: Hilbert only).
      * The oracle grid has none of the later predictors, so its per-layer winners cannot replace the
      * fitted compositions. Run {@code ./gradlew research --args="measure --step fit"}: it implies {@code --oracle},
@@ -36,16 +36,10 @@ public final class CompositionGrids {
         final var rows = new ArrayList<Encoding>();
         for (final var reorder : reorders) {
             for (final var predictor : Prediction.values()) {
-                if (predictor == Prediction.TURN_SCALAR) {
-                    continue;
-                }
                 for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
                     rows.add(PipelineRegistry.row(PipelineRegistry.DEFAULT.withReorder(reorder).withPredictor(predictor)
                             .withSegmentation(segmentation).withWidth(ByteWidth.ESCAPE)
                             .withTranspose(Transpose.INTERLEAVED_PLANES)));
-                    rows.add(PipelineRegistry.row(PipelineRegistry.DEFAULT.withReorder(reorder).withPredictor(predictor)
-                            .withSegmentation(segmentation).withWidth(ByteWidth.ESCAPE)
-                            .withTranspose(Transpose.NONE)));
                     rows.add(PipelineRegistry.row(PipelineRegistry.DEFAULT.withReorder(reorder).withPredictor(predictor)
                             .withSegmentation(segmentation).withWidth(ByteWidth.VARINT_SPLIT)
                             .withTranspose(Transpose.NONE)));
@@ -58,8 +52,8 @@ public final class CompositionGrids {
     /**
      * The compositions the oracle chooses among: every combination of the decisions that a buffer's
      * content can change the answer of, not the one-at-a-time variants of the steps. Reorder (none or
-     * Hilbert) x predictor x class streams or not x byte terminal (escape with planes, escape, split
-     * varint) = 48 rows, the {@code BufferSelector}'s grid with the reorder added. The first row is {@link
+     * Hilbert) x predictor x class streams or not x byte terminal (escape with planes, split
+     * varint) = 32 rows, the {@code BufferSelector}'s grid with the reorder added. The first row is {@link
      * #DEFAULT}, so a tie goes to it.
      */
     public static List<Encoding> oracle() {
@@ -72,9 +66,9 @@ public final class CompositionGrids {
 
     /**
      * The grid the per-(tile, layer) oracle of {@code --step best} chooses among: every predictor
-     * ({@code TURN_SCALAR} included) x flat or class streams x the three byte terminals (escape with
-     * planes, escape, split varint) x the three reorders the registry uses ({@link Reorder#NONE},
-     * {@link Reorder#HILBERT_CENTROID_ROT_MP}, {@link Reorder#CHAIN}) = 252 compositions, each on {@link
+     * x flat or class streams x the two byte terminals (escape with
+     * planes, split varint) x the three reorders the registry uses ({@link Reorder#NONE},
+     * {@link Reorder#HILBERT_CENTROID_ROT_MP}, {@link Reorder#CHAIN}) = 96 compositions, each on {@link
      * #DEFAULT}'s residual map. It holds {@link PipelineRegistry#DEFAULT} and every {@link LayerCompositions#forLayer} composition. Not part
      * of {@link PipelineRegistry#all()}, so the golden dump does not grow; {@code PipelineEncodingTest} round-trips it.
      */
@@ -85,7 +79,6 @@ public final class CompositionGrids {
                 for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
                     final var base = PipelineRegistry.DEFAULT.withReorder(reorder).withPredictor(predictor).withSegmentation(segmentation);
                     configs.add(base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.INTERLEAVED_PLANES));
-                    configs.add(base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.NONE));
                     configs.add(base.withWidth(ByteWidth.VARINT_SPLIT).withTranspose(Transpose.NONE));
                 }
             }
@@ -104,11 +97,10 @@ public final class CompositionGrids {
     public static List<Composition> candidateConfigs(Reorder reorder) {
         final var base = PipelineRegistry.DEFAULT.withReorder(reorder);
         final var predictors = List.of(
-                Prediction.QUAD_CORNER_LINE, Prediction.QUAD_CORNER, Prediction.LINE_CONTINUATION, Prediction.DELTA);
+                Prediction.QUAD_CORNER_SHARED_FRAME, Prediction.QUAD_CORNER, Prediction.LINE_CONTINUATION, Prediction.DELTA);
         final var segmentations = List.of(Segmentation.CLASS, Segmentation.FLAT);
         final var terminals = List.of(
                 base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.INTERLEAVED_PLANES),
-                base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.NONE),
                 base.withWidth(ByteWidth.VARINT_SPLIT).withTranspose(Transpose.NONE));
         final var configs = new ArrayList<Composition>();
         for (final var predictor : predictors) {

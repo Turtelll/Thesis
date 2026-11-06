@@ -42,27 +42,45 @@ Two bytes. The reorder is not part of it.
 
 | Byte | Bits | Field | Values |
 |---|---|---|---|
-| 0 | 0-2 | predictor, low 3 bits | `Prediction` ordinal & 7 |
+| 0 | 0-2 | predictor, low 3 bits | `Prediction` code & 7 |
 | 0 | 3-4 | segmentation | `FLAT`=0, `CLASS`=1, `ROLE`=2, `ROLE_CLASS`=3 |
 | 0 | 5 | residual map | `ZIGZAG`=0 (the only one) |
 | 0 | 6-7 | transpose | `NONE`=0, `INTERLEAVED_PLANES`=1, `PLANE_MAJOR`=2, `COMPONENT_MAJOR`=3 |
 | 1 | 0-3 | byte width | `VARINT`=0, `VARINT_SPLIT`=1, `MIN_FIXED`=2, `ESCAPE`=3, `FORCE_4`=4 |
-| 1 | 4 | predictor, bit 3 | `Prediction` ordinal >> 3 (the predictors outgrew the 3 bits of byte 0) |
+| 1 | 4 | predictor, bit 3 | `Prediction` code >> 3 (the predictors outgrew the 3 bits of byte 0) |
 | 1 | 5-7 | free | 0; **three bits of headroom** |
 
-The predictor ordinals are the declaration order of `Prediction` and are append-only: a new
-predictor takes the next ordinal, never shifts an existing one. There are 14 today; the four
-predictor bits hold 16, and bits 5-7 of byte 1 are the reserve beyond that.
+The predictor field holds an explicit, stable **code** per `Prediction` constant
+(`Prediction.code()`, not the declaration order), so retiring a predictor never shifts the others.
+Eight are live:
+
+| Code | Predictor |
+|---|---|
+| 0 | `DELTA` |
+| 1 | `QUAD_CORNER` |
+| 2 | `LINE_CONTINUATION` |
+| 5 | `QUAD_CORNER_FRAME` |
+| 7 | `QUAD_CORNER_SHARED` |
+| 8 | `QUAD_CORNER_SHARED_FRAME` |
+| 11 | `LINE_CONTINUATION_FRAME_HEADING` |
+| 13 | `LINE_CONTINUATION_SHARED_FRAME_HEADING` |
+
+The codes 3 (`QUAD_CORNER_LINE`), 4 (`TURN_SCALAR`), 6 (`QUAD_CORNER_LINE_FRAME`), 9
+(`LINE_CONTINUATION_FRAME`), 10 (`LINE_CONTINUATION_HEADING`) and 12 (`LINE_CONTINUATION_SHARED`)
+belong to predictors that were retired (the code of the first two is in `encoder/retired/`, see
+[results/tile-oracle.md](results/tile-oracle.md)); a payload carrying one no longer decodes, and the
+codes are not reused. The bytes of every kept row are unchanged. The four predictor bits hold 16
+codes; bits 5-7 of byte 1 are the reserve beyond that.
 
 A fixed-width byte width with a transpose other than `NONE` and `INTERLEAVED_PLANES` is applied
-to residual streams only; the **side stream** of a predictor with side values (`TURN_SCALAR`'s
-`along` scalars) is not an `x, y` pair stream and can have odd length, so it always uses
+to residual streams only; the **side stream** of a predictor with side values (none is live; the retired `TURN_SCALAR`'s
+`along` scalars were one) is not an `x, y` pair stream and can have odd length, so it always uses
 `INTERLEAVED_PLANES`.
 
 ### Shared-reference block
 
-Present only when the predictor is `QUAD_CORNER_SHARED`, `QUAD_CORNER_SHARED_FRAME`,
-`LINE_CONTINUATION_SHARED` or `LINE_CONTINUATION_SHARED_FRAME_HEADING`. A shared predictor's
+Present only when the predictor is `QUAD_CORNER_SHARED`, `QUAD_CORNER_SHARED_FRAME` or
+`LINE_CONTINUATION_SHARED_FRAME_HEADING`. A shared predictor's
 buffer is written as its plain predictor (header id of the plain one, no block) whenever the
 references do not make it smaller, so a decoder needs no mode byte.
 

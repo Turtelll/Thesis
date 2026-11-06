@@ -3,11 +3,11 @@
 **Code names:** `QUAD_CORNER_FRAME_RESIDUAL_WINDOW`, `_ALIGNED`, `_RUN`; the same for `QUAD_CORNER_SHARED_FRAME_`,
 `LINE_CONTINUATION_FRAME_HEADING_` and `LINE_CONTINUATION_SHARED_FRAME_HEADING_` (12 predictors, codes 14–25)
 
-> **Verdict: Not adopted.** `building` gzip -4,81% against `QUAD_CORNER_SHARED_FRAME` in the same layout (-4,45%
-> with the Hilbert reorder), but Brotli +1,28% / zstd +1,02% and no gain on any other layer.
+> **Verdict: Rejected.** In the tile oracle on `building` the references save 0,39% gzip against the oracle without
+> them, nothing under Brotli, and the probe shows nothing on the other layers. Code removed.
 
 ## Encoding target
-Every layer; measured on building, landcover, landuse, water (Polygon) and transportation, waterway, poi.
+Every layer; probed on building and transportation, oracle on building only.
 
 ## Idea
 Share the residuals instead of the vertices. After prediction (`QUAD_CORNER`, `LINE_CONTINUATION`) and the
@@ -19,19 +19,20 @@ Houses of the same type repeat their corner residuals exactly, and so do road st
 a few index bits against two varints. At z14 `building` was expected to be the case where it pays.
 
 ## How the encoding works
-`encoder/reference/ResidualReferences.java`, over every residual stream (all classes, all geometry types):
+`ResidualReferences` (code removed), over every residual stream (all classes, all geometry types):
 
 1. **`WINDOW`:** one flag per vertex; a hit is a pair among the last 16 distinct pairs of the same stream
    (move-to-front), written as a 4-bit index.
 2. **`ALIGNED`:** per run (ring or part) one flag that the run repeats one of the last 4 runs of the same kind
    and length; then one "copy the counterpart" flag per vertex.
 3. **`RUN`:** per run one flag that the whole run repeats an earlier one (start vertex excluded, at least 3 hits).
-4. **Per-stream enable mask**, chosen greedily by trial encodes: a stream whose pairs do not repeat writes no flags.
+4. **Per-stream enable mask**, chosen greedily by trial encodes on raw payload size: a stream whose pairs do not
+   repeat writes no flags.
 5. **Fallback chain per buffer:** the residual candidate, its position-shared base, the plain base; the smallest
    raw payload wins and the header names it (no mode byte).
 
 The `replace` variants take the framed base; the `stack` variants take the position-shared base and share what
-the position references left. Payload layout: `research-java/docs/bitstream.md`.
+the position references left.
 
 ## How the decoder works
 Reads the position block (stacked variants), then the mask, the flag and index bit streams and one value count
@@ -40,19 +41,38 @@ adds it to the move-to-front list or run history) or reads the next pair from it
 prediction and inverts the frame as before.
 
 ## Results
-**Headline** (gzip per tile, `munich-plantiler`, `building`, class segmentation, escape width, interleaved planes):
-`QUAD_CORNER_SHARED_FRAME` 3.910.045 B → `_RESIDUAL_WINDOW` 3.721.786 B (**-4,81%**; vs `DELTA_ZIGZAG_VARINT`
-+3,41% → -1,57%). With the Hilbert reorder 3.839.840 → 3.668.942 B (-4,45%).
+**Probe** (`building`, 310 buffers, `QUAD_CORNER_SHARED_FRAME` base, all zooms, every stream on, raw payload
+bytes before any compressor):
 
-**Decisive case against adoption:**
-- The win is gzip only: Brotli +1,28% and zstd +1,02% vs the same base (Hilbert: +1,06% / +0,73%).
-- All of it is at z14 (-6,53% vs plain delta against -0,86% for the base); at z13 the references lose 0,2 points.
-- `ALIGNED` and `RUN` do nothing (within ±0,1%): 1,33% and 0,24% of pairs hit against 17,53% for `WINDOW`.
-- Landcover, landuse, water, transportation, waterway and poi: no gain (0,00% to +0,12% gzip); the flat
-  segmentation loses with `WINDOW` (+0,5% to +1,5%).
-- On the line base for `building` (not a layer default) `WINDOW` is +0,52% worse than its base.
+| mode | pairs | hit share | payload vs base |
+|---|---|---|---|
+| `WINDOW` | 2.040.481 | 17,53% | -7,91% |
+| `ALIGNED` | 2.040.481 | 1,33% | -0,39% |
+| `RUN` | 2.040.481 | 0,24% | -0,02% |
 
-The rows stay in `residualshared` and the header codes 14–25 stay allocated; grids and `forLayer` are unchanged.
-Decode time and the tile oracle were not run on them.
+`WINDOW` by zoom: z13 6,60% hits, -0,09% payload; z14 20,64% hits, -9,98%. On `transportation` it hits 1,27%
+(polygon base) and 1,42% (line base) of the pairs for -0,02% / -0,11% payload; `ALIGNED` and `RUN` stay below 0,1%.
 
-Source: `research-java/docs/results/shared-residuals.md`.
+**Tile oracle** (`building`, gzip per tile, `munich-plantiler`, grid of 96 compositions against the same grid
+plus the four `WINDOW` predictors = 144):
+
+| | gzip | vs `DELTA_ZIGZAG_VARINT` |
+|---|---|---|
+| per-layer default (Hilbert `QUAD_CORNER_SHARED_FRAME`, class) | 3.214.369 | -14,99% |
+| oracle, 96 compositions | 3.213.707 | -15,01% |
+| oracle, 144 compositions | 3.201.171 | -15,34% |
+
+**Decisive case against:**
+- The best case, a per-buffer oracle that is charged nothing for its choice, gains 0,39% over the oracle without
+  the references (0,41% over the per-layer default), on one layer. The oracle picks a `WINDOW` predictor for 44% +
+  7% of the `building` buffers; dropping `QUAD_CORNER_SHARED_FRAME_RESIDUAL_WINDOW` from the grid costs 0,41%.
+- Under Brotli the 144-grid oracle is 2.955.513 B against 2.952.062 B for the per-layer default (+0,12%); under
+  zstd it is 0,10% smaller. The raw payload shrinks by 7,9% in the probe, so gzip, Brotli and zstd already recover
+  most of what the references remove.
+- Not a gain anywhere else in the probe, and one more flag, mask and fallback chain in the decoder.
+
+**Measurement caveat.** An earlier per-tile comparison in a `residualshared` step showed -4,5% to -4,8% gzip on
+`building`. It listed the ring rows twice (`PipelineRegistry.DEFAULT` and the `building` default are the same
+composition), so their bytes were counted twice per tile and the figure is not valid; the oracle numbers above
+use no duplicated rows. The oracle run was stopped on `building`: the all-layers `bestresidual` run and the
+`CHAIN`-reorder, `ALIGNED` and `RUN` oracle cases were not completed, and decode time was not measured.

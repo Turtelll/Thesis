@@ -19,7 +19,7 @@ public final class MeasureCli {
             + " [--rows a,b] [--layer <name>] [--by-zoom] [--by-geometry] [--stats] [--csv <file>]"
             + " [--brotli-quality <0-11>] [--limit-tiles <n>] [--isolated] [--no-verify] [--oracle]"
             + " [--trials gzip,brotli,zstd,order0,order1] [--features <file>]"
-            + " [--search gzip,brotli,zstd] [--size-all]";
+            + " [--search gzip,brotli,zstd] [--size-all] [--exclude <option>,<option>..]";
 
     static MeasureHarness.Options parse(String[] args) {
         String in = null;
@@ -39,10 +39,12 @@ public final class MeasureCli {
         String features = null;
         var sizeAll = false;
         String search = null;
+        String exclude = null;
         for (var i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--size-all" -> sizeAll = true;
                 case "--search" -> search = args[++i];
+                case "--exclude" -> exclude = args[++i];
                 case "--oracle" -> oracle = true;
                 case "--trials" -> trials = args[++i];
                 case "--features" -> features = args[++i];
@@ -67,6 +69,6 @@ public final class MeasureCli {
             }
         }
         return new MeasureHarness.Options(in == null ? DEFAULT_IN_DIR : in, step, rows, layer, byZoom, byGeometry, stats, csv,
-                brotliQuality, limitTiles, isolated, skipVerification, oracle, trials, features, sizeAll, search);
+                brotliQuality, limitTiles, isolated, skipVerification, oracle, trials, features, sizeAll, search, exclude);
     }
 }

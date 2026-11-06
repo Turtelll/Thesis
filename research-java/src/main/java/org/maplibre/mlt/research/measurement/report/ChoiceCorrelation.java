@@ -270,16 +270,10 @@ public final class ChoiceCorrelation {
             case DELTA -> "delta";
             case QUAD_CORNER -> "qc";
             case LINE_CONTINUATION -> "lc";
-            case QUAD_CORNER_LINE -> "qcl";
-            case TURN_SCALAR -> "turn";
             case QUAD_CORNER_FRAME -> "qcf";
-            case QUAD_CORNER_LINE_FRAME -> "qclf";
             case QUAD_CORNER_SHARED -> "qcs";
             case QUAD_CORNER_SHARED_FRAME -> "qcsf";
-            case LINE_CONTINUATION_FRAME -> "lcf";
-            case LINE_CONTINUATION_HEADING -> "lch";
             case LINE_CONTINUATION_FRAME_HEADING -> "lcfh";
-            case LINE_CONTINUATION_SHARED -> "lcs";
             case LINE_CONTINUATION_SHARED_FRAME_HEADING -> "lcsfh";
         };
     }

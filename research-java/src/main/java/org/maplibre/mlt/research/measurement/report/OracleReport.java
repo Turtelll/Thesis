@@ -1,16 +1,21 @@
 package org.maplibre.mlt.research.measurement.report;
 
 import org.maplibre.mlt.research.buffer.Encoding;
+import org.maplibre.mlt.research.encoder.format.Composition;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
 import org.maplibre.mlt.research.encoder.stream.Transpose;
 import org.maplibre.mlt.research.measurement.compression.Compressor;
 import org.maplibre.mlt.research.measurement.compression.TileCompression;
+import org.maplibre.mlt.research.registry.LayerCompositions;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -45,15 +50,57 @@ public final class OracleReport {
     private final long[][] isolated;
     private int buffers;
 
+    /** The decisions a pipeline row is made of, in the order of {@link #optionsOf}. */
+    public static final List<String> DECISIONS = List.of("reorder", "predictor", "segmentation", "byte terminal");
+
+    /**
+     * Every buffer's candidate sizes, flattened as {@code [candidate * compressors + compressor]};
+     * {@code null} unless {@link #trackDropCost()} was called (it holds buffers x candidates longs).
+     */
+    private List<long[]> kept;
+    /** Per compressor, per decision of {@link #DECISIONS}, the buffers whose tile choice took each option. */
+    private final List<List<Map<String, Integer>>> tileChoices = new ArrayList<>();
+    private final int[] tileBuffers;
+
     public OracleReport(List<Encoding> candidates, List<Compressor> compressors) {
         this.candidates = candidates;
         this.compressors = compressors;
         this.isolated = new long[candidates.size()][compressors.size()];
+        this.tileBuffers = new int[compressors.size()];
         for (var c = 0; c < compressors.size(); c++) {
             wins.add(new LinkedHashMap<>());
             chosenBytes.add(new LinkedHashMap<>());
             components.add(new LinkedHashMap<>());
             byLayer.add(new TreeMap<>());
+            final var perDecision = new ArrayList<Map<String, Integer>>();
+            DECISIONS.forEach(d -> perDecision.add(new TreeMap<>()));
+            tileChoices.add(perDecision);
+        }
+    }
+
+    /**
+     * The option of each decision a composition takes, in the order of {@link #DECISIONS}: the reorder,
+     * the predictor, the segmentation and the byte terminal ({@code ESCAPE_INTERLEAVED_PLANES},
+     * {@code ESCAPE} or {@code VARINT_SPLIT}). The names are those {@code --exclude} takes.
+     */
+    public static List<String> optionsOf(Composition config) {
+        return List.of(config.reorder().name(), config.predictor().name(), config.segmentation().name(),
+                config.width().name() + (config.transpose() == Transpose.NONE ? "" : "_" + config.transpose().name()));
+    }
+
+    /** Keeps every buffer's candidate sizes so {@link #printDropCost()} can be printed; call before the first {@link #offer}. */
+    public void trackDropCost() {
+        if (kept == null) {
+            kept = new ArrayList<>();
+        }
+    }
+
+    /** Records the composition the per-(tile, layer) oracle of compressor {@code c} chose for one buffer. */
+    public void recordTileChoice(int c, Composition choice) {
+        tileBuffers[c]++;
+        final var options = optionsOf(choice);
+        for (var d = 0; d < options.size(); d++) {
+            tileChoices.get(c).get(d).merge(options.get(d), 1, Integer::sum);
         }
     }
 
@@ -92,6 +139,15 @@ public final class OracleReport {
             } else {
                 tally(c, layer, "reorder", "(not a pipeline row)");
             }
+        }
+        if (kept != null) {
+            final var flat = new long[sizes.length * compressors.size()];
+            for (var i = 0; i < sizes.length; i++) {
+                for (var c = 0; c < compressors.size(); c++) {
+                    flat[i * compressors.size() + c] = sizes[i][c];
+                }
+            }
+            kept.add(flat);
         }
         final var inLayer = layerIsolated.computeIfAbsent(
                 layer, k -> new long[candidates.size()][compressors.size()]);
@@ -164,6 +220,172 @@ public final class OracleReport {
                 System.out.println(line);
             });
         }
+    }
+
+    /**
+     * Per compressor, which options of the grid can go: for every option of every decision, how often
+     * the alone oracle and (where {@link #recordTileChoice} was called) the tile oracle pick it, the
+     * share of the chosen bytes it carries and what the alone oracle loses when every composition using
+     * it is removed; then a greedy backward elimination, always removing the option whose removal costs
+     * the least (one option per decision always stays), with the cumulative loss and the compositions
+     * left. Needs {@link #trackDropCost()}; the figures are on buffers compressed alone, an estimate of
+     * what the tile oracle loses, which a run with {@code --exclude} confirms.
+     */
+    public void printDropCost() {
+        if (kept == null || kept.isEmpty()) {
+            return;
+        }
+        final var configs = new ArrayList<Composition>();
+        final var options = new ArrayList<List<String>>();
+        for (final var candidate : candidates) {
+            if (!(candidate instanceof PipelineEncoding row)) {
+                return;
+            }
+            configs.add(row.config());
+            options.add(optionsOf(row.config()));
+        }
+        for (var c = 0; c < compressors.size(); c++) {
+            printDropCost(c, configs, options);
+        }
+    }
+
+    private void printDropCost(int c, List<Composition> configs, List<List<String>> options) {
+        final var n = candidates.size();
+        final var nc = compressors.size();
+        final var all = new boolean[n];
+        Arrays.fill(all, true);
+        final var full = smallestTotal(c, all);
+
+        final var values = new ArrayList<Set<String>>();
+        final var chosen = new ArrayList<Map<String, long[]>>();
+        for (var d = 0; d < DECISIONS.size(); d++) {
+            final var seen = new LinkedHashSet<String>();
+            for (final var option : options) {
+                seen.add(option.get(d));
+            }
+            values.add(seen);
+            chosen.add(new LinkedHashMap<>());
+        }
+        for (final var sizes : kept) {
+            var best = 0;
+            for (var i = 1; i < n; i++) {
+                if (sizes[i * nc + c] < sizes[best * nc + c]) {
+                    best = i;
+                }
+            }
+            for (var d = 0; d < DECISIONS.size(); d++) {
+                final var slot = chosen.get(d).computeIfAbsent(options.get(best).get(d), k -> new long[2]);
+                slot[0]++;
+                slot[1] += sizes[best * nc + c];
+            }
+        }
+
+        System.out.printf("%n--- cost of dropping one option under %s: the alone oracle's bytes (%,d, %d buffers, %d"
+                        + " compositions) with every composition using the option removed ---%n",
+                compressors.get(c).label(), full, kept.size(), n);
+        System.out.printf("%-14s %-40s %8s %8s %8s %12s %9s%n", "decision", "option", "alone", "tile", "bytes",
+                "drop cost", "drop %");
+        for (var d = 0; d < DECISIONS.size(); d++) {
+            final var decision = d;
+            final var ranked = new ArrayList<>(values.get(d));
+            ranked.sort(Comparator.<String>comparingLong(v -> -chosen.get(decision).getOrDefault(v, new long[2])[0])
+                    .thenComparing(Comparator.naturalOrder()));
+            final var chosenBytes = chosen.get(d).values().stream().mapToLong(slot -> slot[1]).sum();
+            for (final var value : ranked) {
+                final var slot = chosen.get(d).getOrDefault(value, new long[2]);
+                final var without = all.clone();
+                var remaining = 0;
+                for (var i = 0; i < n; i++) {
+                    without[i] = !options.get(i).get(d).equals(value);
+                    if (without[i]) {
+                        remaining++;
+                    }
+                }
+                final var tile = tileBuffers[c] == 0 ? "-" : String.format("%.1f%%",
+                        100.0 * tileChoices.get(c).get(d).getOrDefault(value, 0) / tileBuffers[c]);
+                final var total = remaining == 0 ? Long.MAX_VALUE : smallestTotal(c, without);
+                System.out.printf("%-14s %-40s %7.1f%% %8s %7.1f%% %12s %9s%n", DECISIONS.get(d), value,
+                        100.0 * slot[0] / kept.size(), tile, chosenBytes == 0 ? 0.0 : 100.0 * slot[1] / chosenBytes,
+                        total == Long.MAX_VALUE ? "-" : String.format("%,d", total - full),
+                        total == Long.MAX_VALUE ? "-" : String.format("%+.3f%%", 100.0 * (total - full) / full));
+            }
+        }
+
+        System.out.printf("%n--- greedy elimination under %s: each step removes the option that costs the least"
+                + " (alone-oracle bytes, one option per decision stays) ---%n", compressors.get(c).label());
+        System.out.printf("%4s  %-14s %-40s %12s %12s %9s %7s %s%n", "step", "decision", "removed", "step cost",
+                "cumulative", "cum %", "comps", "layer defaults lost");
+        final var alive = new ArrayList<Set<String>>();
+        values.forEach(set -> alive.add(new LinkedHashSet<>(set)));
+        final var aliveCandidates = all.clone();
+        var previous = full;
+        for (var step = 1; ; step++) {
+            var bestDecision = -1;
+            String bestValue = null;
+            var bestTotal = Long.MAX_VALUE;
+            for (var d = 0; d < DECISIONS.size(); d++) {
+                if (alive.get(d).size() < 2) {
+                    continue;
+                }
+                for (final var value : alive.get(d)) {
+                    final var without = aliveCandidates.clone();
+                    for (var i = 0; i < n; i++) {
+                        if (options.get(i).get(d).equals(value)) {
+                            without[i] = false;
+                        }
+                    }
+                    final var total = smallestTotal(c, without);
+                    if (total < bestTotal) {
+                        bestTotal = total;
+                        bestDecision = d;
+                        bestValue = value;
+                    }
+                }
+            }
+            if (bestDecision < 0) {
+                break;
+            }
+            alive.get(bestDecision).remove(bestValue);
+            var remaining = 0;
+            for (var i = 0; i < n; i++) {
+                if (options.get(i).get(bestDecision).equals(bestValue)) {
+                    aliveCandidates[i] = false;
+                }
+                if (aliveCandidates[i]) {
+                    remaining++;
+                }
+            }
+            var lost = 0;
+            for (final var layer : LayerCompositions.fittedLayers()) {
+                final var index = configs.indexOf(LayerCompositions.forLayer(layer));
+                if (index >= 0 && !aliveCandidates[index]) {
+                    lost++;
+                }
+            }
+            System.out.printf("%4d  %-14s %-40s %12s %12s %+8.3f%% %7d %d of %d%n", step, DECISIONS.get(bestDecision),
+                    bestValue, String.format("%,d", bestTotal - previous), String.format("%,d", bestTotal - full),
+                    100.0 * (bestTotal - full) / full, remaining, lost, LayerCompositions.fittedLayers().size());
+            previous = bestTotal;
+        }
+    }
+
+    /** The bytes of every buffer's smallest alive candidate under compressor {@code c}, summed. */
+    private long smallestTotal(int c, boolean[] alive) {
+        final var nc = compressors.size();
+        var total = 0L;
+        for (final var sizes : kept) {
+            var best = Long.MAX_VALUE;
+            for (var i = 0; i < alive.length; i++) {
+                if (alive[i] && sizes[i * nc + c] < best) {
+                    best = sizes[i * nc + c];
+                }
+            }
+            if (best == Long.MAX_VALUE) {
+                return Long.MAX_VALUE;
+            }
+            total += best;
+        }
+        return total;
     }
 
     /**

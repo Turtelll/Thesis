@@ -122,9 +122,9 @@ the bytes a row writes: [docs/bitstream.md](docs/bitstream.md).
 | Flag | Required | Description |
 |---|---|---|
 | `[extractionDir]` | no | Must contain `manifest.json`; defaults to `../data/extractedBaseline` |
-| `--step <name>` | no | `layer` (default: the per-layer default `PipelineRegistry.forLayer` beside the single `DEFAULT` row), `s0` to `s4`, `s6` to `s8`, `selector`, `ladder` (the pipeline built up decision by decision), `oracle` (the grid the oracle chooses among), `tile` (one composition per tile and layer), `best` (the per-(tile, layer) oracle over 252 compositions, see below), or `all` |
+| `--step <name>` | no | `layer` (default: the per-layer default `PipelineRegistry.forLayer` beside the single `DEFAULT` row), `s0` to `s4`, `s6` to `s8`, `selector`, `ladder` (the pipeline built up decision by decision), `oracle` (the grid the oracle chooses among), `tile` (one composition per tile and layer), `best` (the per-(tile, layer) oracle over 96 compositions, see below), or `all` |
 | `--rows a,b` | no | Run only these row names (from any step) |
-| `--oracle` | no | Replace the per-row tables by the per-buffer best of the step's rows: what was chosen and how often, then the result against `ref`. Implied by `--step oracle` (48 compositions); the oracle chooses per backend, charges nothing for the choice and so is an upper bound |
+| `--oracle` | no | Replace the per-row tables by the per-buffer best of the step's rows: what was chosen and how often, then the result against `ref`. Implied by `--step oracle` (32 compositions); the oracle chooses per backend, charges nothing for the choice and so is an upper bound |
 | `--layer <name>` | no | Restrict the run to one layer |
 | `--by-zoom` | no | Add a breakdown by tile zoom (whole tiles, gzip) |
 | `--by-geometry` | no | Add a breakdown by the dominant geometry type of each (tile, layer) buffer |
@@ -135,12 +135,12 @@ the bytes a row writes: [docs/bitstream.md](docs/bitstream.md).
 | `--limit-tiles <n>` | no | Only the first `n` tiles, for quick runs |
 | `--no-verify` | no | Skip the round-trip check; always skipped for `ladder`, `layer` and the oracle (`PipelineEncodingTest` round-trips `PipelineRegistry.all()`, including the ladder stages and the oracle grid) |
 | `--trials`, `--features <file>` | no | The opt-in selector report: compression-free selectors (entropy estimates) and how well cheap buffer features predict each stage's choice. |
-| `--search <list>`, `--size-all` | no | `--step best` only. `--search` is the backends the oracles search under, from `gzip` (always, the default), `brotli`, `zstd`, e.g. `gzip,zstd` (the search runs the compressor on every candidate, so Brotli 11 is many hours; a search on raw bytes or entropy estimates loses, [docs/results/failed/raw-search.md](docs/results/failed/raw-search.md)). `--size-all` sizes every row, the chosen compositions included, under gzip, Brotli and zstd |
+| `--search <list>`, `--size-all` | no | `--step best` only. `--search` is the backends the oracles search under, from `gzip` (always, the default), `brotli`, `zstd`, e.g. `gzip,zstd` (the search runs the compressor on every candidate, so Brotli 11 is many hours; a search on raw bytes or entropy estimates loses, [docs/results/failed/raw-search.md](docs/results/failed/raw-search.md)). `--size-all` sizes every row, the chosen compositions included, under gzip, Brotli and zstd. `--exclude <option>,..` takes options out of the grid (`TURN_SCALAR`, `CHAIN`, `CLASS`, `VARINT_SPLIT`, `ESCAPE_INTERLEAVED_PLANES`, any predictor or reorder name), for both oracles, to confirm a pruned grid ([docs/results/tile-oracle.md](docs/results/tile-oracle.md#pruning-the-grid)). The run also prints, per option, how often each oracle picks it and what the alone oracle loses without it, and a greedy elimination order |
 
 `--step best` is the best compression the pipeline's mechanisms reach when encoding time and
 complexity do not count. Every (tile, layer) buffer chooses among `PipelineRegistry.bestGrid()`:
-every predictor x flat or class streams x the three byte terminals x no reorder, Hilbert or chain
-(252 compositions, all signalled by the buffer header but the reorder, which needs no signal).
+every predictor x flat or class streams x the two byte terminals (escape with planes, split varint) x no reorder, Hilbert or chain
+(96 compositions, all signalled by the buffer header but the reorder, which needs no signal).
 Per backend it reports two oracles: `ORACLE <backend>`, the composition smallest on the buffer compressed
 alone, and `ORACLE TILE <backend>`, a coordinate descent on the compressed tile that starts from the
 smaller of the per-layer default and the alone-best tile and runs until a pass changes nothing (never
@@ -189,7 +189,9 @@ Whole-tile effect of the reorder on the property columns and ids (the other side
 `dump` writes, for every row of the baselines and `PipelineRegistry.all()` and every buffer, the SHA-256 and
 size of the encoded bytes, plus per-tile compressed sizes (`buffers.tsv.gz`, `tiles.tsv.gz`,
 `manifest.tsv`). `--diff` compares two dumps and names every row and buffer that changed, so a
-refactor can be shown byte-identical. Options: `--limit-tiles <n>`, `--layer <name>`, `--serial`.
+refactor can be shown byte-identical. Options: `--limit-tiles <n>`, `--layer <name>`, `--serial`,
+`--grid best` (the 96 compositions of `CompositionGrids.bestGrid()` instead of the baselines and registry rows; the
+reference `research-rust`'s `mlt-oracle golden-check` compares against).
 `research-java/golden/pre-consolidation.manifest.tsv` is the committed manifest of the dump taken at
 tag `pre-consolidation` (Munich only).
 
@@ -217,7 +219,7 @@ with every tile compressed on its own. Every row is round-tripped on every buffe
 
 `Workshop.known()` holds the predictors measured so far: `DELTA` (the baseline as a rule; its Varint
 bytes equal `DELTA_ZIGZAG_VARINT`'s) and the pipeline's own predictors (`QUAD_CORNER`,
-`LINE_CONTINUATION`, `QUAD_CORNER_LINE`, `QUAD_CORNER_FRAME`, `QUAD_CORNER_LINE_FRAME`) through
+`LINE_CONTINUATION`, `QUAD_CORNER_FRAME`) through
 its `FLAT` split (`PredictionTransform`), so a row here writes the same residual pairs as the
 `FLAT` row of `measure`. The whole-encoding rows that used to sit here (`TURN_SCALAR`,
 `QUAD_CORNER_SHARED`) and the retired predictors (`ROT90_FIXED`, `QUAD_CORNER_ROT90`, `DELTA2_ZIGZAG`,

@@ -36,7 +36,7 @@ public final class PayloadHeader {
      * predictors outgrew the three bits byte 0 has for them.
      */
     public static byte[] write(Composition c) {
-        final var predictor = c.predictor().ordinal();
+        final var predictor = c.predictor().code();
         final var first = (predictor & PREDICTOR_MASK)
                 | c.segmentation().ordinal() << SEGMENTATION_SHIFT
                 | c.map().ordinal() << MAP_SHIFT
@@ -49,7 +49,7 @@ public final class PayloadHeader {
     public static Composition parse(int first, int second, Reorder reorder) {
         return new Composition(
                 reorder,
-                Prediction.values()[(first & PREDICTOR_MASK) | (second >> PREDICTOR_HIGH_SHIFT) << PREDICTOR_BITS],
+                Prediction.ofCode((first & PREDICTOR_MASK) | (second >> PREDICTOR_HIGH_SHIFT) << PREDICTOR_BITS),
                 Segmentation.values()[(first >> SEGMENTATION_SHIFT) & SEGMENTATION_MASK],
                 ResidualMap.values()[(first >> MAP_SHIFT) & MAP_MASK],
                 ByteWidth.values()[second & WIDTH_MASK],

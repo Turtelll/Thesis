@@ -123,6 +123,33 @@ pub fn encode_tile(
     Ok((encoded.0, encoded.1, hit))
 }
 
+/// PATCH (research-rust): the outer compression of one stored tile, at the levels the thesis measures:
+/// gzip 6 (zlib, as `java.util.zip` deflates), Brotli quality 9, zstd level 19.
+pub fn compress_tile(data: &[u8], compression: Compression) -> AnyResult<Bytes> {
+    use std::io::Write as _;
+
+    match compression {
+        Compression::None => Ok(Bytes::copy_from_slice(data)),
+        Compression::Gzip => {
+            let mut encoder =
+                flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::new(6));
+            encoder.write_all(data)?;
+            Ok(Bytes::from(encoder.finish()?))
+        }
+        Compression::Brotli => {
+            let mut out = Vec::new();
+            {
+                let mut encoder = brotli::CompressorWriter::new(&mut out, 4096, 9, 22);
+                encoder.write_all(data)?;
+                encoder.flush()?;
+            }
+            Ok(Bytes::from(out))
+        }
+        Compression::Zstd => Ok(Bytes::from(zstd::encode_all(data, 19)?)),
+        Compression::Unknown => Err(anyhow!("cannot compress tiles with an unknown compression")),
+    }
+}
+
 /// Running totals for a container-to-container conversion, printed in the summary line.
 #[derive(Default)]
 pub struct TileStats {

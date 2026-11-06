@@ -34,7 +34,7 @@ class OracleReportTest {
   @Test
   void gridStartsWithTheDefaultAndHasDistinctRows() {
     var grid = CompositionGrids.oracle();
-    assertEquals(48, grid.size());
+    assertEquals(32, grid.size());
     assertEquals(PipelineRegistry.DEFAULT.name(), grid.getFirst().name());
     var names = new HashSet<String>();
     for (var row : grid) {

@@ -37,7 +37,15 @@ mlt ui tile.mlt | mlt ui <directory> | mlt ls | mlt decode | mlt dump | mlt hexd
 python check_convert.py --subset ../data/MVT/munich-plantiler.mbtiles target-results/munich40.mbtiles 40   # the first 40 tiles, as a small tileset
 python check_convert.py out.mbtiles target-results/tiles   # converted tiles byte for byte against `compare --write-tiles`, and their gzip total
 python check_convert.py --sum out.mbtiles                  # raw and gzip -6 totals of a converted tileset
+mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline oracle --gzip     # each tile compressed before it is stored: --gzip (6), --brotli (9), --zstd (19)
+python check_convert.py --same a.mbtiles b.mbtiles        # two archives hold the same tiles once decompressed
 ```
+
+`--gzip`, `--brotli` and `--zstd` (shorthands for `--tile-compression gzip|brotli|zstd`, mutually exclusive) compress every tile after it is
+encoded and before it is merged into the output, for `.mbtiles` and `.pmtiles` output. The levels are the ones the thesis measures: gzip 6, Brotli
+quality 9, zstd 19. An `.mbtiles` written this way carries a `compression` metadata row (`gzip`, `br`, `zstd`; Brotli has no magic bytes), which
+`mlt ui` and `check_convert.py` read; without a flag the row is removed (the source's row described its MVT tiles). The `.mbtiles` file size is then
+the compressed size, no longer the raw one. `check_convert.py` needs `pip install brotli zstandard` for those two.
 
 `--vertex-pipeline` takes `off` (the stock encoder, the default), `default`, `oracle` (`--oracle-max-passes <n>`, default 10) or the
 name of one of the 96 compositions of `bestGrid()` (a wrong name prints them all). It is a version 2 option, so it needs

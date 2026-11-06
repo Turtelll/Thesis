@@ -7,6 +7,10 @@ has moved.
 The goal: `pipeline/` is the only encoder stack and one harness does everything `BenchmarkCli` does, without
 changing a cited number unless approved. This file is the evidence for what to keep, merge, port and delete.
 
+> **Retired after the tile-oracle pruning** ([results/tile-oracle.md](results/tile-oracle.md#retiring-the-options)):
+> `TURN_SCALAR` and `QUAD_CORNER_LINE` (code now in `encoder/retired/`), `QUAD_CORNER_LINE_FRAME`,
+> `LINE_CONTINUATION_FRAME`, `LINE_CONTINUATION_HEADING`, `LINE_CONTINUATION_SHARED`, and the `ESCAPE`
+> terminal without byte planes. Rows of this inventory that name them are history; `--step turn` is gone.
 ## 0. How the evidence was produced
 
 | what | how | where it lives |

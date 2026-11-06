@@ -439,6 +439,10 @@ level (it is the terminal the byte planes need, which then give -0,65 / -0,38). 
 end-to-end choice: the reorder is taken out again because it costs more in the property columns than it
 saves in the geometry buffers.
 
+> **Superseded since the retirement of `QUAD_CORNER_LINE`** ([tile-oracle.md](tile-oracle.md#retiring-the-options)):
+> S2 is now `QUAD_CORNER_SHARED_FRAME` and every stage after it moves (S2 10.292.463 gzip, -8,41%; S7
+> `GEOMETRY_BEST` 10.118.776, -9,95%; `DEFAULT` 10.450.157, -7,00%). The table above is the record of the
+> ladder as measured with `QUAD_CORNER_LINE`; the sections that name it below are history.
 ## Oracle: which combination compresses best
 
 `./gradlew research --args="measure --step oracle --by-zoom"` (log `research-java/build/pipeline-oracle.txt`, 4.368

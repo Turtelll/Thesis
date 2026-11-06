@@ -14,12 +14,12 @@ import java.util.List;
  * one zigzag array, the regions in the predictor's region order and a side stream last, with the
  * inverse from the topology alone. It is the layout the mechanism tests pin positions in.
  */
-final class ClassSegmented {
+public final class ClassSegmented {
 
     private ClassSegmented() {
     }
 
-    static int[] apply(ClassifiedPredictor predictor, BufferContext ctx) {
+    public static int[] apply(ClassifiedPredictor predictor, BufferContext ctx) {
         final var layout = Segmentation.CLASS.layout(ctx, predictor, ctx.vertices().size());
         final var streams = Segmentation.split(layout, predictor, ctx.vertices());
         return Arrays.stream(streams)
@@ -27,7 +27,7 @@ final class ClassSegmented {
                 .toArray();
     }
 
-    static List<Vertex> invert(ClassifiedPredictor predictor, int[] values, BufferContext topology, int vertexCount) {
+    public static List<Vertex> invert(ClassifiedPredictor predictor, int[] values, BufferContext topology, int vertexCount) {
         final var layout = Segmentation.CLASS.layout(topology, predictor, vertexCount);
         final var streams = new int[layout.streamCount()][];
         var cursor = 0;

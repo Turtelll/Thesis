@@ -7,6 +7,7 @@ import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.extraction.ExtractionReader;
 import org.maplibre.mlt.research.extraction.ExtractionWriter.ManifestEntry;
 import org.maplibre.mlt.research.encoder.format.PipelineEncoding;
+import org.maplibre.mlt.research.registry.CompositionGrids;
 import org.maplibre.mlt.research.registry.LayerCompositions;
 import org.maplibre.mlt.research.registry.PipelineRegistry;
 import org.maplibre.mlt.research.measurement.verification.RoundTrip;
@@ -79,6 +80,24 @@ public final class GoldenDump {
 
     // --- dump ---------------------------------------------------------------------------------
 
+    /** {@code --grid best}: the 96 compositions of the tile oracle's grid, no baselines, no per-layer row. */
+    public static final String GRID_BEST = "best";
+
+    static List<Row> rows(String grid) {
+        if (grid == null) {
+            return rows();
+        }
+        if (!GRID_BEST.equals(grid)) {
+            throw new IllegalArgumentException("unknown grid " + grid + " (known: " + GRID_BEST + ")");
+        }
+        final var rows = new ArrayList<Row>();
+        for (final var composition : CompositionGrids.bestGrid()) {
+            final var encoding = new PipelineEncoding(composition);
+            rows.add(new Row(encoding.name(), encoding));
+        }
+        return List.copyOf(rows);
+    }
+
     static List<Row> rows() {
         final var rows = new LinkedHashMap<String, Row>();
         final var add = (java.util.function.Consumer<Encoding>) encoding -> {
@@ -135,7 +154,7 @@ public final class GoldenDump {
 
     public static void run(Options opts) throws Exception {
         final var inDir = Path.of(opts.in);
-        final var rows = rows();
+        final var rows = rows(opts.grid);
         final var compressors = Compressor.all(BROTLI_QUALITY);
         final var manifest = Corpus.groupedByTile(ExtractionReader.readManifest(inDir));
         final var tiles = new LinkedHashMap<String, List<ManifestEntry>>();
@@ -372,7 +391,15 @@ public final class GoldenDump {
         return HexFormat.of().formatHex(digest().digest(bytes));
     }
 
-    public record Options(String in, String out, int limitTiles, String layer, boolean serial) {
+    /**
+     * @param grid {@code null} for the registry's rows (the default dump), {@value #GRID_BEST} for the 96
+     *             compositions of {@link CompositionGrids#bestGrid()} and nothing else: the rows the Rust port's
+     *             {@code golden-check} compares against
+     */
+    public record Options(String in, String out, int limitTiles, String layer, boolean serial, String grid) {
+        public Options(String in, String out, int limitTiles, String layer, boolean serial) {
+            this(in, out, limitTiles, layer, serial, null);
+        }
     }
 
 }

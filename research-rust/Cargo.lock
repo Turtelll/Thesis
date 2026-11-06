@@ -2588,6 +2588,7 @@ name = "mlt-cli-pipeline"
 version = "0.6.1"
 dependencies = [
  "anyhow",
+ "brotli",
  "bytes",
  "clap",
  "crossbeam-channel",
@@ -2622,6 +2623,7 @@ dependencies = [
  "usize_cast",
  "walkdir",
  "xxhash-rust",
+ "zstd",
 ]
 
 [[package]]

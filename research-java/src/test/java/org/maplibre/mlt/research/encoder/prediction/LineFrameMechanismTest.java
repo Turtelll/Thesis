@@ -18,7 +18,7 @@ import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
 import org.maplibre.mlt.research.measurement.verification.RoundTrip;
 
 /**
- * {@code LINE_CONTINUATION_FRAME}: the plain-delta edges of line parts (the 2nd vertex of every run
+ * {@code LINE_CONTINUATION_FRAME_HEADING}: the plain-delta edges of line parts (the 2nd vertex of every run
  * and the runs the continuation gate leaves alone) are coded in the frame of the nearest decoded
  * run. A street grid rotated off the tile axes, made of 2- and 3-vertex parts and a few long ones,
  * costs fewer bytes than the same grid under plain {@code LINE_CONTINUATION}; the rotation is an
@@ -93,7 +93,7 @@ class LineFrameMechanismTest {
     var ctx = grid(400, 33, 2);
     for (var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
       var plain = new PipelineEncoding(config(Prediction.LINE_CONTINUATION, segmentation));
-      var framed = new PipelineEncoding(config(Prediction.LINE_CONTINUATION_FRAME, segmentation));
+      var framed = new PipelineEncoding(config(Prediction.LINE_CONTINUATION_FRAME_HEADING, segmentation));
       var plainBytes = gzipped(plain.encode(ctx).payload());
       var framedBytes = gzipped(framed.encode(ctx).payload());
       assertTrue(
@@ -106,7 +106,7 @@ class LineFrameMechanismTest {
   void aGridAlongTheTileAxesIsNotMadeWorse() {
     var ctx = grid(400, 0, 0);
     var plain = new PipelineEncoding(config(Prediction.LINE_CONTINUATION, Segmentation.CLASS));
-    var framed = new PipelineEncoding(config(Prediction.LINE_CONTINUATION_FRAME, Segmentation.CLASS));
+    var framed = new PipelineEncoding(config(Prediction.LINE_CONTINUATION_FRAME_HEADING, Segmentation.CLASS));
     var plainBytes = gzipped(plain.encode(ctx).payload());
     var framedBytes = gzipped(framed.encode(ctx).payload());
     assertTrue(
@@ -122,7 +122,7 @@ class LineFrameMechanismTest {
         for (var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
           var encoding =
               new PipelineEncoding(
-                  config(Prediction.LINE_CONTINUATION_FRAME, segmentation).withReorder(reorder));
+                  config(Prediction.LINE_CONTINUATION_FRAME_HEADING, segmentation).withReorder(reorder));
           var encoded = encoding.encode(ctx);
           // the topology streams of a tile are the emitted (reordered) ones
           var decoded =
@@ -172,7 +172,7 @@ class LineFrameMechanismTest {
     var ctx = roads(60, 33);
     for (var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
       var plain = new PipelineEncoding(config(Prediction.LINE_CONTINUATION, segmentation));
-      var heading = new PipelineEncoding(config(Prediction.LINE_CONTINUATION_HEADING, segmentation));
+      var heading = new PipelineEncoding(config(Prediction.LINE_CONTINUATION_FRAME_HEADING, segmentation));
       var plainBytes = gzipped(plain.encode(ctx).payload());
       var headingBytes = gzipped(heading.encode(ctx).payload());
       assertTrue(
@@ -197,7 +197,7 @@ class LineFrameMechanismTest {
     buffers.add(grid(150, 33, 2));
     for (var ctx : buffers) {
       for (var prediction :
-          List.of(Prediction.LINE_CONTINUATION_HEADING, Prediction.LINE_CONTINUATION_FRAME_HEADING)) {
+          List.of(Prediction.LINE_CONTINUATION_FRAME_HEADING)) {
         for (var segmentation : Segmentation.values()) {
           for (var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
             var encoding =
@@ -218,7 +218,7 @@ class LineFrameMechanismTest {
     // the runs are not derivable from a single run, so the framed predictor degrades to the plain one
     var ctx = grid(1, 33, 2);
     var plain = new PipelineEncoding(config(Prediction.LINE_CONTINUATION, Segmentation.CLASS));
-    var framed = new PipelineEncoding(config(Prediction.LINE_CONTINUATION_FRAME, Segmentation.CLASS));
+    var framed = new PipelineEncoding(config(Prediction.LINE_CONTINUATION_FRAME_HEADING, Segmentation.CLASS));
     assertEquals(plain.encode(ctx).payload().length, framed.encode(ctx).payload().length);
     assertEquals(
         ctx.vertices(), framed.decode(framed.encode(ctx), topologyOnly(ctx), ctx.vertices().size()));

@@ -225,6 +225,10 @@ pub(super) enum TileCompression {
     None,
     /// Gzip-compress each MLT tile payload for size, sacrificing decoding speed
     Gzip,
+    /// PATCH (research-rust): Brotli-compress each MLT tile payload
+    Brotli,
+    /// PATCH (research-rust): zstd-compress each MLT tile payload
+    Zstd,
 }
 
 impl From<TileCompression> for Compression {
@@ -232,6 +236,8 @@ impl From<TileCompression> for Compression {
         match comp {
             TileCompression::None => Self::None,
             TileCompression::Gzip => Self::Gzip,
+            TileCompression::Brotli => Self::Brotli,
+            TileCompression::Zstd => Self::Zstd,
         }
     }
 }
@@ -422,6 +428,15 @@ pub struct ConvertArgs {
     /// Outer compression for tile payloads
     #[clap(long, value_enum, default_value = "none")]
     tile_compression: TileCompression,
+    /// PATCH (research-rust): shorthand for `--tile-compression gzip` (level 6), each tile compressed before it is stored
+    #[clap(long, conflicts_with_all = ["tile_compression", "brotli", "zstd"])]
+    gzip: bool,
+    /// PATCH (research-rust): shorthand for `--tile-compression brotli` (quality 9), each tile compressed before it is stored
+    #[clap(long, conflicts_with_all = ["tile_compression", "gzip", "zstd"])]
+    brotli: bool,
+    /// PATCH (research-rust): shorthand for `--tile-compression zstd` (level 19), each tile compressed before it is stored
+    #[clap(long, conflicts_with_all = ["tile_compression", "gzip", "brotli"])]
+    zstd: bool,
     /// Bounds to convert, in the format `min_lon,min_lat,max_lon,max_lat`
     ///
     /// Every tile overlapping the bounds is converted, at every zoom level.
@@ -504,6 +519,19 @@ impl ConvertArgs {
     #[must_use]
     pub fn output_container(&self) -> ContainerFormat {
         ContainerFormat::from_path(&self.output)
+    }
+    /// PATCH (research-rust): the outer compression of the stored tiles, from `--tile-compression` or one of
+    /// the `--gzip`, `--brotli` and `--zstd` shorthands.
+    fn tile_compression(&self) -> TileCompression {
+        if self.gzip {
+            TileCompression::Gzip
+        } else if self.brotli {
+            TileCompression::Brotli
+        } else if self.zstd {
+            TileCompression::Zstd
+        } else {
+            self.tile_compression
+        }
     }
     /// PATCH (research-rust): how `--vertex-pipeline` chooses the composition of the vertex codec.
     fn vertex_mode(&self) -> AnyResult<VertexMode> {
@@ -702,11 +730,13 @@ pub fn convert(args: &ConvertArgs) -> AnyResult<()> {
             args.input.display()
         );
     }
-    if args.tile_compression != TileCompression::None
-        && (!has_archive_input || output_container != ContainerFormat::Pmtiles)
-    {
+    // PATCH (research-rust): an .mbtiles output stores each tile compressed too, as the `.pmtiles` writer does.
+    let compressible_output = (has_archive_input && output_container == ContainerFormat::Pmtiles)
+        || (input_container == ContainerFormat::Mbtiles
+            && output_container == ContainerFormat::Mbtiles);
+    if args.tile_compression() != TileCompression::None && !compressible_output {
         bail!(
-            "--tile-compression is currently only supported when converting .mbtiles or .pmtiles input to .pmtiles output"
+            "--tile-compression (--gzip, --brotli, --zstd) is currently only supported when converting .mbtiles or .pmtiles input to .pmtiles output, or .mbtiles input to .mbtiles output"
         );
     }
     let converted = if has_archive_input {
@@ -739,7 +769,7 @@ pub fn convert(args: &ConvertArgs) -> AnyResult<()> {
                 &args.input,
                 output,
                 &reencoder,
-                args.tile_compression.into(),
+                args.tile_compression().into(),
                 filter.as_ref(),
             )),
             ContainerFormat::Mbtiles => {
@@ -772,7 +802,7 @@ async fn convert_mbtiles(
     filter: Option<&BboxFilter>,
 ) -> AnyResult<()> {
     let dst_type = args.mbtiles_format.map(MbtType::from);
-    let tile_compression = args.tile_compression.into();
+    let tile_compression = args.tile_compression().into();
     let Some(filter) = filter else {
         return from_mbtiles::convert(
             &args.input,
@@ -1166,22 +1196,30 @@ mod tests {
         .unwrap_err();
         insta::assert_snapshot!(
             err.to_string(),
-            @"--tile-compression is currently only supported when converting .mbtiles or .pmtiles input to .pmtiles output"
+            @"--tile-compression (--gzip, --brotli, --zstd) is currently only supported when converting .mbtiles or .pmtiles input to .pmtiles output, or .mbtiles input to .mbtiles output"
         );
     }
 
     #[test]
-    fn tile_compression_into_an_mbtiles_output_is_rejected() {
-        let err = convert(&parse_args(&[
-            "--tile-compression",
-            "gzip",
-            "src.mbtiles",
-            "dst.mbtiles",
-        ]))
-        .unwrap_err();
+    fn tile_compression_from_pmtiles_into_an_mbtiles_output_is_rejected() {
+        let err = convert(&parse_args(&["--zstd", "src.pmtiles", "dst.mbtiles"])).unwrap_err();
         insta::assert_snapshot!(
             err.to_string(),
-            @"--tile-compression is currently only supported when converting .mbtiles or .pmtiles input to .pmtiles output"
+            @"--tile-compression (--gzip, --brotli, --zstd) is currently only supported when converting .mbtiles or .pmtiles input to .pmtiles output, or .mbtiles input to .mbtiles output"
+        );
+    }
+
+    #[test]
+    fn the_compression_flags_pick_the_tile_compression() {
+        assert!(parse_args(&["src", "dst"]).tile_compression() == TileCompression::None);
+        assert!(parse_args(&["--gzip", "src", "dst"]).tile_compression() == TileCompression::Gzip);
+        assert!(
+            parse_args(&["--brotli", "src", "dst"]).tile_compression() == TileCompression::Brotli
+        );
+        assert!(parse_args(&["--zstd", "src", "dst"]).tile_compression() == TileCompression::Zstd);
+        assert!(
+            parse_args(&["--tile-compression", "zstd", "src", "dst"]).tile_compression()
+                == TileCompression::Zstd
         );
     }
 

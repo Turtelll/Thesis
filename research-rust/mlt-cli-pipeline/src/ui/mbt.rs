@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::{self, TryRecvError};
 use std::thread;
 
-use martin_tile_utils::{decode_gzip, decode_zstd};
+use martin_tile_utils::{decode_brotli, decode_gzip, decode_zstd};
 use mbtiles::Mbtiles;
 use mlt_core::geo_types::{Coord, Geometry, Polygon};
 use mlt_core::geojson::FeatureCollection;
@@ -35,6 +35,8 @@ pub(crate) struct TileLoadResult {
     pub data: Result<Option<Vec<u8>>, String>,
     /// PATCH (research-rust): the archive stores MLT tiles (metadata ormat is mlt), not MVT.
     pub is_mlt: bool,
+    /// PATCH (research-rust): the archive's `compression` metadata is `br`; Brotli has no magic bytes to sniff.
+    pub is_brotli: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -265,6 +267,12 @@ impl MbtilesState {
                     .ok()
                     .flatten()
                     .is_some_and(|format| format.eq_ignore_ascii_case("mlt"));
+                let is_brotli = mbt
+                    .get_metadata_value(&mut conn, "compression")
+                    .await
+                    .ok()
+                    .flatten()
+                    .is_some_and(|name| name.eq_ignore_ascii_case("br"));
                 if init_tx.send(Ok(())).is_err() {
                     return;
                 }
@@ -280,6 +288,7 @@ impl MbtilesState {
                         y,
                         data: result,
                         is_mlt,
+                        is_brotli,
                     });
                 }
             });
@@ -509,7 +518,14 @@ impl MbtilesState {
         let entry = match res.data {
             Err(e) => MbtTileData::Error(e),
             Ok(None) => MbtTileData::Empty,
-            Ok(Some(raw)) => match decode_and_parse(res.z, res.x, res.y, raw, res.is_mlt) {
+            Ok(Some(raw)) => match decode_and_parse(
+                res.z,
+                res.x,
+                res.y,
+                raw,
+                res.is_mlt,
+                res.is_brotli,
+            ) {
                 Ok(Some((fc, extent, layer_groups, geo_index))) => {
                     let bytes = loaded_bytes(&fc, &geo_index);
                     MbtTileData::Loaded {
@@ -686,8 +702,19 @@ impl MbtilesState {
 // Tile decode & parse helpers
 // ---------------------------------------------------------------------------
 
-fn decode_and_parse(z: u8, tx: u32, ty: u32, raw: Vec<u8>, is_mlt: bool) -> anyhow::Result<Option<DecodedTile>> {
-    let buf = decompress(raw)?;
+fn decode_and_parse(
+    z: u8,
+    tx: u32,
+    ty: u32,
+    raw: Vec<u8>,
+    is_mlt: bool,
+    is_brotli: bool,
+) -> anyhow::Result<Option<DecodedTile>> {
+    let buf = if is_brotli {
+        decode_brotli(&raw)?
+    } else {
+        decompress(raw)?
+    };
     if buf.is_empty() {
         return Ok(None);
     }

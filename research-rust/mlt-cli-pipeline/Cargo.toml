@@ -36,6 +36,7 @@ mlt-tile-oracle = { path = "../mlt-tile-oracle" }
 # the patched copy of mlt-core (library name `mlt_core`)
 mlt-core-pipeline = { path = "../mlt-core-pipeline", features = ["unstable-v2"] }
 anyhow.workspace = true
+brotli.workspace = true
 bytes.workspace = true
 clap.workspace = true
 crossbeam-channel.workspace = true
@@ -67,6 +68,7 @@ toml.workspace = true
 usize_cast.workspace = true
 walkdir.workspace = true
 xxhash-rust.workspace = true
+zstd.workspace = true
 
 [lints]
 workspace = true

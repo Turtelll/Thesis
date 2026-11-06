@@ -22,7 +22,7 @@ import org.maplibre.mlt.research.encoder.segmentation.Segmentation;
 import org.maplibre.mlt.research.measurement.verification.RoundTrip;
 
 /**
- * {@code LINE_CONTINUATION_SHARED} and {@code LINE_CONTINUATION_SHARED_FRAME_HEADING} in the
+ * {@code LINE_CONTINUATION_SHARED_FRAME_HEADING} in the
  * pipeline: a ladder of rungs between two rails takes the references, roads that touch nowhere fall
  * back to the plain predictor with nothing reversed, and either way the decoder needs only the bytes
  * and the topology.
@@ -32,8 +32,7 @@ class LineReferencesMechanismTest {
   private static final int LINESTRING = 1;
 
   private static final List<Prediction> SHARED =
-      List.of(
-          Prediction.LINE_CONTINUATION_SHARED, Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING);
+      List.of(Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING);
 
   /**
    * Two rails and {@code rungs} parts off them: every even one a rung from the bottom to the top
@@ -101,7 +100,7 @@ class LineReferencesMechanismTest {
   @ParameterizedTest
   @EnumSource(
       value = Prediction.class,
-      names = {"LINE_CONTINUATION_SHARED", "LINE_CONTINUATION_SHARED_FRAME_HEADING"})
+      names = {"LINE_CONTINUATION_SHARED_FRAME_HEADING"})
   void aLadderTakesTheReferencesAndIsSmallerThanThePlainPredictor(Prediction prediction) {
     var ctx = ladder(40);
     for (var segmentation : Segmentation.values()) {
@@ -120,7 +119,7 @@ class LineReferencesMechanismTest {
   @ParameterizedTest
   @EnumSource(
       value = Prediction.class,
-      names = {"LINE_CONTINUATION_SHARED", "LINE_CONTINUATION_SHARED_FRAME_HEADING"})
+      names = {"LINE_CONTINUATION_SHARED_FRAME_HEADING"})
   void decodesFromTheTopologyAloneToTheEmittedBuffer(Prediction prediction) {
     for (var ctx : List.of(ladder(40), ladder(3), detached(5))) {
       for (var segmentation : Segmentation.values()) {
@@ -140,7 +139,7 @@ class LineReferencesMechanismTest {
   @ParameterizedTest
   @EnumSource(
       value = Prediction.class,
-      names = {"LINE_CONTINUATION_SHARED", "LINE_CONTINUATION_SHARED_FRAME_HEADING"})
+      names = {"LINE_CONTINUATION_SHARED_FRAME_HEADING"})
   void roadsThatTouchNowhereFallBackToThePlainPredictorAndAreNotReversed(Prediction prediction) {
     var ctx = detached(10);
     var shared = new PipelineEncoding(config(prediction, Segmentation.CLASS));

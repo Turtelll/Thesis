@@ -6,11 +6,9 @@ import org.maplibre.mlt.research.buffer.VertexRuns;
 import org.maplibre.mlt.research.buffer.Encoding.BufferContext;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.LineContinuation;
 import org.maplibre.mlt.research.encoder.reference.LineReferences;
-import org.maplibre.mlt.research.encoder.prediction.mechanism.QuadCornerLine;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.FramePrior;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.SegmentQuadCorner;
 import org.maplibre.mlt.research.encoder.reference.RingReferences;
-import org.maplibre.mlt.research.encoder.prediction.mechanism.TurnScalar;
 
 import java.util.List;
 
@@ -24,34 +22,20 @@ import java.util.List;
 public enum Prediction {
 
     /** Componentwise first-order delta, the baseline. */
-    DELTA,
+    DELTA(0),
 
     /** Fourth corner of the previous three in a quad ring (buildings), old {@code QUAD_CORNER}. */
-    QUAD_CORNER,
+    QUAD_CORNER(1),
 
     /** Line parts continue the previous segment (roads), old {@code LINE_CONTINUATION}. */
-    LINE_CONTINUATION,
-
-    /** Both of the above, one class set, old {@code QUAD_CORNER_LINE}. */
-    QUAD_CORNER_LINE,
-
-    /**
-     * Buildings: {@code QUAD_CORNER}'s corner on four-vertex rings, and on the vertices of even
-     * {@code >4}-vertex polygon rings a 90-degree turn against the previous edge, stored as one edge
-     * length scalar (the {@link SideValues side value}, its own stream) plus a correction, old
-     * {@code TURN_SCALAR}. Needs a class-separating segmentation to pay.
-     */
-    TURN_SCALAR,
+    LINE_CONTINUATION(2),
 
     /**
      * {@code QUAD_CORNER}, with the plain-delta edges of polygon rings coded in the frame of the
      * nearest decoded ring ({@link FramePrior}): an exactly invertible integer rotation of the
      * residual, so the stream keeps two values per vertex and nothing is signalled.
      */
-    QUAD_CORNER_FRAME,
-
-    /** {@code QUAD_CORNER_LINE} with the same ring frame. */
-    QUAD_CORNER_LINE_FRAME,
+    QUAD_CORNER_FRAME(5),
 
     /**
      * {@code QUAD_CORNER} plus references to vertices an earlier polygon ring shares ({@link
@@ -61,50 +45,61 @@ public enum Prediction {
      * A buffer without a gain from the references is written as plain {@link #QUAD_CORNER} (the
      * predictor field of the header says which), so a layer without shared vertices pays nothing.
      */
-    QUAD_CORNER_SHARED,
+    QUAD_CORNER_SHARED(7),
 
     /** {@link #QUAD_CORNER_SHARED} with the ring frame of {@link #QUAD_CORNER_FRAME}. */
-    QUAD_CORNER_SHARED_FRAME,
+    QUAD_CORNER_SHARED_FRAME(8),
 
     /**
-     * {@link #LINE_CONTINUATION} with the frame of {@link #QUAD_CORNER_FRAME} on line parts: the
-     * plain-delta edges of a line run other than its start (the 2nd vertex of every run, all of a run
-     * the continuation gate leaves alone) are coded in the frame of the nearest decoded run, refined
-     * by the run's own decoded edges. The continued vertices keep their residual. Appended last so
-     * the ordinals of the other predictors stay put.
+     * {@link #LINE_CONTINUATION} with the frame of {@link #QUAD_CORNER_FRAME} on line parts, and the
+     * continuation residual of a continued vertex rotated into the direction of the incoming edge: an
+     * along-track component (the step got longer or shorter) and a sideways one (the road bent),
+     * instead of both mixed over the tile axes. The plain-delta edges of a line run other than its
+     * start (the 2nd vertex of every run, all of a run the continuation gate leaves alone) are coded
+     * in the frame of the nearest decoded run, refined by the run's own decoded edges; the heading
+     * frame is the two vertices before, so the decoder has it. Both rotations are exact integer
+     * bijections ({@link FramePrior#forwardHeading}) on disjoint vertices and nothing is signalled.
      */
-    LINE_CONTINUATION_FRAME,
+    LINE_CONTINUATION_FRAME_HEADING(11),
 
     /**
-     * {@link #LINE_CONTINUATION} with the continuation residual of a continued vertex rotated into the
-     * direction of the incoming edge: an along-track component (the step got longer or shorter) and a
-     * sideways one (the road bent), instead of both mixed over the tile axes. The frame is the two
-     * vertices before, so the decoder has it; the rotation is an exact integer bijection ({@link
-     * FramePrior#forwardHeading}) and nothing is signalled.
+     * {@link #LINE_CONTINUATION_FRAME_HEADING} plus references to the positions earlier line parts hold
+     * ({@link LineReferences}, old {@code LINE_CONTINUATION_SHARED_DICT}): an entry and an exit flag at
+     * the ends of every line part, and a bit-packed index into the dictionary of earlier positions in
+     * place of the residual on a hit. A part whose end is in the dictionary and whose start is not is
+     * reversed, which changes line direction. Polygon rings and points keep their plain residuals;
+     * the frame and heading rotations act on the vertices the references leave, which still count as
+     * decoded for them. A buffer the references do not shrink is written as plain {@link
+     * #LINE_CONTINUATION_FRAME_HEADING}, so a layer without junctions pays nothing.
      */
-    LINE_CONTINUATION_HEADING,
+    LINE_CONTINUATION_SHARED_FRAME_HEADING(13);
 
-    /** {@link #LINE_CONTINUATION_FRAME} and {@link #LINE_CONTINUATION_HEADING}: both, on disjoint vertices. */
-    LINE_CONTINUATION_FRAME_HEADING,
+    // Retired codes, free: 3 QUAD_CORNER_LINE, 4 TURN_SCALAR, 6 QUAD_CORNER_LINE_FRAME, 9 LINE_CONTINUATION_FRAME,
+    // 10 LINE_CONTINUATION_HEADING, 12 LINE_CONTINUATION_SHARED (see encoder.retired and docs/results/tile-oracle.md).
 
-    /**
-     * {@link #LINE_CONTINUATION} plus references to the positions earlier line parts hold ({@link
-     * LineReferences}, old {@code LINE_CONTINUATION_SHARED_DICT}): an
-     * entry and an exit flag at the ends of every line part, and a bit-packed index into the
-     * dictionary of earlier positions in place of the residual on a hit. A part whose end is in the
-     * dictionary and whose start is not is reversed, which changes line direction. Polygon rings and
-     * points keep their plain residuals. A buffer the references do not shrink is written as plain
-     * {@link #LINE_CONTINUATION}, so a layer without junctions pays nothing. Appended last so the
-     * ordinals of the other predictors stay put.
-     */
-    LINE_CONTINUATION_SHARED,
+    private final int code;
+
+    Prediction(int code) {
+        this.code = code;
+    }
 
     /**
-     * {@link #LINE_CONTINUATION_SHARED} on top of {@link #LINE_CONTINUATION_FRAME_HEADING}: the frame
-     * and heading rotations act on the vertices the references leave, which still count as decoded
-     * for them.
+     * The value of the predictor field in the payload header. It is fixed per predictor, not the ordinal,
+     * so retiring one leaves the codes of the others (and every payload written with them) as they were.
      */
-    LINE_CONTINUATION_SHARED_FRAME_HEADING;
+    public int code() {
+        return code;
+    }
+
+    /** The predictor with the header code {@code code}; a retired or unknown code is an error. */
+    public static Prediction ofCode(int code) {
+        for (final var value : values()) {
+            if (value.code == code) {
+                return value;
+            }
+        }
+        throw new IllegalArgumentException("no predictor has the header code " + code + " (retired or unknown)");
+    }
 
     /** Whether this predictor codes shared-vertex references (see {@link #QUAD_CORNER_SHARED}). */
     public boolean shared() {
@@ -116,7 +111,6 @@ public enum Prediction {
         return switch (this) {
             case QUAD_CORNER_SHARED -> QUAD_CORNER;
             case QUAD_CORNER_SHARED_FRAME -> QUAD_CORNER_FRAME;
-            case LINE_CONTINUATION_SHARED -> LINE_CONTINUATION;
             case LINE_CONTINUATION_SHARED_FRAME_HEADING -> LINE_CONTINUATION_FRAME_HEADING;
             default -> this;
         };
@@ -130,8 +124,7 @@ public enum Prediction {
     public RingReferences.Scan scan(BufferContext ctx) {
         return switch (this) {
             case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME -> RingReferences.scan(ctx);
-            case LINE_CONTINUATION_SHARED, LINE_CONTINUATION_SHARED_FRAME_HEADING ->
-                    LineReferences.scan(ctx);
+            case LINE_CONTINUATION_SHARED_FRAME_HEADING -> LineReferences.scan(ctx);
             default -> throw new UnsupportedOperationException(this + " has no references");
         };
     }
@@ -141,41 +134,31 @@ public enum Prediction {
         return switch (this) {
             case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME ->
                     RingReferences.Walk.forDecoding(topo, vertexCount, flags, indices);
-            case LINE_CONTINUATION_SHARED, LINE_CONTINUATION_SHARED_FRAME_HEADING ->
-                    LineReferences.walkForDecoding(
-                            topo, vertexCount, flags, indices);
+            case LINE_CONTINUATION_SHARED_FRAME_HEADING ->
+                    LineReferences.walkForDecoding(topo, vertexCount, flags, indices);
             default -> throw new UnsupportedOperationException(this + " has no references");
         };
     }
 
     /**
      * The predictor behind this choice. Stateless across buffers, so a fresh instance per call is
-     * cheap; {@link #TURN_SCALAR}'s instance remembers the winding of the last layout it classified,
-     * so one instance serves one buffer.
+     * cheap; the framed predictors remember the runs of the last layout they classified, so one
+     * instance serves one buffer.
      */
     public ClassifiedPredictor predictor() {
         return switch (this) {
             case DELTA -> new Delta();
             case QUAD_CORNER -> new SegmentQuadCorner();
             case LINE_CONTINUATION -> new LineContinuation();
-            case QUAD_CORNER_LINE -> new QuadCornerLine();
-            case TURN_SCALAR -> new TurnScalarPredictor();
             case QUAD_CORNER_FRAME ->
                     new FramedPredictor(new SegmentQuadCorner(), "QUAD_CORNER_FRAME", true, false, false);
-            case QUAD_CORNER_LINE_FRAME ->
-                    new FramedPredictor(new QuadCornerLine(), "QUAD_CORNER_LINE_FRAME", true, false, false);
-            case LINE_CONTINUATION_FRAME ->
-                    new FramedPredictor(new LineContinuation(), "LINE_CONTINUATION_FRAME", false, true, false);
-            case LINE_CONTINUATION_HEADING ->
-                    new FramedPredictor(new LineContinuation(), "LINE_CONTINUATION_HEADING", false, false, true);
             case LINE_CONTINUATION_FRAME_HEADING ->
                     new FramedPredictor(new LineContinuation(), "LINE_CONTINUATION_FRAME_HEADING", false, true, true);
             // the residual predictor of a shared row is its plain one; the references are PipelineEncoding's
-            case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME, LINE_CONTINUATION_SHARED,
-                    LINE_CONTINUATION_SHARED_FRAME_HEADING -> plain().predictor();
+            case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME, LINE_CONTINUATION_SHARED_FRAME_HEADING ->
+                    plain().predictor();
         };
     }
-
     /**
      * A predictor whose plain-delta ring edges are coded in a frame the decoder predicts from the rings
      * it has decoded. Unlike a prediction, the frame rotates the <em>residual</em> ({@code R(v - p)}
@@ -399,101 +382,6 @@ public enum Prediction {
 
         /** Predicted y, see {@link #predictX(int, int, List, int)}. */
         int predictY(int vertexClass, int i, List<Vertex> vertices, int side);
-    }
-
-    /**
-     * The old {@code TURN_SCALAR}: classes START, INTERIOR, CORNER and TURN, from the topology alone.
-     * A turn vertex is predicted at {@code p1 + round(along * u / |u|)}, with {@code u} the previous
-     * edge rotated 90 degrees (counter-clockwise on outer rings, clockwise on inner rings) and {@code
-     * along} the side value; the residual is the old correction. Every other class is delta or the
-     * parallelogram corner.
-     */
-    private static final class TurnScalarPredictor implements SideValues {
-
-        /** Winding of every vertex of the last classified buffer; the class alone does not carry it. */
-        private boolean[] ccw = new boolean[0];
-
-        @Override
-        public String name() {
-            return "TURN_SCALAR";
-        }
-
-        @Override
-        public int[] classify(BufferContext ctx, int vertexCount) {
-            final var classes = TurnScalar.classify(ctx, vertexCount);
-            ccw = classes.ccw();
-            return classes.classes();
-        }
-
-        @Override
-        public int classCount() {
-            return TurnScalar.TURN + 1;
-        }
-
-        @Override
-        public int[] regionOrder() {
-            return new int[]{TurnScalar.START, TurnScalar.INTERIOR, TurnScalar.CORNER, TurnScalar.TURN};
-        }
-
-        @Override
-        public boolean hasPrediction(int vertexClass) {
-            return vertexClass == TurnScalar.CORNER || vertexClass == TurnScalar.TURN;
-        }
-
-        @Override
-        public boolean hasSide(int vertexClass) {
-            return vertexClass == TurnScalar.TURN;
-        }
-
-        @Override
-        public int side(int vertexClass, int i, List<Vertex> vertices) {
-            final var p1 = vertices.get(i - 1);
-            final var ux = ux(i, vertices);
-            final var uy = uy(i, vertices);
-            final var len = Math.hypot(ux, uy);
-            if (len == 0) {
-                return 0;
-            }
-            final var wx = vertices.get(i).x() - p1.x();
-            final var wy = vertices.get(i).y() - p1.y();
-            return (int) Math.round(((double) ux * wx + (double) uy * wy) / len);
-        }
-
-        @Override
-        public int predictX(int vertexClass, int i, List<Vertex> vertices) {
-            if (vertexClass != TurnScalar.CORNER) {
-                throw new UnsupportedOperationException("class " + vertexClass + " carries a side value");
-            }
-            return TurnScalar.cornerX(i, vertices);
-        }
-
-        @Override
-        public int predictY(int vertexClass, int i, List<Vertex> vertices) {
-            if (vertexClass != TurnScalar.CORNER) {
-                throw new UnsupportedOperationException("class " + vertexClass + " carries a side value");
-            }
-            return TurnScalar.cornerY(i, vertices);
-        }
-
-        @Override
-        public int predictX(int vertexClass, int i, List<Vertex> vertices, int side) {
-            final var u = ux(i, vertices);
-            return vertices.get(i - 1).x() + TurnScalar.scaled(side, u, Math.hypot(u, uy(i, vertices)));
-        }
-
-        @Override
-        public int predictY(int vertexClass, int i, List<Vertex> vertices, int side) {
-            final var u = uy(i, vertices);
-            return vertices.get(i - 1).y() + TurnScalar.scaled(side, u, Math.hypot(ux(i, vertices), u));
-        }
-
-        private int ux(int i, List<Vertex> vertices) {
-            return TurnScalar.ux(ccw[i], vertices.get(i - 1), vertices.get(i - 2));
-        }
-
-        private int uy(int i, List<Vertex> vertices) {
-            return TurnScalar.uy(ccw[i], vertices.get(i - 1), vertices.get(i - 2));
-        }
     }
 
     /** First-order delta only: one class, never a geometric prediction. */

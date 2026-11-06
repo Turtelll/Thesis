@@ -328,7 +328,7 @@ public final class ResidualBitsProbe {
             sources.add(residualSourceOf(encoding));
         }
         for (var prediction : List.of(Prediction.QUAD_CORNER, Prediction.LINE_CONTINUATION,
-                Prediction.QUAD_CORNER_LINE, Prediction.QUAD_CORNER_FRAME, Prediction.QUAD_CORNER_LINE_FRAME)) {
+                Prediction.QUAD_CORNER_FRAME)) {
             sources.add(predicted(prediction));
         }
 

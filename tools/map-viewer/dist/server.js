@@ -3,9 +3,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const node_fs_1 = __importDefault(require("node:fs"));
 const node_path_1 = __importDefault(require("node:path"));
+const node_worker_threads_1 = require("node:worker_threads");
 const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const express_1 = __importDefault(require("express"));
+const composition_1 = require("./composition");
 /**
  * Serves the thesis mbtiles source data (data/MVT/*.mbtiles) as a plain
  * XYZ vector tile endpoint for MapLibre GL, plus the static viewer page.
@@ -22,15 +25,22 @@ const DATASETS = {
     "munich-plantiler": node_path_1.default.join(MVT_DIR, "munich-plantiler.mbtiles"),
     "germany-rs": node_path_1.default.join(MVT_DIR, "germany-rs.mbtiles"),
     "munich-overture": node_path_1.default.join(MVT_DIR, "munich-overture.mbtiles"),
+    "chicago-25km": node_path_1.default.join(MVT_DIR, "chicago-25km.mbtiles"),
+    "tokyo-25km": node_path_1.default.join(MVT_DIR, "tokyo-25km.mbtiles"),
+    "sao-paulo-25km": node_path_1.default.join(MVT_DIR, "sao-paulo-25km.mbtiles"),
 };
-const DEFAULT_DATASET = "munich-maptiler";
+const DEFAULT_DATASET = "munich-plantiler";
+// Composition scan results (see composition.ts), one JSON file per dataset.
+const CACHE_DIR = node_path_1.default.resolve(__dirname, "..", "cache");
 const dbs = Object.fromEntries(Object.entries(DATASETS).map(([id, file]) => [id, new better_sqlite3_1.default(file, {
         readonly: true,
         fileMustExist: true
     }),]));
+function datasetId(req) {
+    return typeof req.query.dataset === "string" ? req.query.dataset : DEFAULT_DATASET;
+}
 function resolveDataset(req) {
-    const id = typeof req.query.dataset === "string" ? req.query.dataset : DEFAULT_DATASET;
-    return dbs[id];
+    return dbs[datasetId(req)];
 }
 function xyzRowToTms(z, xyzRow) {
     return (1 << z) - 1 - xyzRow;
@@ -78,6 +88,108 @@ app.get("/metadata.json", (req, res) => {
     const rows = db.prepare("SELECT name, value FROM metadata").all();
     const metadata = Object.fromEntries(rows.map((r) => [r.name, r.value]));
     res.json(metadata);
+});
+const scans = new Map();
+const scanErrors = new Map();
+const loaded = new Map();
+function isDataset(id) {
+    return Object.prototype.hasOwnProperty.call(DATASETS, id);
+}
+function cacheFileOf(id) {
+    return node_path_1.default.join(CACHE_DIR, `${id}.composition.json`);
+}
+/** Aggregates from memory or the cache file, or null if missing/stale/unreadable. */
+function loadAggregates(id) {
+    const inMemory = loaded.get(id);
+    if (inMemory)
+        return inMemory;
+    const file = cacheFileOf(id);
+    if (!node_fs_1.default.existsSync(file))
+        return null;
+    try {
+        const cache = JSON.parse(node_fs_1.default.readFileSync(file, "utf-8"));
+        const source = node_fs_1.default.statSync(DATASETS[id]);
+        if (cache.version !== composition_1.CACHE_VERSION || cache.sourceSize !== source.size || cache.sourceMtimeMs !== source.mtimeMs) {
+            return null;
+        }
+        const aggregates = (0, composition_1.deserialize)(cache);
+        loaded.set(id, aggregates);
+        return aggregates;
+    }
+    catch {
+        return null;
+    }
+}
+function startScan(id) {
+    const state = { done: 0, total: 0 };
+    scans.set(id, state);
+    const input = { tileset: id, mbtilesFile: DATASETS[id], cacheFile: cacheFileOf(id) };
+    const worker = new node_worker_threads_1.Worker(node_path_1.default.join(__dirname, "compositionWorker.js"), { workerData: input });
+    let finished = false;
+    const finish = (error) => {
+        if (finished)
+            return;
+        finished = true;
+        scans.delete(id);
+        if (error)
+            scanErrors.set(id, error);
+    };
+    worker.on("message", (message) => {
+        if (message.type === "progress") {
+            state.done = message.done ?? 0;
+            state.total = message.total ?? 0;
+        }
+        else if (message.type === "done") {
+            finish();
+        }
+        else if (message.type === "error") {
+            finish(message.message ?? "scan failed");
+        }
+    });
+    worker.on("error", (error) => finish(error.message));
+    worker.on("exit", (code) => finish(code === 0 ? "scan worker exited without a result" : `scan worker exited with code ${code}`));
+    console.log(`Composition scan started: ${id}`);
+    return state;
+}
+app.get("/composition.json", (req, res) => {
+    const id = datasetId(req);
+    if (!isDataset(id)) {
+        res.status(400).send("Unknown dataset");
+        return;
+    }
+    const zoomParam = typeof req.query.zoom === "string" ? req.query.zoom : "all";
+    const zoom = zoomParam === "all" ? "all" : Number(zoomParam);
+    if (zoom !== "all" && !Number.isInteger(zoom)) {
+        res.status(400).send("Invalid zoom");
+        return;
+    }
+    const aggregates = loadAggregates(id);
+    if (aggregates) {
+        res.json({ status: "ready", zooms: (0, composition_1.availableZooms)(aggregates), summary: (0, composition_1.summarize)(aggregates, id, zoom) });
+        return;
+    }
+    const error = scanErrors.get(id);
+    if (error) {
+        res.json({ status: "error", message: error });
+        return;
+    }
+    const scan = scans.get(id) ?? startScan(id);
+    res.json({ status: "scanning", done: scan.done, total: scan.total });
+});
+app.post("/composition/rescan", (req, res) => {
+    const id = datasetId(req);
+    if (!isDataset(id)) {
+        res.status(400).send("Unknown dataset");
+        return;
+    }
+    let scan = scans.get(id);
+    if (!scan) {
+        loaded.delete(id);
+        scanErrors.delete(id);
+        node_fs_1.default.rmSync(cacheFileOf(id), { force: true });
+        scan = startScan(id);
+    }
+    res.json({ status: "scanning", done: scan.done, total: scan.total });
 });
 app.use(express_1.default.static(PUBLIC_DIR));
 app.listen(PORT, () => {

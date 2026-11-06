@@ -172,9 +172,14 @@ Names below are the **new** ones; the bodies of the linked files still use the o
   biggest late win; role streams, the bias map and the GCD do not pay. The per-buffer selection by trial
   compression gains 0,3 to 0,65% isolated but loses 0,0 to 0,3% per tile, and is discarded.
 
+- [mlt-v2-rust-port.md](mlt-v2-rust-port.md) — the pipeline codec ported to Rust (`research-rust`, bit-exact with the Java
+  golden dump) and used as the vertex encoder of MapLibre Tile v2: whole-tile gzip of the stock v2 encoder against the tile
+  oracle (96 compositions, whole layers permuted so properties follow): -9,25% gzip (+1,2% raw), -5,97% with the fixed per-layer default.
+
 - [tile-oracle.md](tile-oracle.md) — the real per-(tile, layer) oracle (`measure --step best`): the
-  best of 252 compositions (every predictor x streams x terminal x reorder) per buffer, chosen alone and
-  on the compressed tile, against the fixed per-layer default.
+  best of 252 compositions (96 since the retirement; every predictor x streams x terminal x reorder) per buffer, chosen alone and
+  on the compressed tile, against the fixed per-layer default; and which options of the grid the oracle
+  rarely picks and what dropping them costs (`--exclude`).
 - [general-purpose-compression.md](general-purpose-compression.md) — the delivery size:
   per-tile gzip/Brotli/zstd, why FastPFOR loses there, and which predictor and byte layout
   survive it.

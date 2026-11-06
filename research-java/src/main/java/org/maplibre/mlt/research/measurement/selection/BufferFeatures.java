@@ -31,7 +31,7 @@ import java.util.stream.IntStream;
  * @param entropy       per {@link Prediction}, in ordinal order: order-0 entropy of the zigzag
  *                      residuals, bits per vertex (x and y)
  * @param zeroShare     per {@link Prediction}: share of the residuals that are zero
- * @param wideShare     share of the {@code QUAD_CORNER_LINE} zigzag residuals at or above 255, what
+ * @param wideShare     share of the {@code QUAD_CORNER} zigzag residuals at or above 255, what
  *                      an escape byte has to catch
  */
 public record BufferFeatures(
@@ -92,7 +92,7 @@ public record BufferFeatures(
             final var p = prediction.ordinal();
             entropy[p] = n == 0 ? 0 : 2.0 * entropyBits(histogram, values);
             zeroShare[p] = values == 0 ? 0 : (double) histogram.getOrDefault(0, 0L) / values;
-            if (prediction == Prediction.QUAD_CORNER_LINE) {
+            if (prediction == Prediction.QUAD_CORNER) {
                 wideShare = values == 0 ? 0 : (double) wide / values;
             }
         }

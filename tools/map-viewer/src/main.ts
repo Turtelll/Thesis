@@ -1,5 +1,6 @@
 import maplibregl, {Map as MapLibreMap} from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import {buildCompositionDrawer} from "./composition";
 
 /**
  * Renders the thesis mbtiles source data (served by ../server/server.ts) as an
@@ -21,7 +22,10 @@ const SOURCE_ID = "mbtiles";
 const DATASETS = [{id: "munich-plantiler", label: "Munich Plantiler"},
     {id: "germany-rs", label: "Germany"},
     {id: "munich-overture", label: "Munich Overture"},
-    {id: "bayern", label: "Bayern Plantiler"},];
+    {id: "bayern", label: "Bayern Plantiler"},
+    {id: "chicago-25km", label: "Chicago Plantiler"},
+    {id: "tokyo-25km", label: "Tokyo Plantiler"},
+    {id: "sao-paulo-25km", label: "São Paulo Plantiler"},];
 
 function currentDataset(): string {
     const id = new URLSearchParams(window.location.search).get("dataset");
@@ -63,6 +67,21 @@ const VERTEX_PALETTE = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "
 
 function colorForGeom(key: number): string {
     return VERTEX_PALETTE[key % VERTEX_PALETTE.length];
+}
+
+// Stable color key for a feature: FNV-1a hash of its id, so the same feature
+// keeps its color across refreshes and across every tile it is split into.
+// Hashed rather than used raw because Planetiler ids encode the OSM element
+// type in the last digit (id % 10 would color every way the same). Features
+// without an id fall back to hashing their properties.
+function geomKeyOf(feature: GeoJSON.Feature): number {
+    const s = feature.id !== undefined ? String(feature.id) : JSON.stringify(feature.properties);
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+    }
+    return h >>> 0;
 }
 
 // Walks a GeoJSON-style coordinate geometry (from a MapLibre feature) and
@@ -252,21 +271,49 @@ function refreshVertices(map: MapLibreMap, layer: LayerConfig): void {
     if (!source) return;
     const features = map.querySourceFeatures(SOURCE_ID, {sourceLayer: layer.sourceLayer});
     const vertices: GeoJSON.Feature[] = [];
-    features.forEach((feature, index) => {
-        extractVertices(feature.geometry, index, vertices);
+    features.forEach((feature) => {
+        extractVertices(feature.geometry, geomKeyOf(feature), vertices);
     });
     source.setData({type: "FeatureCollection", features: vertices});
 }
 
-// One entry per layer the Java pipeline also extracts (landcover, building,
-// water, transportation), styled distinctly so overlaps stay legible.
+// One entry per layer the Java pipeline also extracts (landuse, landcover,
+// building, water, transportation), styled distinctly so overlaps stay legible.
+// Order is draw order: landuse sits at the bottom, under landcover.
 const LAYERS: LayerConfig[] = [{
+    id: "landuse", sourceLayer: "landuse", label: "Landuse", color: "#d4b483", type: "fill"
+}, {
     id: "landcover", sourceLayer: "landcover", label: "Landcover", color: "#8fbf7f", type: "fill"
 }, {id: "water", sourceLayer: "water", label: "Water", color: "#6ea8d8", type: "fill"}, {
     id: "building", sourceLayer: "building", label: "Building", color: "#c98f6b", type: "fill"
 }, {
     id: "transportation", sourceLayer: "transportation", label: "Transportation", color: "#3d3d3d", type: "line",
 },];
+
+// Point/label layers the Java pipeline does not extract, drawn as circles and
+// switched together by one shared toggle (see buildLabelToggle).
+const LABEL_LAYERS = [{sourceLayer: "poi", color: "#d6336c"}, {
+    sourceLayer: "place", color: "#7048e8"
+}, {sourceLayer: "water_name", color: "#1971c2"},];
+const LABEL_LAYER_PREFIX = "label-";
+
+function addLabelLayers(map: MapLibreMap, visibility: string): void {
+    for (const label of LABEL_LAYERS) {
+        map.addLayer({
+            id: LABEL_LAYER_PREFIX + label.sourceLayer,
+            type: "circle",
+            source: SOURCE_ID,
+            "source-layer": label.sourceLayer,
+            layout: {visibility: visibility as "visible" | "none"},
+            paint: {
+                "circle-color": label.color,
+                "circle-radius": 3,
+                "circle-stroke-width": 0.5,
+                "circle-stroke-color": "#000000"
+            },
+        });
+    }
+}
 
 async function loadCenter(dataset: string): Promise<{ center: [number, number]; zoom: number }> {
     try {
@@ -332,14 +379,14 @@ function addLayer(map: MapLibreMap, layer: LayerConfig): void {
 }
 
 // Assigns each currently-loaded feature of a layer a geomKey via
-// setFeatureState, keyed by the same per-viewport batch index refreshVertices
-// uses for its vertex points, so a feature's fill/line/circle color always
-// matches the color of its own vertices.
+// setFeatureState, keyed by the same geomKeyOf hash refreshVertices uses for
+// its vertex points, so a feature's fill/line/circle color always matches the
+// color of its own vertices.
 function refreshGeomKeys(map: MapLibreMap, layer: LayerConfig): void {
     const features = map.querySourceFeatures(SOURCE_ID, {sourceLayer: layer.sourceLayer});
-    features.forEach((feature, index) => {
+    features.forEach((feature) => {
         if (feature.id === undefined) return;
-        map.setFeatureState({source: SOURCE_ID, sourceLayer: layer.sourceLayer, id: feature.id}, {geomKey: index});
+        map.setFeatureState({source: SOURCE_ID, sourceLayer: layer.sourceLayer, id: feature.id}, {geomKey: geomKeyOf(feature)});
     });
 }
 
@@ -449,11 +496,13 @@ function rebuildSource(map: MapLibreMap, dataset: string, maxzoom: number): void
             visibility.set(layer.id + OUTLINE_SUFFIX, map.getLayoutProperty(layer.id + OUTLINE_SUFFIX, "visibility") ?? "visible");
         }
     }
+    const labelVisibility = map.getLayoutProperty(LABEL_LAYER_PREFIX + LABEL_LAYERS[0].sourceLayer, "visibility") ?? "visible";
 
     for (const layer of LAYERS) {
         if (layer.type === "fill") map.removeLayer(layer.id + OUTLINE_SUFFIX);
         map.removeLayer(layer.id);
     }
+    for (const label of LABEL_LAYERS) map.removeLayer(LABEL_LAYER_PREFIX + label.sourceLayer);
     map.removeSource(SOURCE_ID);
 
     map.addSource(SOURCE_ID, {
@@ -472,6 +521,36 @@ function rebuildSource(map: MapLibreMap, dataset: string, maxzoom: number): void
         addOutlineLayer(map, layer);
         map.setLayoutProperty(layer.id + OUTLINE_SUFFIX, "visibility", visibility.get(layer.id + OUTLINE_SUFFIX)!);
     }
+    addLabelLayers(map, labelVisibility);
+    if (map.getSource(HIGHLIGHT_SOURCE)) raiseHighlightLayers(map);
+}
+
+function buildLabelToggle(map: MapLibreMap): void {
+    const panel = document.getElementById("layer-panel")!;
+    const item = document.createElement("label");
+    item.className = "layer-toggle";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = true;
+    checkbox.addEventListener("change", () => {
+        for (const label of LABEL_LAYERS) {
+            map.setLayoutProperty(LABEL_LAYER_PREFIX + label.sourceLayer, "visibility", checkbox.checked ? "visible" : "none");
+        }
+    });
+
+    item.appendChild(checkbox);
+    for (const label of LABEL_LAYERS) {
+        const swatch = document.createElement("span");
+        swatch.className = "swatch";
+        swatch.style.backgroundColor = label.color;
+        item.appendChild(swatch);
+    }
+
+    const text = document.createElement("span");
+    text.textContent = "POI / place / water_name";
+    item.appendChild(text);
+    panel.appendChild(item);
 }
 
 // Toggle that locks the source's maxzoom to the zoom level active when it's
@@ -632,6 +711,315 @@ function buildLayerToggles(map: MapLibreMap): void {
     }
 }
 
+// Interactive feature inspection. While a layer's "<layer> vertices" checkbox
+// is on, that layer's features are hoverable (highlighted outline + pointer
+// cursor) and clicking one opens a popup with its part count.
+const HIGHLIGHT_SOURCE = "hover-highlight";
+const HIGHLIGHT_LAYERS = [HIGHLIGHT_SOURCE + "-fill", HIGHLIGHT_SOURCE + "-line", HIGHLIGHT_SOURCE + "-point"];
+
+function addHighlightLayers(map: MapLibreMap): void {
+    map.addSource(HIGHLIGHT_SOURCE, {type: "geojson", data: {type: "FeatureCollection", features: []}});
+    map.addLayer({
+        id: HIGHLIGHT_LAYERS[0],
+        type: "fill",
+        source: HIGHLIGHT_SOURCE,
+        filter: ["==", ["geometry-type"], "Polygon"],
+        paint: {"fill-color": "#ffffff", "fill-opacity": 0.3},
+    });
+    map.addLayer({
+        id: HIGHLIGHT_LAYERS[1],
+        type: "line",
+        source: HIGHLIGHT_SOURCE,
+        // Yellow outlines the whole hovered feature; orange marks its hovered part.
+        paint: {
+            "line-color": ["case", ["==", ["get", "part"], true], "#ff6b00", "#ffd400"],
+            "line-width": ["case", ["==", ["get", "part"], true], 4, 3],
+            "line-opacity": 0.95,
+        },
+    });
+    map.addLayer({
+        id: HIGHLIGHT_LAYERS[2],
+        type: "circle",
+        source: HIGHLIGHT_SOURCE,
+        filter: ["==", ["geometry-type"], "Point"],
+        paint: {
+            "circle-radius": 7,
+            "circle-color": "#ffd400",
+            "circle-opacity": 0.6,
+            "circle-stroke-width": 1.5,
+            "circle-stroke-color": "#000000"
+        },
+    });
+}
+
+// Keeps the highlight on top after rebuildSource re-adds the base layers.
+function raiseHighlightLayers(map: MapLibreMap): void {
+    for (const id of HIGHLIGHT_LAYERS) map.moveLayer(id);
+}
+
+// Part/ring counts in MLT terms: a part is one member of a Multi* geometry
+// (a line of a MultiLineString, a polygon of a MultiPolygon, a point of a
+// MultiPoint); a plain single geometry is one part. Rings are counted over all
+// polygon parts (outer + holes).
+function describeGeometry(geometry: GeoJSON.Geometry): { type: string; parts: number; rings: number | null; vertices: number } {
+    const vertices = countVertices(geometry);
+    switch (geometry.type) {
+        case "Point":
+            return {type: geometry.type, parts: 1, rings: null, vertices};
+        case "MultiPoint":
+            return {type: geometry.type, parts: geometry.coordinates.length, rings: null, vertices};
+        case "LineString":
+            return {type: geometry.type, parts: 1, rings: null, vertices};
+        case "MultiLineString":
+            return {type: geometry.type, parts: geometry.coordinates.length, rings: null, vertices};
+        case "Polygon":
+            return {type: geometry.type, parts: 1, rings: geometry.coordinates.length, vertices};
+        case "MultiPolygon":
+            return {
+                type: geometry.type,
+                parts: geometry.coordinates.length,
+                rings: geometry.coordinates.reduce((sum, poly) => sum + poly.length, 0),
+                vertices,
+            };
+        default:
+            return {type: geometry.type, parts: 0, rings: null, vertices};
+    }
+}
+
+// Vertices a ring contributes to the MLT VertexBuffer. GeoJSON polygon rings
+// repeat their first coordinate at the end, but MVT encodes that closure as
+// ClosePath and the VertexBuffer has no vertex for it, so it is not counted.
+function ringVertices(ring: number[][]): number {
+    if (ring.length > 1) {
+        const first = ring[0];
+        const last = ring[ring.length - 1];
+        if (first[0] === last[0] && first[1] === last[1]) return ring.length - 1;
+    }
+    return ring.length;
+}
+
+// VertexBuffer vertex count of a geometry (all parts, all rings), the same
+// counting rule as data-analysis/vertex_stats.py and the composition drawer.
+function countVertices(geometry: GeoJSON.Geometry): number {
+    switch (geometry.type) {
+        case "Point":
+            return 1;
+        case "MultiPoint":
+        case "LineString":
+            return geometry.coordinates.length;
+        case "MultiLineString":
+            return geometry.coordinates.reduce((sum, line) => sum + line.length, 0);
+        case "Polygon":
+            return geometry.coordinates.reduce((sum, ring) => sum + ringVertices(ring), 0);
+        case "MultiPolygon":
+            return geometry.coordinates.reduce((sum, poly) => sum + poly.reduce((s, ring) => s + ringVertices(ring), 0), 0);
+        default:
+            return 0;
+    }
+}
+
+// Splits a geometry into its MLT parts, each as a single-part geometry: the
+// members of a Multi* geometry, or the geometry itself when it is not one.
+function partsOf(geometry: GeoJSON.Geometry): GeoJSON.Geometry[] {
+    switch (geometry.type) {
+        case "MultiPoint":
+            return geometry.coordinates.map((coordinates): GeoJSON.Geometry => ({type: "Point", coordinates}));
+        case "MultiLineString":
+            return geometry.coordinates.map((coordinates): GeoJSON.Geometry => ({type: "LineString", coordinates}));
+        case "MultiPolygon":
+            return geometry.coordinates.map((coordinates): GeoJSON.Geometry => ({type: "Polygon", coordinates}));
+        default:
+            return [geometry];
+    }
+}
+
+// Screen-space (pixel) distance from p to the segment a-b.
+function segmentDistance(p: maplibregl.Point, a: maplibregl.Point, b: maplibregl.Point): number {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const lengthSquared = dx * dx + dy * dy;
+    const t = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSquared));
+    return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+function pathDistance(path: maplibregl.Point[], p: maplibregl.Point): number {
+    if (path.length === 1) return Math.hypot(p.x - path[0].x, p.y - path[0].y);
+    let best = Infinity;
+    for (let i = 0; i + 1 < path.length; i++) best = Math.min(best, segmentDistance(p, path[i], path[i + 1]));
+    return best;
+}
+
+// Even-odd point-in-ring test in screen space.
+function ringContains(ring: maplibregl.Point[], p: maplibregl.Point): boolean {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const a = ring[i];
+        const b = ring[j];
+        if ((a.y > p.y) !== (b.y > p.y) && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+    }
+    return inside;
+}
+
+// How far (in pixels) the cursor is from a single-part geometry: 0 when it is
+// inside a polygon (outside its holes), otherwise the distance to the nearest
+// edge/point. Used to pick which part of a Multi* feature is being hovered.
+function partDistance(map: MapLibreMap, part: GeoJSON.Geometry, p: maplibregl.Point): number {
+    const project = (c: number[]) => map.project(c as [number, number]);
+    switch (part.type) {
+        case "Point":
+            return pathDistance([project(part.coordinates)], p);
+        case "LineString":
+            return pathDistance(part.coordinates.map(project), p);
+        case "Polygon": {
+            const rings = part.coordinates.map((ring) => ring.map(project));
+            if (rings.length > 0 && ringContains(rings[0], p) && !rings.slice(1).some((hole) => ringContains(hole, p))) return 0;
+            return Math.min(...rings.map((ring) => pathDistance(ring, p)));
+        }
+        default:
+            return Infinity;
+    }
+}
+
+interface HoveredPart {
+    index: number;
+    count: number;
+    geometry: GeoJSON.Geometry;
+    vertices: number;
+}
+
+// The part of the feature under the cursor. Single-part features skip the
+// projection work: their only part is the feature itself.
+function hoveredPart(map: MapLibreMap, geometry: GeoJSON.Geometry, p: maplibregl.Point): HoveredPart {
+    const parts = partsOf(geometry);
+    let index = 0;
+    if (parts.length > 1) {
+        let best = Infinity;
+        parts.forEach((part, i) => {
+            const distance = partDistance(map, part, p);
+            if (distance < best) {
+                best = distance;
+                index = i;
+            }
+        });
+    }
+    return {index, count: parts.length, geometry: parts[index] ?? geometry, vertices: countVertices(parts[index] ?? geometry)};
+}
+
+// Hover tooltip: the vertices of the hovered part and, for multi-part
+// features, of the whole feature as well.
+function buildHoverContent(layer: LayerConfig, feature: maplibregl.MapGeoJSONFeature, part: HoveredPart, featureVertices: number): HTMLElement {
+    const root = document.createElement("div");
+    root.className = "feature-popup";
+
+    const title = document.createElement("strong");
+    // class == subclass is common (e.g. farmland / farmland): show it once.
+    const type = [...new Set(typeRows(feature).map(([, value]) => value))].join(" / ");
+    title.textContent = type ? `${layer.label}: ${type}` : layer.label;
+    root.appendChild(title);
+
+    const geometry = [`Geometry: ${feature.geometry.type}`];
+    const lines = geometry.concat(part.count > 1 ? [`Part ${part.index + 1} of ${part.count}: ${part.vertices.toLocaleString("en-US")} vertices`, `Feature: ${featureVertices.toLocaleString("en-US")} vertices`] : [`Vertices: ${featureVertices.toLocaleString("en-US")}`]);
+    for (const text of lines) {
+        const line = document.createElement("div");
+        line.textContent = text;
+        root.appendChild(line);
+    }
+    return root;
+}
+
+// Type tags of a feature, coarse to fine: Overture tilesets tag `subtype` and
+// `class`, OpenMapTiles-style tilesets (Planetiler) `class` and `subclass`
+// (e.g. road class "minor"/"path", landcover class "wood"/"grass"). Layers or
+// tilesets without them (e.g. Planetiler buildings) simply yield no rows.
+const TYPE_PROPERTIES: [string, string][] = [["Subtype", "subtype"], ["Class", "class"], ["Subclass", "subclass"]];
+
+function typeRows(feature: maplibregl.MapGeoJSONFeature): [string, string][] {
+    const rows: [string, string][] = [];
+    for (const [label, key] of TYPE_PROPERTIES) {
+        const value = feature.properties?.[key];
+        if (value !== undefined && value !== null && value !== "") rows.push([label, String(value)]);
+    }
+    return rows;
+}
+
+function buildPopupContent(layer: LayerConfig, feature: maplibregl.MapGeoJSONFeature): HTMLElement {
+    const info = describeGeometry(feature.geometry);
+    const root = document.createElement("div");
+    root.className = "feature-popup";
+
+    const title = document.createElement("strong");
+    title.textContent = layer.label;
+    root.appendChild(title);
+
+    const rows: [string, string][] = [...typeRows(feature), ["Geometry", info.type], ["Parts", String(info.parts)], ["Vertices", info.vertices.toLocaleString("en-US")]];
+    if (info.rings !== null) rows.push(["Rings", String(info.rings)]);
+    if (feature.id !== undefined) rows.push(["Feature id", String(feature.id)]);
+    for (const [key, value] of rows) {
+        const line = document.createElement("div");
+        line.textContent = `${key}: ${value}`;
+        root.appendChild(line);
+    }
+    return root;
+}
+
+function setupFeatureInteraction(map: MapLibreMap): void {
+    addHighlightLayers(map);
+    const highlight = map.getSource(HIGHLIGHT_SOURCE) as maplibregl.GeoJSONSource;
+    const popup = new maplibregl.Popup({closeButton: true, maxWidth: "260px"});
+    // Non-interactive tooltip following the cursor (pointer-events: none in index.html).
+    const tooltip = new maplibregl.Popup({closeButton: false, closeOnClick: false, maxWidth: "240px", offset: 14, className: "hover-tooltip"});
+    let hoveredKey: string | null = null;
+
+    // Layers currently inspectable: base layer shown and its vertices toggle on.
+    // Listed topmost-first so the first query hit is the feature drawn on top.
+    const activeLayers = (): LayerConfig[] => LAYERS.filter((layer) => map.getLayoutProperty(layer.id, "visibility") !== "none" && map.getLayoutProperty(layer.id + VERTEX_SUFFIX, "visibility") === "visible").reverse();
+
+    const featureAt = (point: maplibregl.Point): { layer: LayerConfig; feature: maplibregl.MapGeoJSONFeature } | null => {
+        const active = activeLayers();
+        if (active.length === 0) return null;
+        // Small pixel tolerance so thin lines and point layers are easy to hit.
+        const box: [maplibregl.PointLike, maplibregl.PointLike] = [[point.x - 4, point.y - 4], [point.x + 4, point.y + 4]];
+        const hits = map.queryRenderedFeatures(box, {layers: active.map((l) => l.id)});
+        if (hits.length === 0) return null;
+        const layer = active.find((l) => l.id === hits[0].layer.id)!;
+        return {layer, feature: hits[0]};
+    };
+
+    const clearHover = () => {
+        if (hoveredKey === null) return;
+        hoveredKey = null;
+        highlight.setData({type: "FeatureCollection", features: []});
+        tooltip.remove();
+        map.getCanvas().style.cursor = "";
+    };
+
+    map.on("mousemove", (e) => {
+        const hit = featureAt(e.point);
+        if (!hit) return clearHover();
+        const part = hoveredPart(map, hit.feature.geometry, e.point);
+        const key = `${hit.layer.id}:${hit.feature.id ?? geomKeyOf(hit.feature)}:${part.index}`;
+        map.getCanvas().style.cursor = "pointer";
+        tooltip.setLngLat(e.lngLat);
+        if (key === hoveredKey) return;
+        hoveredKey = key;
+        // The whole feature is highlighted; for multi-part features the hovered
+        // part is drawn on top in a second color, so the vertex count in the
+        // tooltip visibly belongs to it.
+        const features: GeoJSON.Feature[] = [{type: "Feature", properties: {part: false}, geometry: hit.feature.geometry}];
+        if (part.count > 1) features.push({type: "Feature", properties: {part: true}, geometry: part.geometry});
+        highlight.setData({type: "FeatureCollection", features});
+        tooltip.setDOMContent(buildHoverContent(hit.layer, hit.feature, part, countVertices(hit.feature.geometry)));
+        if (!tooltip.isOpen()) tooltip.addTo(map);
+    });
+    map.on("mouseout", clearHover);
+
+    map.on("click", (e) => {
+        const hit = featureAt(e.point);
+        if (!hit) return;
+        popup.setLngLat(e.lngLat).setDOMContent(buildPopupContent(hit.layer, hit.feature)).addTo(map);
+    });
+}
+
 async function main(): Promise<void> {
     const dataset = currentDataset();
     const {center, zoom} = await loadCenter(dataset);
@@ -660,15 +1048,21 @@ async function main(): Promise<void> {
         for (const layer of LAYERS.filter((l) => l.type === "fill")) {
             addOutlineLayer(map, layer);
         }
+        addLabelLayers(map, "visible");
         for (const layer of LAYERS) {
             addVertexLayer(map, layer);
             addCloseArrowLayer(map, layer);
             addReorderArrowLayer(map, layer);
         }
         buildDatasetSelect(dataset);
+        buildCompositionDrawer(map, dataset, DATASETS.find((d) => d.id === dataset)!.label, LAYERS.map((l) => ({
+            sourceLayer: l.sourceLayer, label: l.label, color: l.color
+        })));
         buildTileBoundaryToggle(map);
         buildZoomLockToggle(map, dataset);
         buildLayerToggles(map);
+        buildLabelToggle(map);
+        setupFeatureInteraction(map);
 
         const refreshVisibleVertexLayers = () => {
             for (const layer of LAYERS) {

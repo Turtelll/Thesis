@@ -32,7 +32,7 @@ gzip at level 6 is the reference, because every client supports it. Brotli (qual
   baselines under gzip, plain delta + zigzag + varint (11.237.124 bytes on the corpus). Stage figures on
   these pages are of this kind.
 - The MLT v2 encoder (Rust) measures whole tiles, every layer with its property columns, against stock MLT
-  v2. The headline table in the [overview](README.md) is of this kind.
+  v2. The headline table in the [overview](../index.md) is of this kind.
 
 ```
 ./gradlew research --args="measure --step ladder --by-zoom"   # the pipeline built up decision by decision

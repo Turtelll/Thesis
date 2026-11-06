@@ -142,17 +142,6 @@ class PredictionMechanismTest {
     }
   }
 
-  /** TURN_SCALAR writes one residual pair per vertex and its {@code along} scalars as a side stream. */
-  @Test
-  void turnScalarWritesAScalarPerTurnVertex() {
-    var ctx = buildings();
-    var predictor = Prediction.TURN_SCALAR.predictor();
-    var layout = Segmentation.FLAT.layout(ctx, predictor, ctx.vertices().size());
-    var streams = Segmentation.split(layout, predictor, ctx.vertices());
-
-    assertEquals(ctx.vertices().size() * 2, streams[0].length);
-    assertTrue(streams[layout.sideStream()].length > 0, "the L-shaped building has turn vertices");
-  }
   @ParameterizedTest
   @EnumSource(Prediction.class)
   void headerCarriesThePredictor(Prediction prediction) {
