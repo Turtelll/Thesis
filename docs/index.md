@@ -15,17 +15,22 @@ of those streams by its raw size; the rows marked *gzip stream choice* pick amon
 size instead, so the format does not change. The sizes are whole tiles as a client receives them: the Munich
 corpus, 358 tiles, every layer, gzip level 6, summed over all tiles.
 
-| encoder | raw bytes | gzip bytes | gzip vs stock |
-|---|---|---|---|
-| stock MLT v2 | 18.487.134 | 16.786.524 | |
-| stock MLT v2 with its own feature sorting | 18.317.963 | 16.643.440 | -0,85% |
-| stock MLT v2, gzip stream choice | 20.721.218 | 16.083.379 | -4,19% |
-| pipeline, plain delta + split varint on every layer | 19.383.707 | 16.202.284 | -3,48% |
-| pipeline, per-layer default composition | 19.186.915 | 15.785.075 | -5,97% |
-| pipeline, `DEFAULT` composition on every layer | 19.338.509 | 15.534.092 | -7,46% |
-| pipeline, tile oracle without feature reorder | 18.767.109 | 15.298.529 | -8,86% |
-| pipeline, tile oracle | 18.702.304 | 15.234.332 | -9,25% |
-| pipeline, tile oracle, gzip stream choice | 20.312.304 | 15.084.159 | **-10,14%** |
+| encoder | raw bytes | gzip bytes | gzip vs stock | gzip vs MVT |
+|---|---|---|---|---|
+| MVT (the source tiles) | 31.580.127 | 21.090.045 | +25,64% | |
+| stock MLT v2 | 18.487.134 | 16.786.524 | | -20,41% |
+| stock MLT v2 with its own feature sorting | 18.317.963 | 16.643.440 | -0,85% | -21,08% |
+| stock MLT v2, gzip stream choice | 20.721.218 | 16.083.379 | -4,19% | -23,74% |
+| pipeline, plain delta + split varint on every layer | 19.383.707 | 16.202.284 | -3,48% | -23,18% |
+| pipeline, per-layer default composition | 19.186.915 | 15.785.075 | -5,97% | -25,15% |
+| pipeline, `DEFAULT` composition on every layer | 19.338.509 | 15.534.092 | -7,46% | -26,34% |
+| pipeline, tile oracle without feature reorder | 18.767.109 | 15.298.529 | -8,86% | -27,46% |
+| pipeline, tile oracle | 18.702.304 | 15.234.332 | -9,25% | -27,77% |
+| pipeline, tile oracle, gzip stream choice | 20.312.304 | 15.084.159 | **-10,14%** | **-28,48%** |
+
+The MVT row is the source tileset (`munich-plantiler.mbtiles`, Planetiler), every tile decompressed and gzipped
+again at level 6 with Python's zlib; this reproduces the stored tiles to the byte. Every MLT row is converted from
+these tiles and holds the same features. Under gzip the MVT tiles are 1,40 times the size of the best row.
 
 The tile oracle with gzip stream choice saves 1,70 MB of 16,79 MB. Four things stand out:
 
