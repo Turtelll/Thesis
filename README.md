@@ -1,6 +1,9 @@
 # Thesis 
 > This repository contains research code for a Bachelor Thesis
 > The research will be done in a seperate java project. MLT repo is included for converter and research purposes.
+
+Link to docs: https://turtelll.github.io/Thesis/
+
 ## Topic
 The topic of the Research is finding new encoding strategies to reduce Maplibre Tile size (Vector Tiles) with various approaches. For VertexBuffer and IndexBuffer
 ### Data
