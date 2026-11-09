@@ -533,6 +533,9 @@ pub struct EncoderConfig {
     /// composition instead of the stock vertex layouts. It reuses the stream code of rANS vertices.
     #[cfg(feature = "unstable-v2")]
     vertex_pipeline: Option<mlt_pipeline::Composition>,
+    /// PATCH (research-rust): decide every stream-encoding competition by the gzip size of the layer
+    /// written so far with the candidate, instead of the candidate's raw byte length.
+    gzip_selection: bool,
 }
 impl EncoderConfig {
     /// The settings `profile` picks, which the `with_*` methods override.
@@ -566,6 +569,7 @@ impl EncoderConfig {
                 allow_rans_vertices: false,
                 #[cfg(feature = "unstable-v2")]
                 vertex_pipeline: None,
+                gzip_selection: false,
             },
             Profile::Web(network) => Self {
                 #[cfg(feature = "unstable-v2")]
@@ -593,6 +597,7 @@ impl EncoderConfig {
                 allow_rans_vertices: false,
                 #[cfg(feature = "unstable-v2")]
                 vertex_pipeline: None,
+                gzip_selection: false,
             },
             Profile::MinSize => Self {
                 #[cfg(feature = "unstable-v2")]
@@ -620,6 +625,7 @@ impl EncoderConfig {
                 allow_rans_vertices: true,
                 #[cfg(feature = "unstable-v2")]
                 vertex_pipeline: None,
+                gzip_selection: false,
             },
             Profile::Diffable => Self {
                 #[cfg(feature = "unstable-v2")]
@@ -647,6 +653,7 @@ impl EncoderConfig {
                 allow_rans_vertices: false,
                 #[cfg(feature = "unstable-v2")]
                 vertex_pipeline: None,
+                gzip_selection: false,
             },
             Profile::FastEncoding => Self {
                 #[cfg(feature = "unstable-v2")]
@@ -674,6 +681,7 @@ impl EncoderConfig {
                 allow_rans_vertices: false,
                 #[cfg(feature = "unstable-v2")]
                 vertex_pipeline: None,
+                gzip_selection: false,
             },
         }
     }
@@ -897,6 +905,20 @@ impl EncoderConfig {
     #[must_use]
     pub fn vertex_pipeline(self) -> Option<mlt_pipeline::Composition> {
         self.vertex_pipeline
+    }
+
+    /// PATCH (research-rust): whether stream-encoding competitions are decided by gzip size.
+    #[must_use]
+    pub fn gzip_selection(self) -> bool {
+        self.gzip_selection
+    }
+
+    /// PATCH (research-rust): decide stream-encoding competitions by the gzip size (level 6) of the
+    /// layer written so far with the candidate, instead of the candidate's raw byte length.
+    #[must_use]
+    pub fn with_gzip_selection(mut self, enabled: bool) -> Self {
+        self.gzip_selection = enabled;
+        self
     }
 
     /// PATCH (research-rust): write plain-xy vertex streams with `composition`.

@@ -7,7 +7,8 @@
 //! * [`VertexMode::Default`]: `for_layer(layer name)`;
 //! * [`VertexMode::Fixed`]: one composition for every layer;
 //! * [`VertexMode::Oracle`]: `TileSelector.oracle`, a coordinate descent over the gzip size of the whole tile
-//!   across the 96 compositions of `bestGrid()`.
+//!   across the 96 compositions of `bestGrid()`. Every candidate also picks the encodings of the other streams
+//!   (ids, geometry lengths, properties) by gzip size ([`gzip_config`]) instead of the stock raw byte length.
 //!
 //! A composition's reorder permutes whole layers (id and every property column follow), so each candidate
 //! is a complete layer encoding. `mlt-oracle compare` and `mlt convert --vertex-pipeline` share this code.
@@ -32,7 +33,7 @@ pub enum VertexMode {
     Off,
     /// `for_layer(layer name)` for every layer.
     Default,
-    /// The tile oracle, at most `max_passes` descent passes.
+    /// The tile oracle, at most `max_passes` descent passes, every candidate on [`gzip_config`].
     Oracle { max_passes: usize },
     /// One composition (of `best_grid()`) for every layer.
     Fixed(Composition),
@@ -118,7 +119,7 @@ pub fn encode_tile(layers: Vec<TileLayer>, base: EncoderConfig, mode: VertexMode
             let grid = best_grid();
             let trials: Vec<LayerTrial> = layers
                 .into_iter()
-                .map(|l| trial_layer(l, &grid, false, base))
+                .map(|l| trial_layer(l, &grid, false, gzip_config(base)))
                 .collect::<Result<_, _>>()?;
             let alone = alone_sizes(&trials);
             let sel = select(&trials, &grid, &alone, &|_| true, max_passes);
@@ -200,6 +201,12 @@ pub fn pipeline_config(base: EncoderConfig, composition: Composition) -> Encoder
         .with_spatial_hilbert_sort(false)
         .with_id_sort(false)
         .with_vertex_pipeline(Some(composition))
+}
+
+/// `base` with every stream-encoding competition (ids, geometry lengths, properties, the stock vertex layouts of
+/// fallback layers) decided by the gzip size of the layer written so far with the candidate, not its raw bytes.
+pub fn gzip_config(base: EncoderConfig) -> EncoderConfig {
+    base.with_gzip_selection(true)
 }
 
 /// `base` with the encoder's own feature-order trials (Hilbert, feature id).
@@ -469,7 +476,7 @@ type Xy = (i32, i32);
 
 /// One connected piece of a geometry: what a decoder may rewrite without changing the shape.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-enum Part {
+pub enum Part {
     /// A closed ring, stored with its closing vertex.
     Ring(Vec<Xy>),
     Line(Vec<Xy>),
@@ -542,7 +549,17 @@ fn signature(parts: &[Part], directed: bool) -> Vec<Part> {
     all
 }
 
-fn classify(
+/// The shape of `geometry` up to ring start, MultiPoint order, part order and line direction: two geometries a
+/// decoder must treat as the same have the same shape.
+pub fn shape(geometry: &mlt_core::geo_types::Geometry<i32>) -> Vec<Part> {
+    let mut parts = Vec::new();
+    parts_of(geometry, &mut parts);
+    signature(&parts, false)
+}
+
+/// Counts `got` against `reference` in `stats`: identical, reordered (ring start, MultiPoint order), reversed
+/// (line direction) or different.
+pub fn classify(
     reference: &mlt_core::geo_types::Geometry<i32>,
     got: &mlt_core::geo_types::Geometry<i32>,
     stats: &mut GeomStats,

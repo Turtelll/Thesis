@@ -31,6 +31,8 @@ workspace = true
 
 [dependencies]
 mlt-pipeline = { path = "../mlt-pipeline" }
+# PATCH (research-rust): `EncoderConfig::gzip_selection` scores stream competitions with real zlib level 6
+flate2 = { version = "1", default-features = false, features = ["zlib"] }
 arbitrary = { workspace = true, optional = true }
 bitvec.workspace = true
 bytemuck.workspace = true

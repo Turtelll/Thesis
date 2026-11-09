@@ -8,8 +8,8 @@ Result: [`research-java/docs/results/mlt-v2-rust-port.md`](../research-java/docs
 |---|---|
 | `mlt-pipeline` | the codec: reorder, predict, segment, zigzag, byte width, transpose, the 2-byte self-describing header, the shared-reference blocks. Bit-exact with Java (`golden-check`). No dependency on mlt-core. |
 | `mlt-core-pipeline` | a copy of `maplibre-tile-spec/rust/mlt-core` at the pinned commit (`062d6c72`, 0.22.1) with a small patch, library name `mlt_core`. The submodule itself is untouched. |
-| `mlt-tile-oracle` | the tile oracle as a library: `encode_tile(layers, base, VertexMode, verify)` writes the layers of a tile with the codec as vertex stream (per-layer default, one fixed composition, or the gzip descent over the 96 compositions), plus the geometry check. Shared by `mlt-oracle` and the `mlt` CLI. |
-| `mlt-oracle` | the measurement CLI: `golden-check` (codec against the Java golden master) and `compare` (whole-tile gzip, stock vs the tile oracle). |
+| `mlt-tile-oracle` | the tile oracle as a library: `encode_tile(layers, base, VertexMode, verify)` writes the layers of a tile with the codec as vertex stream (per-layer default, one fixed composition, or the gzip descent over the 96 compositions, every candidate with its other streams picked by gzip size: `gzip_config`), plus the geometry check. Shared by `mlt-oracle` and the `mlt` CLI. |
+| `mlt-oracle` | the measurement CLI: `golden-check` (codec against the Java golden master), `compare` (whole-tile gzip, stock vs the tile oracle) and `diff` (two tilesets hold the same features). |
 | `mlt-cli-pipeline` | a copy of `maplibre-tile-spec/rust/mlt` (the `mlt` CLI, 0.6.1) at the same commit, linked against `mlt-core-pipeline`, with `mlt convert --vertex-pipeline` and an MLT-aware `.mbtiles` map in `mlt ui`. Binary name `mlt`. |
 
 ## Commands (from `research-rust/`)
@@ -22,6 +22,7 @@ mlt-oracle golden-check --golden ../data/golden/grid-best # all 96 rows (researc
 mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles --by-zoom --by-layer --csv out.csv
 mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles --write-tiles target-results/tiles   # also write <z>_<x>_<y>.stock.mlt / .oracle.mlt
 python check_tiles.py target-results/tiles out.csv        # independent gzip -6 sizes (Python zlib) of the written tiles, checked against the csv
+mlt-oracle decode-time target-results/munich-stock.mbtiles target-results/munich-oracle.mbtiles --by-zoom   # whole-tile decode time (parse + decode_all), first archive (stock v2) as reference; --reps/--warmup/--csv
 ```
 
 ### Whole tilesets and the visualizer: the `mlt` CLI
@@ -29,7 +30,7 @@ python check_tiles.py target-results/tiles out.csv        # independent gzip -6 
 ```
 cargo build --release -p mlt-cli-pipeline                 # builds target/release/mlt
 mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline default   # per-layer default composition (forLayer)
-mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline oracle    # tile oracle: best of 96 compositions per layer on the gzip size of the tile
+mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline oracle    # tile oracle: best of 96 compositions per layer on the gzip size of the tile, the other streams picked by gzip size
 mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline PIPE_QUAD_CORNER_SHARED_FRAME_CLASS_ZIGZAG_ESCAPE_PLANES   # one composition for every layer
 mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline oracle --verify   # decode every tile, compare with the stock decode
 mlt ui out.mbtiles                                        # terminal visualizer: the world map of an MLT .mbtiles
@@ -39,6 +40,7 @@ python check_convert.py out.mbtiles target-results/tiles   # converted tiles byt
 python check_convert.py --sum out.mbtiles                  # raw and gzip -6 totals of a converted tileset
 mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline oracle --gzip     # each tile compressed before it is stored: --gzip (6), --brotli (9), --zstd (19)
 python check_convert.py --same a.mbtiles b.mbtiles        # two archives hold the same tiles once decompressed
+mlt-oracle diff ../data/MVT/munich-plantiler.mbtiles out.mbtiles   # same tiles, layers and features (MVT or MLT, stock or pipeline, any compression): features matched in any order on id, properties and geometry up to ring start, MultiPoint order and line direction; exits 1 on a difference
 ```
 
 `--gzip`, `--brotli` and `--zstd` (shorthands for `--tile-compression gzip|brotli|zstd`, mutually exclusive) compress every tile after it is
@@ -71,9 +73,10 @@ Everything else is the upstream source byte for byte. The changed places, all ma
 
 | file | change |
 |---|---|
-| `Cargo.toml` | new; package `mlt-core-pipeline`, `[lib] name = "mlt_core"`, depends on `mlt-pipeline`, no dev-dependencies/benches/tests |
+| `Cargo.toml` | new; package `mlt-core-pipeline`, `[lib] name = "mlt_core"`, depends on `mlt-pipeline` and `flate2` (zlib), no dev-dependencies/benches/tests |
 | `src/lib.rs` | the crate doc no longer includes the README |
-| `src/encoder/model.rs` | `EncoderConfig.vertex_pipeline: Option<mlt_pipeline::Composition>` with `with_vertex_pipeline`/`vertex_pipeline`; `allow_rans_vertices()` is always `false` |
+| `src/encoder/model.rs` | `EncoderConfig.vertex_pipeline: Option<mlt_pipeline::Composition>` with `with_vertex_pipeline`/`vertex_pipeline`; `allow_rans_vertices()` is always `false`; `EncoderConfig.gzip_selection` with `with_gzip_selection`/`gzip_selection` |
+| `src/encoder/writer.rs` | with `gzip_selection` every stream-encoding competition (`try_alternatives`) keeps the candidate with the smallest gzip size (level 6) of the layer written so far (header, meta, data, the running bests of open competitions left out) instead of the smallest raw length; `AltLevel.best_score` |
 | `src/encoder/geometry/encode02.rs` | `write_vertices` hands plain-xy vertex streams to the pipeline codec when the config selects a composition; `pipeline_input`/`pipeline_topology`/`pipeline_buffer` build its topology lists from the section's length streams |
 | `src/encoder/geometry/streams.rs` | `encode_pipeline_vertex_stream02` |
 | `src/decoder/geometry/decode.rs` | `decode_vertex_stream` reads the payload over the section's length streams (`pipeline_topology`) |

@@ -4,6 +4,8 @@ repo_url: https://github.com/Turtelll/Thesis
 repo_name: Turtelll/Thesis
 edit_uri: edit/main/docs/
 docs_dir: docs
+not_in_nav: |
+  /encoding/
 
 theme:
   name: material

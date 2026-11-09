@@ -43,6 +43,8 @@ the size is gzip level 6 (real zlib, as `java.util.zip` deflates), summed over t
 | pipeline, per-layer default | every vertex stream by the codec with `forLayer(layer)` |
 | pipeline, per-layer alone-best | per layer the composition whose layer bytes gzip smallest alone |
 | pipeline, tile oracle | `TileSelector.oracle` (coordinate descent on the gzip size of the whole tile, from the smaller of the default and the alone-best tile, at most 10 passes), 96 candidates per layer |
+| stock + gzip stream selection | stock with every stream-encoding competition decided by gzip size, see [the other streams by gzip size](#the-other-streams-by-gzip-size) |
+| pipeline, tile oracle + gzip streams | the tile oracle with every candidate on gzip stream selection; what `--vertex-pipeline oracle` writes now |
 
 A composition's reorder permutes **whole layers**: id and every property column follow the features, so a candidate is a
 complete layer encoding and the tile the oracle minimises is the complete MLT v2 tile (the Java oracle sees the geometry buffers
@@ -64,6 +66,11 @@ mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles --by-zoom --by
 | pipeline, per-layer alone-best | 15.255.104 | -9,12% | - | - |
 | pipeline, tile oracle, no feature reorder (32 compositions) | 15.298.529 | -8,86% | 18.767.109 | +1,51% |
 | pipeline, tile oracle (96) | 15.234.332 | **-9,25%** | 18.702.304 | +1,16% |
+| stock v2 + gzip stream selection | 16.083.379 | -4,19% | 20.721.218 | +12,08% |
+| pipeline, tile oracle (96) + gzip streams | 15.084.159 | **-10,14%** | 20.312.304 | +9,87% |
+
+The two last rows are the [other streams by gzip size](#the-other-streams-by-gzip-size); every other section up to there
+is the tile oracle with the stock raw-length stream selection.
 
 ### Where the 9,25% comes from
 
@@ -196,6 +203,63 @@ tiles of the written archive (raw, and gzip level 6 re-measured with Python's zl
 - The `mlt ui` map reads the `format` metadata of an archive and decodes MLT tiles with the patched decoder. The loader was driven without a
   terminal (a temporary probe that asked it for tile 9/272/177 of the oracle and default archives): both decode to the same 2.333 features,
   11 layers, as the MVT source. The interactive screens themselves were not driven.
+
+## The other streams by gzip size
+
+The tile oracle searched the vertex stream only. Every other stream of a layer (ids, geometry lengths and types,
+integer, float and string properties, shared dictionaries; and the stock vertex layouts of a layer that falls back)
+is picked by stock `mlt-core` in a competition of candidate encodings (`Encoder::try_alternatives`: varint vs FastPFOR,
+RLE, delta, FSST vs dictionary vs plain, ...), and stock keeps the candidate with the fewest **raw** bytes.
+
+`EncoderConfig::with_gzip_selection(true)` (patch in `mlt-core-pipeline`, `writer.rs`) decides those competitions by
+gzip instead: a candidate's score is its deflate size (zlib level 6) after the layer written so far. zlib is primed with
+the last 32 KiB (the deflate window) of the layer before the competition, with the running best of every enclosing
+competition left out, and compresses only the candidate. The first candidate is scored only once a second one
+arrives. The context is the layer, not the tile: the layers before it are not decided while its candidates are written.
+The tile oracle (`mlt_tile_oracle::gzip_config`) writes every one of its 96 candidates per layer this way, and the
+descent then runs as before. With the flag off every competition is decided as before: the raw-length rows above are
+reproduced to the byte (15.234.332 / 18.702.304).
+
+```
+mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles --by-zoom --by-layer --csv gzip-streams.csv --write-tiles tiles-gzip-streams
+```
+
+| step | gzip bytes | step vs previous | raw bytes |
+|---|---|---|---|
+| stock v2 | 16.786.524 | | 18.487.134 |
+| stock v2 + gzip stream selection | 16.083.379 | **-4,19%** | 20.721.218 |
+| tile oracle (96), raw-length streams | 15.234.332 | -9,25% vs stock | 18.702.304 |
+| tile oracle (96) + gzip streams | 15.084.159 | **-0,99%** (-10,14% vs stock) | 20.312.304 |
+
+- Under the tile oracle the other streams give one point more (-150 KB). On stock the same switch gives -4,19%, which
+  also decides the stock vertex layouts by gzip; how much of the -4,19% is vertex streams was not isolated.
+- The tiles grow raw (+9,87% vs stock, against +1,16% for the raw-length oracle): gzip prefers encodings that are
+  larger before compression. Which encodings change was not inspected.
+- By zoom the gain is in every zoom from z5 up; z14 goes from -9,38% to **-10,39%** vs stock, z0 to z4 are unchanged.
+- By layer (each layer gzipped on its own, oracle vs stock): `poi` +0,75% → **-1,56%** (the one large layer that was
+  above stock), `place` -0,01% → -2,56%, `transportation_name` -6,04% → -8,03%, `landcover` -13,51% → -13,76%,
+  `building` -18,74% → -19,50%, `transportation` -11,34% → -11,71%; `housenumber` +1,80% → +2,31% (worse on its own; the oracle
+  scores the tile, not the layer alone), `aerodrome_label` +0,77% → +0,63%. All layers -9,28% → -10,15%.
+- Picks: reorder none 69,6%, `HILBERT_CENTROID_ROT_MP` 23,9%, `CHAIN` 6,5% (before 71,9 / 22,2 / 5,8%).
+
+**Verification.** All 358 tiles of both oracles decode, the vertices equal the codec's emitted buffer, ids and properties
+equal the stock decode of the same feature order, 0 of 482.944 features hold another shape (22.160 reversed, 33.696 reordered).
+`check_tiles.py` on the written tiles: 16.786.524 and 15.084.159 bytes, 0 mismatches against the CSV over 358 tiles. Determinism
+(a second run) was not checked.
+
+**The 32 KiB window.** Scoring with gzip of the whole layer so far plus the candidate (the exact criterion) was measured on the first
+40 tiles: oracle + gzip streams 1.631.993 bytes (-0,95% vs the raw-length oracle) against 1.633.109 (-0,88%) with the window, so the
+window gives away 0,07 points. It is the deflate window, so every match the exact criterion could find is in reach; the difference is
+deflate's block splits (each candidate is compressed as its own stream).
+
+**Cost.** First 40 tiles (the low zooms and the first z12-z14 tiles), `compare --no-stock-sorted`, 12 cores: 2 min 11 s with both
+trial sets and no scoring, 8 min 31 s with the exact criterion, 6 min 22 s with the window, 3 min 19 s with the window, lazy first-candidate
+scoring and one reused zlib state (same bytes as the window alone). The full corpus took about 70 minutes (from the file times; it was not timed),
+against 14 minutes before: `compare` now writes every layer twice (raw-length and gzip stream selection), scores every competition and
+verifies both oracles.
+
+**Not re-run.** `mlt convert --vertex-pipeline oracle` now writes the gzip-stream oracle; the `convert` table above (15.234.332, 697 s) is
+the raw-length oracle and was not re-run, nor `check_convert.py` against the new tiles.
 
 ## Caveats
 

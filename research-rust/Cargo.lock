@@ -2638,6 +2638,7 @@ dependencies = [
  "enum_dispatch",
  "fast-mvt",
  "fastpfor",
+ "flate2",
  "fsst-rs",
  "geo",
  "geo-types",
@@ -2664,6 +2665,7 @@ dependencies = [
 name = "mlt-oracle"
 version = "0.1.0"
 dependencies = [
+ "brotli",
  "flate2",
  "mlt-core-pipeline",
  "mlt-pipeline",
@@ -2673,6 +2675,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "zstd",
 ]
 
 [[package]]

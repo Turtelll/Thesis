@@ -59,6 +59,7 @@ cargo build --release -p mlt-oracle
 mlt-oracle golden-check --golden ../data/golden/<dump> # Rust codec vs the Java golden dump, bit for bit (dump with --grid best)
 mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles --by-zoom --by-layer # whole-tile MLT v2 gzip: stock vs the tile oracle, with the decomposition and the geometry check
 mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles --write-tiles target-results/tiles # also write the stock and oracle tiles; python check_tiles.py <dir> re-measures them
+mlt-oracle decode-time target-results/munich-stock.mbtiles target-results/munich-oracle.mbtiles --by-zoom # whole-tile decode time of MLT .mbtiles (min of --reps, decompression untimed), first archive (stock v2, `mlt convert --mlt-version 2`) as reference
 ```
 
 The same encoder is in the `mlt` CLI (`research-rust/mlt-cli-pipeline`, a patched copy of the submodule's `mlt`), to encode whole
@@ -69,6 +70,7 @@ cargo build --release -p mlt-cli-pipeline # target/release/mlt
 mlt convert ../data/MVT/munich-plantiler.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline oracle --verify # off | default | oracle | one composition name; the tile oracle for the whole tileset
 mlt ui out.mbtiles # terminal visualizer, the world map of an MLT .mbtiles (also: mlt ui tile.mlt, mlt ui <directory>, mlt ls/decode)
 python check_convert.py out.mbtiles target-results/tiles # converted tiles byte for byte against compare --write-tiles
+mlt-oracle diff ../data/MVT/munich-plantiler.mbtiles out.mbtiles # completeness: both tilesets (MVT/MLT, stock/pipeline) hold the same tiles, layers, features (order, ring start, line direction free)
 ```
 
 `research-rust/mlt-core-pipeline` and `research-rust/mlt-cli-pipeline` are patched copies of the submodule's `mlt-core` and `mlt` (the

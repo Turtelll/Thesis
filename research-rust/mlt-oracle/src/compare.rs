@@ -7,8 +7,14 @@
 //! * **stock + sort**: the same with the encoder's own feature-order trials (Hilbert, feature ID);
 //! * **per-layer default**: every vertex stream written by the pipeline codec with `for_layer(layer)`;
 //! * **alone-best**: per layer the composition whose layer bytes gzip smallest alone;
-//! * **tile oracle**: `TileSelector.oracle`, coordinate descent over the gzip size of the whole tile
-//!   across all 96 compositions of `bestGrid()`, from the smaller of the default and the alone-best tile.
+//! * **tile oracle, raw-length stream selection**: `TileSelector.oracle`, coordinate descent over the gzip size of
+//!   the whole tile across all 96 compositions of `bestGrid()`, from the smaller of the default and the alone-best
+//!   tile, with the other streams (ids, geometry lengths, properties) encoded as stock picks them: raw byte length;
+//! * **stock + gzip stream selection**: stock with every stream-encoding competition decided by gzip size
+//!   (`gzip_config`);
+//! * **tile oracle**: the same descent with every candidate on `gzip_config`, what `mlt convert --vertex-pipeline
+//!   oracle` writes. The per-zoom and per-layer tables, the picks, `--write-tiles` and the csv `oracle_*` columns are
+//!   this row.
 //!
 //! A composition's reorder permutes whole layers (id and every property column follow), so each of the
 //! 96 candidates is a complete layer encoding. The pipeline codec is the vertex stream of the patched
@@ -20,18 +26,20 @@ use mlt_core::mvt::mvt_to_tile_layers;
 use mlt_pipeline::registry::best_grid;
 use mlt_pipeline::{Composition, Reorder};
 use mlt_tile_oracle::{
-    GeomStats, LayerTrial, ORACLE_MAX_PASSES, alone_sizes, concat, fixed_choice, gzip_len, raw_len, select, stock_config,
-    trial_layer, verify,
+    GeomStats, LayerTrial, ORACLE_MAX_PASSES, alone_sizes, concat, fixed_choice, gzip_config, gzip_len, raw_len, select,
+    stock_config, trial_layer, verify,
 };
 use rayon::prelude::*;
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::path::PathBuf;
 
-const USAGE: &str = "compare --mbtiles <file> [--csv <file>] [--by-zoom] [--by-layer] [--layer <name>] [--limit-tiles <n>] [--no-verify] [--no-stock-sorted] [--max-passes <n>] [--write-tiles <dir>]\n\
+const USAGE: &str = "compare --mbtiles <file> [--csv <file>] [--by-zoom] [--by-layer] [--layer <name>] [--limit-tiles <n>] [--no-verify] [--no-stock-sorted] [--max-passes <n>] [--write-tiles <dir>] [--verify-all-compositions]\n\
   Whole-tile MLT v2 under gzip (zlib level 6): stock vs the pipeline codec as the vertex encoder.\n\
   --write-tiles writes <z>_<x>_<y>.stock.mlt and .oracle.mlt, so the sizes can be checked with other tools\n\
-  (`gzip -6 -c file | wc -c` is the compressed size compare reports).";
+  (`gzip -6 -c file | wc -c` is the compressed size compare reports).\n\
+  --verify-all-compositions round-trips every one of the 96 grid compositions on every pipelined\n\
+  layer (not just the oracle's chosen one), through the real tile container.";
 
 struct Options {
     mbtiles: PathBuf,
@@ -41,6 +49,7 @@ struct Options {
     layer: Option<String>,
     limit: usize,
     verify: bool,
+    verify_all: bool,
     stock_sorted: bool,
     max_passes: usize,
     write_tiles: Option<PathBuf>,
@@ -55,6 +64,7 @@ fn parse(args: &[String]) -> Result<Option<Options>, String> {
         layer: None,
         limit: usize::MAX,
         verify: true,
+        verify_all: false,
         stock_sorted: true,
         max_passes: ORACLE_MAX_PASSES,
         write_tiles: None,
@@ -80,6 +90,7 @@ fn parse(args: &[String]) -> Result<Option<Options>, String> {
                 o.write_tiles = Some(dir);
             }
             "--no-verify" => o.verify = false,
+            "--verify-all-compositions" => o.verify_all = true,
             "--no-stock-sorted" => o.stock_sorted = false,
             "--help" | "-h" => {
                 println!("{USAGE}");
@@ -112,6 +123,12 @@ struct TileResult {
     alone_gzip: usize,
     oracle_raw: usize,
     oracle_gzip: usize,
+    /// The oracle with the other streams on the stock raw-length selection.
+    rawsel_raw: usize,
+    rawsel_gzip: usize,
+    /// Stock with gzip stream selection.
+    stock_gs_raw: usize,
+    stock_gs_gzip: usize,
     /// Every layer on plain delta + split varint through the codec: the Java `DELTA_ZIGZAG_VARINT` reference.
     plain_raw: usize,
     plain_gzip: usize,
@@ -120,6 +137,8 @@ struct TileResult {
     noreorder_gzip: usize,
     verified: Result<(), String>,
     geometry: Vec<(String, GeomStats)>,
+    /// With `--verify-all-compositions`: every (composition, error) that failed round trip on this tile.
+    all_compositions_failed: Vec<(String, String)>,
 }
 
 struct LayerResult {
@@ -144,6 +163,10 @@ fn process(z: u32, x: u32, y: u32, data: &[u8], o: &Options, grid: &[Composition
     if layers.is_empty() {
         return Ok(None);
     }
+    let trials_gs: Vec<LayerTrial> = layers
+        .iter()
+        .map(|l| trial_layer(l.clone(), grid, false, gzip_config(stock_config())).map_err(|e| format!("{z}/{x}/{y}: {e}")))
+        .collect::<Result<_, _>>()?;
     let trials: Vec<LayerTrial> = layers
         .into_iter()
         .map(|l| trial_layer(l, grid, o.stock_sorted, stock_config()).map_err(|e| format!("{z}/{x}/{y}: {e}")))
@@ -158,7 +181,8 @@ fn process(z: u32, x: u32, y: u32, data: &[u8], o: &Options, grid: &[Composition
     });
 
     let alone = alone_sizes(&trials);
-    let sel = select(&trials, grid, &alone, &|_| true, o.max_passes);
+    let rawsel = select(&trials, grid, &alone, &|_| true, o.max_passes);
+    let sel = select(&trials_gs, grid, &alone_sizes(&trials_gs), &|_| true, o.max_passes);
     let no_reorder = select(&trials, grid, &alone, &|c| c.reorder == Reorder::None, o.max_passes);
     let plain_composition = Composition {
         reorder: Reorder::None,
@@ -167,29 +191,48 @@ fn process(z: u32, x: u32, y: u32, data: &[u8], o: &Options, grid: &[Composition
         terminal: mlt_pipeline::Terminal::VarintSplit,
     };
     let plain = fixed_choice(&trials, grid, plain_composition);
-    let (verified, geometry) = if o.verify { verify(&trials, grid, &sel.chosen, stock_config()) } else { (Ok(()), Vec::new()) };
+    let (verified, geometry) = if o.verify {
+        let (rawsel_verified, _) = verify(&trials, grid, &rawsel.chosen, stock_config());
+        let (verified, geometry) = verify(&trials_gs, grid, &sel.chosen, stock_config());
+        (rawsel_verified.and(verified), geometry)
+    } else {
+        (Ok(()), Vec::new())
+    };
+
+    let all_compositions_failed = if o.verify_all {
+        grid.iter()
+            .filter_map(|&composition| {
+                let chosen = fixed_choice(&trials, grid, composition);
+                let (outcome, _) = verify(&trials, grid, &chosen, stock_config());
+                outcome.err().map(|e| (composition.name(), e))
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
 
     if let Some(dir) = &o.write_tiles {
         let name = |kind: &str| dir.join(format!("{z}_{x}_{y}.{kind}.mlt"));
         let stock_tile: Vec<u8> = trials.iter().flat_map(|t| t.stock.iter().copied()).collect();
-        let oracle_tile: Vec<u8> = concat(&trials, &sel.chosen, None).flat_map(|b| b.iter().copied()).collect();
+        let oracle_tile: Vec<u8> = concat(&trials_gs, &sel.chosen, None).flat_map(|b| b.iter().copied()).collect();
         std::fs::write(name("stock"), stock_tile).map_err(|e| e.to_string())?;
         std::fs::write(name("oracle"), oracle_tile).map_err(|e| e.to_string())?;
     }
 
     let layers = trials
         .iter()
+        .zip(&trials_gs)
         .enumerate()
-        .map(|(l, t)| {
-            let default = t.candidates[sel.tile_default[l]].as_deref().expect("start is allowed");
-            let oracle = t.candidates[sel.chosen[l]].as_deref().expect("chosen is allowed");
+        .map(|(l, (t, t_gs))| {
+            let default = t.candidates[rawsel.tile_default[l]].as_deref().expect("start is allowed");
+            let oracle = t_gs.candidates[sel.chosen[l]].as_deref().expect("chosen is allowed");
             LayerResult {
                 name: t.name.clone(),
                 stock_gzip: gzip_len([t.stock.as_slice()]),
                 default_gzip: gzip_len([default]),
                 oracle_gzip: gzip_len([oracle]),
-                choice: t.pipelined.then(|| grid[sel.chosen[l]]),
-                pipelined: t.pipelined,
+                choice: t_gs.pipelined.then(|| grid[sel.chosen[l]]),
+                pipelined: t_gs.pipelined,
             }
         })
         .collect();
@@ -201,18 +244,23 @@ fn process(z: u32, x: u32, y: u32, data: &[u8], o: &Options, grid: &[Composition
         stock_raw,
         stock_gzip,
         sorted,
-        default_raw: raw_len(&trials, &sel.tile_default),
-        default_gzip: sel.default_gzip,
-        alone_raw: raw_len(&trials, &sel.alone),
-        alone_gzip: sel.alone_gzip,
-        oracle_raw: raw_len(&trials, &sel.chosen),
+        default_raw: raw_len(&trials, &rawsel.tile_default),
+        default_gzip: rawsel.default_gzip,
+        alone_raw: raw_len(&trials, &rawsel.alone),
+        alone_gzip: rawsel.alone_gzip,
+        oracle_raw: raw_len(&trials_gs, &sel.chosen),
         oracle_gzip: sel.oracle_gzip,
+        rawsel_raw: raw_len(&trials, &rawsel.chosen),
+        rawsel_gzip: rawsel.oracle_gzip,
+        stock_gs_raw: trials_gs.iter().map(|t| t.stock.len()).sum(),
+        stock_gs_gzip: gzip_len(trials_gs.iter().map(|t| t.stock.as_slice())),
         plain_raw: raw_len(&trials, &plain),
         plain_gzip: gzip_len(concat(&trials, &plain, None)),
         noreorder_raw: raw_len(&trials, &no_reorder.chosen),
         noreorder_gzip: no_reorder.oracle_gzip,
         verified,
         geometry,
+        all_compositions_failed,
     }))
 }
 
@@ -257,6 +305,10 @@ struct Sum {
     plain_gzip: usize,
     noreorder_raw: usize,
     noreorder_gzip: usize,
+    rawsel_raw: usize,
+    rawsel_gzip: usize,
+    stock_gs_raw: usize,
+    stock_gs_gzip: usize,
 }
 
 impl Sum {
@@ -273,6 +325,10 @@ impl Sum {
         self.plain_gzip += t.plain_gzip;
         self.noreorder_raw += t.noreorder_raw;
         self.noreorder_gzip += t.noreorder_gzip;
+        self.rawsel_raw += t.rawsel_raw;
+        self.rawsel_gzip += t.rawsel_gzip;
+        self.stock_gs_raw += t.stock_gs_raw;
+        self.stock_gs_gzip += t.stock_gs_gzip;
     }
 }
 
@@ -334,11 +390,13 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let rows = [
         ("stock v2 (default profile, no tessellation)", total.stock_gzip, total.stock_raw),
         ("stock v2 + own sort trials (hilbert, id)", sorted.1, sorted.0),
+        ("stock v2 + gzip stream selection", total.stock_gs_gzip, total.stock_gs_raw),
         ("pipeline, plain delta + split varint", total.plain_gzip, total.plain_raw),
         ("pipeline, per-layer default (forLayer)", total.default_gzip, total.default_raw),
         ("pipeline, per-layer alone-best", total.alone_gzip, 0),
         ("pipeline, tile oracle, no feature reorder (32)", total.noreorder_gzip, total.noreorder_raw),
-        ("pipeline, tile oracle (96 compositions)", total.oracle_gzip, total.oracle_raw),
+        ("pipeline, tile oracle (96), raw-length streams", total.rawsel_gzip, total.rawsel_raw),
+        ("pipeline, tile oracle (96) + gzip streams", total.oracle_gzip, total.oracle_raw),
     ];
     for (label, gzip, raw) in rows {
         if gzip == 0 {
@@ -349,10 +407,11 @@ pub fn run(args: &[String]) -> Result<(), String> {
         println!("{label:<48} {gzip:>14} {:>9} {raw_text:>14} {raw_pct:>9}", pct(gzip, total.stock_gzip));
     }
     println!(
-        "steps: stock -> plain delta {}, plain delta -> no-reorder oracle {}, no-reorder oracle -> full oracle {}",
+        "steps: stock -> plain delta {}, plain delta -> no-reorder oracle {}, no-reorder oracle -> full oracle {}, full oracle -> + gzip streams {}",
         pct(total.plain_gzip, total.stock_gzip),
         pct(total.noreorder_gzip, total.plain_gzip),
-        pct(total.oracle_gzip, total.noreorder_gzip)
+        pct(total.rawsel_gzip, total.noreorder_gzip),
+        pct(total.oracle_gzip, total.rawsel_gzip)
     );
 
     let failed: Vec<&TileResult> = ok.iter().filter(|t| t.verified.is_err()).collect();
@@ -362,6 +421,23 @@ pub fn run(args: &[String]) -> Result<(), String> {
             println!("  {}/{}/{}: {}", t.z, t.x, t.y, t.verified.as_ref().unwrap_err());
         }
         print_geometry(&ok);
+    }
+
+    if o.verify_all {
+        let total_failed: usize = ok.iter().map(|t| t.all_compositions_failed.len()).sum();
+        let grid_len = grid.len();
+        println!(
+            "\nverify-all-compositions: {} of {} (tile, composition) round trips failed ({} tiles x {} compositions)",
+            total_failed,
+            ok.len() * grid_len,
+            ok.len(),
+            grid_len
+        );
+        for t in &ok {
+            for (name, err) in t.all_compositions_failed.iter().take(5) {
+                println!("  {}/{}/{} [{name}]: {err}", t.z, t.x, t.y);
+            }
+        }
     }
 
     if o.by_zoom {
@@ -410,12 +486,12 @@ pub fn run(args: &[String]) -> Result<(), String> {
 
     if let Some(path) = &o.csv {
         let mut out = String::from(
-            "z,x,y,layers,stock_raw,stock_gzip,stock_sorted_raw,stock_sorted_gzip,default_raw,default_gzip,alone_raw,alone_gzip,oracle_raw,oracle_gzip,plain_raw,plain_gzip,noreorder_raw,noreorder_gzip,verified\n",
+            "z,x,y,layers,stock_raw,stock_gzip,stock_sorted_raw,stock_sorted_gzip,default_raw,default_gzip,alone_raw,alone_gzip,oracle_raw,oracle_gzip,plain_raw,plain_gzip,noreorder_raw,noreorder_gzip,verified,oracle_rawsel_raw,oracle_rawsel_gzip,stock_gzsel_raw,stock_gzsel_gzip\n",
         );
         for t in &ok {
             let (sr, sg) = t.sorted.unzip();
             out.push_str(&format!(
-                "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
+                "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
                 t.z,
                 t.x,
                 t.y,
@@ -434,7 +510,11 @@ pub fn run(args: &[String]) -> Result<(), String> {
                 t.plain_gzip,
                 t.noreorder_raw,
                 t.noreorder_gzip,
-                t.verified.is_ok()
+                t.verified.is_ok(),
+                t.rawsel_raw,
+                t.rawsel_gzip,
+                t.stock_gs_raw,
+                t.stock_gs_gzip
             ));
         }
         std::fs::write(path, out).map_err(|e| format!("{}: {e}", path.display()))?;

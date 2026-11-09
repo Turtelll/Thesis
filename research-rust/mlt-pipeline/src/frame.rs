@@ -29,11 +29,15 @@ fn to_degrees(radians: f64) -> f64 {
 
 /// Java's `Math.round(double)`: the nearest integer, ties toward positive infinity, saturating,
 /// NaN as 0. `x - floor(x)` is exact, so no `x + 0.5` rounding error enters.
+/// `f64::floor` (hardware-exact, IEEE-754 `floor` has no rounding-mode ambiguity unlike
+/// transcendental functions) is used in place of `libm::floor` here for speed; verified
+/// bit-identical to `libm::floor` over an exhaustive/dense sweep plus special values
+/// (NaN, ties, overflow) -- see the frame-trig investigation for the verification method.
 fn round(x: f64) -> i64 {
     if x.is_nan() {
         return 0;
     }
-    let floor = libm::floor(x);
+    let floor = x.floor();
     let rounded = if x - floor >= 0.5 { floor + 1.0 } else { floor };
     rounded as i64
 }
@@ -77,7 +81,7 @@ fn heading(ex: i32, ey: i32) -> (i32, i32) {
         return (0, ZERO_FRAME);
     }
     let t = (to_degrees(libm::atan2(f64::from(ey), f64::from(ex))) + 45.0) / 90.0;
-    let whole = libm::floor(t);
+    let whole = t.floor();
     let mut quarters = whole as i32;
     let mut index = round((t - whole) * 65536.0);
     if index == 65536 {
@@ -306,7 +310,7 @@ impl FramePrior {
 
 /// The grid cell along one axis, clamped to the grid.
 fn cell(coordinate: f64) -> usize {
-    let c = (libm::floor(coordinate / f64::from(CELL)) as i32).wrapping_add(ORIGIN);
+    let c = ((coordinate / f64::from(CELL)).floor() as i32).wrapping_add(ORIGIN);
     c.clamp(0, GRID as i32 - 1) as usize
 }
 

@@ -157,6 +157,9 @@ pub struct Encoder {
     /// Empty while no [`Encoder::try_alternatives`] session
     /// is in progress.
     alt_stack: Vec<AltLevel>,
+
+    /// PATCH (research-rust): the deflate state [`Self::candidate_deflate_len`] reuses across candidates.
+    zlib: Option<flate2::Compress>,
 }
 
 impl Encoder {
@@ -178,6 +181,7 @@ impl Encoder {
             #[cfg(feature = "unstable-v2")]
             family_context: Family::default(),
             alt_stack: Vec::new(),
+            zlib: None,
         }
     }
 
@@ -221,6 +225,7 @@ impl Encoder {
             #[cfg(feature = "unstable-v2")]
             family_context: Family::Int(WordWidth::W32),
             alt_stack: vec![],
+            zlib: None,
         }
     }
 
@@ -460,6 +465,7 @@ impl Encoder {
             meta_start: self.meta.len(),
             best_data: None,
             best_meta: None,
+            best_score: None,
         });
         AltSession { enc: self }
     }
@@ -475,9 +481,7 @@ impl Encoder {
             !self.alt_stack.is_empty(),
             "alt_commit called outside an active AltSession"
         );
-        let (data, meta, stack) = (&mut self.data, &mut self.meta, &mut self.alt_stack);
-        let level = stack.last_mut().unwrap();
-        Self::close_candidate(data, meta, level);
+        self.close_candidate();
     }
 
     /// Finalize the innermost competition and pop it from the stack.
@@ -490,14 +494,11 @@ impl Encoder {
             !self.alt_stack.is_empty(),
             "alt_pop called outside an active AltSession"
         );
-        {
-            let (data, meta, stack) = (&mut self.data, &mut self.meta, &mut self.alt_stack);
-            let level = stack.last_mut().unwrap();
-            let data_pending = data.len() - (level.data_start + level.best_data.unwrap_or(0));
-            let meta_pending = meta.len() - (level.meta_start + level.best_meta.unwrap_or(0));
-            if data_pending > 0 || meta_pending > 0 || level.best_data.is_none() {
-                Self::close_candidate(data, meta, level);
-            }
+        let level = self.alt_stack.last().unwrap();
+        let data_pending = self.data.len() - (level.data_start + level.best_data.unwrap_or(0));
+        let meta_pending = self.meta.len() - (level.meta_start + level.best_meta.unwrap_or(0));
+        if data_pending > 0 || meta_pending > 0 || level.best_data.is_none() {
+            self.close_candidate();
         }
         self.alt_stack.pop();
     }
@@ -507,14 +508,36 @@ impl Encoder {
     /// Compares the bytes written since the last committed candidate against
     /// the current best by **total** (`data + meta`) size.
     /// Keeps the shorter one; ties preserve the existing best.
-    fn close_candidate(data: &mut Vec<u8>, meta: &mut Vec<u8>, level: &mut AltLevel) {
-        let best_data_end = level.data_start + level.best_data.unwrap_or(0);
-        let best_meta_end = level.meta_start + level.best_meta.unwrap_or(0);
-        let cand_data = data.len() - best_data_end;
-        let cand_meta = meta.len() - best_meta_end;
-        let cand_total = cand_data + cand_meta;
-        let best_total = level.best_data.unwrap_or(0) + level.best_meta.unwrap_or(0);
-        if level.best_data.is_none_or(|_| cand_total < best_total) {
+    ///
+    /// PATCH (research-rust): with [`EncoderConfig::gzip_selection`] the score is
+    /// [`Self::candidate_deflate_len`] instead. The first candidate is taken unscored and scored only
+    /// when a second one arrives, so a competition that ends with one candidate costs no deflate.
+    fn close_candidate(&mut self) {
+        let gzip = self.cfg.gzip_selection();
+        let level = self.alt_stack.last().unwrap();
+        let (data_start, meta_start) = (level.data_start, level.meta_start);
+        let best_data_end = data_start + level.best_data.unwrap_or(0);
+        let best_meta_end = meta_start + level.best_meta.unwrap_or(0);
+        let cand_data = self.data.len() - best_data_end;
+        let cand_meta = self.meta.len() - best_meta_end;
+        let keep = if level.best_data.is_none() {
+            None
+        } else {
+            let best = match level.best_score {
+                Some(best) => best,
+                None => self.candidate_deflate_len(meta_start..best_meta_end, data_start..best_data_end),
+            };
+            self.alt_stack.last_mut().unwrap().best_score = Some(best);
+            let cand = if gzip {
+                self.candidate_deflate_len(best_meta_end..self.meta.len(), best_data_end..self.data.len())
+            } else {
+                cand_data + cand_meta
+            };
+            Some((cand, best))
+        };
+        let (data, meta) = (&mut self.data, &mut self.meta);
+        let level = self.alt_stack.last_mut().unwrap();
+        if keep.is_none_or(|(cand, best)| cand < best) {
             // New best: shift data candidate bytes to data_start.
             if level.best_data.is_some() {
                 data.copy_within(best_data_end..best_data_end + cand_data, level.data_start);
@@ -524,11 +547,72 @@ impl Encoder {
             meta.truncate(level.meta_start + cand_meta);
             level.best_data = Some(cand_data);
             level.best_meta = Some(cand_meta);
+            level.best_score = match keep {
+                Some((cand, _)) => Some(cand),
+                None if gzip => None,
+                None => Some(cand_data + cand_meta),
+            };
         } else {
             // Not an improvement: discard.
             data.truncate(best_data_end);
             meta.truncate(best_meta_end);
         }
+    }
+
+    /// PATCH (research-rust): the deflate size (zlib level 6) of one candidate of the innermost competition,
+    /// its bytes at `meta` and `data`, after the layer written before that competition opened. zlib is primed
+    /// with the last 32 KiB (the deflate window) of `hdr`, `meta` and `data` up to the innermost level's start,
+    /// without the running best of any enclosing competition, then compresses only the candidate (its `meta`
+    /// bytes, then its `data` bytes). Every match gzip of the whole layer could find is in reach, so this ranks
+    /// candidates as `gzip(layer so far + candidate)` does, up to deflate's block splits, at a cost bounded by
+    /// the window instead of the layer. The levels are nested, so their best ranges are disjoint and in order.
+    fn candidate_deflate_len(&mut self, meta: std::ops::Range<usize>, data: std::ops::Range<usize>) -> usize {
+        use flate2::{Compress, Compression, FlushCompress, Status};
+
+        const WINDOW: usize = 32 * 1024;
+
+        fn live<'a>(buf: &'a [u8], cuts: impl Iterator<Item = (usize, usize)>, end: usize, out: &mut Vec<&'a [u8]>) {
+            let mut at = 0;
+            for (start, len) in cuts {
+                out.push(&buf[at..start]);
+                at = start + len;
+            }
+            out.push(&buf[at..end]);
+        }
+
+        let (inner, outer) = self.alt_stack.split_last().expect("a competition is open");
+        let mut prefix: Vec<&[u8]> = vec![&self.hdr];
+        live(&self.meta, outer.iter().map(|l| (l.meta_start, l.best_meta.unwrap_or(0))), inner.meta_start, &mut prefix);
+        live(&self.data, outer.iter().map(|l| (l.data_start, l.best_data.unwrap_or(0))), inner.data_start, &mut prefix);
+
+        let mut dictionary = Vec::with_capacity(WINDOW);
+        for part in prefix.into_iter().rev() {
+            let take = part.len().min(WINDOW - dictionary.len());
+            dictionary.extend(part[part.len() - take..].iter().rev());
+            if dictionary.len() == WINDOW {
+                break;
+            }
+        }
+        dictionary.reverse();
+
+        let mut zlib = self.zlib.take().unwrap_or_else(|| Compress::new(Compression::new(6), false));
+        zlib.reset();
+        if !dictionary.is_empty() {
+            zlib.set_dictionary(&dictionary).expect("a raw deflate stream takes a dictionary before any input");
+        }
+        let mut out = [0u8; 4096];
+        for part in [&self.meta[meta], &self.data[data]] {
+            let mut at = 0;
+            while at < part.len() {
+                let before = zlib.total_in();
+                zlib.compress(&part[at..], &mut out, FlushCompress::None).expect("deflate of a buffer");
+                at += usize::try_from(zlib.total_in() - before).expect("a slice length");
+            }
+        }
+        while zlib.compress(&[], &mut out, FlushCompress::Finish).expect("deflate of a buffer") != Status::StreamEnd {}
+        let len = usize::try_from(zlib.total_out()).expect("a compressed slice length");
+        self.zlib = Some(zlib);
+        len
     }
 }
 
@@ -548,6 +632,9 @@ struct AltLevel {
     best_data: Option<usize>,
     /// Byte count appended to `meta` by the current best candidate.
     best_meta: Option<usize>,
+    /// PATCH (research-rust): the score the current best candidate won with (its total bytes, or
+    /// its deflate size under [`EncoderConfig::gzip_selection`]; `None` until a second candidate arrives).
+    best_score: Option<usize>,
 }
 
 /// RAII guard for a stream-encoding competition opened by [`Encoder::try_alternatives`].
