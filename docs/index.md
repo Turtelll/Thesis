@@ -10,26 +10,34 @@ general-purpose compressor (gzip, Brotli or zstd) that the tile is delivered wit
 ## Gains against stock MLT v2
 
 The pipeline runs inside the MLT v2 encoder (`mlt-core`, Rust) as its vertex encoder. Everything else in
-the tile (topology, ids, property columns) is written by the stock encoder. The sizes are whole tiles as a
-client receives them: the Munich corpus, 358 tiles, every layer, gzip level 6, summed over all tiles.
+the tile (topology, ids, property columns) is written by the stock encoder. Stock picks the encoding of each
+of those streams by its raw size; the rows marked *gzip stream choice* pick among the same encodings by gzip
+size instead, so the format does not change. The sizes are whole tiles as a client receives them: the Munich
+corpus, 358 tiles, every layer, gzip level 6, summed over all tiles.
 
 | encoder | raw bytes | gzip bytes | gzip vs stock |
 |---|---|---|---|
 | stock MLT v2 | 18.487.134 | 16.786.524 | |
 | stock MLT v2 with its own feature sorting | 18.317.963 | 16.643.440 | -0,85% |
+| stock MLT v2, gzip stream choice | 20.721.218 | 16.083.379 | -4,19% |
 | pipeline, plain delta + split varint on every layer | 19.383.707 | 16.202.284 | -3,48% |
 | pipeline, per-layer default composition | 19.186.915 | 15.785.075 | -5,97% |
 | pipeline, `DEFAULT` composition on every layer | 19.338.509 | 15.534.092 | -7,46% |
 | pipeline, tile oracle without feature reorder | 18.767.109 | 15.298.529 | -8,86% |
 | pipeline, tile oracle | 18.702.304 | 15.234.332 | -9,25% |
+| pipeline, tile oracle, gzip stream choice | 20.312.304 | 15.084.159 | **-10,14%** |
 
-The tile oracle saves 1,55 MB of 16,79 MB. Three things stand out:
+The tile oracle with gzip stream choice saves 1,70 MB of 16,79 MB. Four things stand out:
 
 - The pipeline's tiles are larger before compression and smaller after it. The stages make the bytes
   easy to compress, not small on their own.
-- About a third of the gain (3,48 points) comes from writing the vertices in a gzip-friendly form at all.
-  The predictors, frames, references and stream layouts add 5,6 points, the feature reorder 0,4.
-- All 358 tiles decode, and every feature keeps its shape. What may change is what a renderer does not
+- Choosing the stock encodings by gzip size alone makes stock tiles 4,19% smaller. Against that stock row,
+  which uses the same criterion, the pipeline's own gain is -6,21%. On top of the tile oracle the gzip
+  stream choice adds 0,99 points.
+- Of the 9,25 points with the stock stream choice, 3,48 come from writing the vertices in a gzip-friendly
+  form at all. The predictors, frames, references and stream layouts add 5,6 points, the feature reorder 0,4.
+- All 358 tiles of both tile oracles decode, and every feature keeps its shape (the stock gzip stream
+  choice tiles were not decoded). What may change is what a renderer does not
   draw differently: feature order, the start vertex of a ring, the order of points in a MultiPoint, and the
   direction of some line parts (which matters only for direction-dependent symbols such as one-way arrows).
 
