@@ -43,6 +43,5 @@ Supporting figures (same metric):
 
 - S2 (`FLAT`): -4,65% gzip / -6,43% Brotli 9 / -6,17% zstd.
 - With class streams -5,86%; S8 `GEOMETRY_BEST` -6,58% gzip / -11,72% Brotli / -7,99% zstd; `DEFAULT` -3,63%.
-- The ladder's S2 is now `QUAD_CORNER_SHARED_FRAME`.
 
 Source: `research-java/docs/results/openzl-pipeline.md`, `tile-oracle.md`.

@@ -13,8 +13,8 @@ A reference costs a flag bit and a short index, which is far less than a residua
 referenced still counts as decoded, so guesses and frames after it work as before.
 
 References are added on top of a guess. Each shared predictor is the plain predictor of the
-[prediction](03-prediction.md) page plus references: `QUAD_CORNER_SHARED` and `QUAD_CORNER_SHARED_FRAME`
-for rings, `LINE_CONTINUATION_SHARED_FRAME_HEADING` for lines.
+[prediction](03-prediction.md) page plus references: `QUAD_CORNER_SHARED` and
+`QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` for rings, `LINE_CONTINUATION_SHARED` for lines.
 
 ## The encodings
 
@@ -62,8 +62,8 @@ Rings and points in a line layer keep their plain residuals.
 ### Fallback
 
 The encoder writes every buffer both with and without references and keeps the smaller one. Without a
-gain, the header names the plain predictor (`QUAD_CORNER`, `QUAD_CORNER_FRAME`,
-`LINE_CONTINUATION_FRAME_HEADING`). A layer without shared vertices therefore pays nothing, and no mode byte
+gain, the header names the plain predictor (`QUAD_CORNER`, `QUAD_CORNER_PREVFRAME_FIRST_ONLY`,
+`LINE_CONTINUATION`). A layer without shared vertices therefore pays nothing, and no mode byte
 is needed.
 
 ### Residuals instead of positions
@@ -97,11 +97,12 @@ decoded vertex. Rotated rings and reversed parts are emitted as they are.
 ## What it is worth
 
 - Rings: in the earlier pipeline, adding references to `QUAD_CORNER` saved 2,22 points of gzip on the whole
-  corpus. `QUAD_CORNER_SHARED_FRAME` is today the default of `building`, `landcover`, `landuse`, `water` and
-  `aeroway`, and the predictor the tile oracle picks most often for polygons.
-- Lines: on `transportation` (gzip, against plain delta + varint), references take
-  `LINE_CONTINUATION_FRAME_HEADING` from -4,97% to -10,75% in stored order, and from -9,19% to -12,06% with
-  the chain order, which places connected parts next to each other.
+  corpus. `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` is today the default of `building`, `landcover`,
+  `landuse`, `water` and `aeroway`.
+- Lines: on `transportation` (gzip, against plain delta + varint, measured on the earlier line-frame
+  predictor), references added 5,8 points in stored order and 2,9 with the chain order, which places
+  connected parts next to each other. `LINE_CONTINUATION_SHARED` is today the default of `transportation`,
+  `transportation_name`, `waterway` and `boundary`.
 
 Further reading: [shared ring vertices](../encoding/good/shared-ring-vertices.md),
 [line dictionary](../encoding/good/shared-line-vertices.md),

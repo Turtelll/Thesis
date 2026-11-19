@@ -65,26 +65,25 @@ of a part, short parts, rings and points) and `LINE_INTERIOR` (continued).
 A predictor is one of the guesses above, optionally combined with two further ideas, each with a page of its
 own:
 
-- [frames](04-frames.md) rotate the residual into the direction of the wall or the road, so one of its
+- [frames](04-frames.md) rotate the residual of a ring edge into the direction of the wall, so one of its
   two components is near zero;
 - [shared references](05-shared-references.md) replace a vertex that an earlier ring or line already holds
   by a pointer to it.
 
-Eight combinations are live. The code is the value in the payload header.
+Seven combinations are live. The code is the value in the payload header.
 
 | code | predictor | guess | frame | shared references |
 |---|---|---|---|---|
 | 0 | `DELTA` | previous vertex | | |
 | 1 | `QUAD_CORNER` | quad corner | | |
-| 5 | `QUAD_CORNER_FRAME` | quad corner | ring frame | |
+| 23 | `QUAD_CORNER_PREVFRAME_FIRST_ONLY` | quad corner | ring frame | |
 | 7 | `QUAD_CORNER_SHARED` | quad corner | | ring references |
-| 8 | `QUAD_CORNER_SHARED_FRAME` | quad corner | ring frame | ring references |
+| 25 | `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` | quad corner | ring frame | ring references |
 | 2 | `LINE_CONTINUATION` | line continuation | | |
-| 11 | `LINE_CONTINUATION_FRAME_HEADING` | line continuation | line frame and heading | |
-| 13 | `LINE_CONTINUATION_SHARED_FRAME_HEADING` | line continuation | line frame and heading | line references |
+| 12 | `LINE_CONTINUATION_SHARED` | line continuation | | line references |
 
-The missing codes belonged to predictors the tile oracle never needed (for example a turn-angle predictor
-and a corner guess on lines). They were retired, and their codes are not reused, so a payload never changes
+The missing codes belonged to retired predictors (for example a turn-angle predictor, a corner guess on
+lines, earlier ring frames and the line frames). Their codes are not reused, so a payload never changes
 meaning.
 
 ## Decoding
@@ -106,14 +105,11 @@ On their own layers the gains are larger, and grow with the ideas added on top:
 | layer | predictor | gzip against plain delta + varint |
 |---|---|---|
 | `building` | `QUAD_CORNER` | -9,20% |
-| `building` | `QUAD_CORNER_FRAME` | -12,69% |
+| `building` | `QUAD_CORNER_PREVFRAME_FIRST_ONLY` | -12,38% |
 | `transportation` | `LINE_CONTINUATION` | -5,23% |
-| `transportation` | `LINE_CONTINUATION_FRAME_HEADING` | -6,89% |
-| `transportation` | `LINE_CONTINUATION_SHARED_FRAME_HEADING`, chain order | -12,06% |
 
-In the code (`encoder/prediction/Prediction.java`, `mechanism/SegmentQuadCorner.java`,
-`mechanism/LineContinuation.java`) every guess implements one interface, `ClassifiedPredictor`: classify
-the vertices, say which classes have a guess, compute the guess from the decoded prefix.
+In the code (`research-rust/mlt-pipeline/src/predict.rs`) every guess classifies the vertices from the
+topology, says which classes have a guess, and computes the guess from the decoded prefix.
 
 Further reading: [quad corner](../encoding/good/quad-corner.md),
 [line continuation](../encoding/good/line-continuation.md); guesses that did not pay, such as

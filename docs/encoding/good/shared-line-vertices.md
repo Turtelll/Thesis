@@ -59,8 +59,8 @@ part P2: d e c   →  reversed to c e d:  entry=1 idx(c) | residual e | exit=0, 
 
 **Decisive case for inclusion:** 3 to 6 points on `transportation` under every order, the largest single gain
 on the line layers. On the joint tile (geometry + properties, ids regenerated) `CHAIN` + references is -5,14%
-gzip against the previous default, so `forLayer("transportation")` = `CHAIN` +
-`LINE_CONTINUATION_SHARED_FRAME_HEADING`. The cheaper [marked-table variant](../out-of-scope/line-shared-marked.md)
+gzip against the previous default. Today `for_layer("transportation")` = `CHAIN` + `LINE_CONTINUATION_SHARED`
+(the line frame is gone from the grid). The cheaper [marked-table variant](../out-of-scope/line-shared-marked.md)
 loses on every line layer.
 
 Supporting figures:

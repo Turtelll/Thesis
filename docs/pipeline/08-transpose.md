@@ -9,17 +9,17 @@ Written as planes, all low bytes first and then all high bytes, the high plane b
 that costs the compressor almost nothing, and the low plane becomes one homogeneous byte stream.
 
 This only works for fixed-width values, where byte `b` of every value is in the same place. That is why the
-[escape width](07-byte-width.md) exists: it is a fixed width that is as small as the split varint.
+[escape width](07-byte-width.md) exists: it is a fixed width that is as small as a varint.
 
 ## The encodings
 
-`encoder/stream/Transpose.java`. Byte `b` of value `i` (of `n` values, `x` and `y` interleaved,
+`research-rust/mlt-pipeline/src/stream.rs`. Byte `b` of value `i` (of `n` values, `x` and `y` interleaved,
 little-endian) is written at
 
 | option | position | status |
 |---|---|---|
-| `NONE` | `i · width + b` | used with the split varint |
-| `INTERLEAVED_PLANES` | `b · n + i` | used with escape |
+| `NONE` | `i · width + b` | lost |
+| `INTERLEAVED_PLANES` | `b · n + i` | used with escape, the only one in the grid |
 | `PLANE_MAJOR` | per plane, all `x`, then all `y` | lost |
 | `COMPONENT_MAJOR` | `x` as planes, then `y` as planes | lost |
 

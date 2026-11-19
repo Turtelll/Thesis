@@ -3,7 +3,7 @@
 **Code names:** `INTERLEAVED_PLANES`, pipeline S7
 
 > **Verdict: Kept.** -6,51% gzip on the tileset against -5,90% for the same fixed-width stream untransposed;
-> part of `DEFAULT` and most per-layer compositions.
+> part of every composition of the grid.
 
 ## Encoding target
 all layers; fixed-width streams ([escape width](escape-byte-width.md)), largest effect on housenumber (Point) and
@@ -54,10 +54,7 @@ Supporting figures (same metric):
 | `ESCAPE` + `PLANE_MAJOR` | -5,72% | -8,17% | -7,21% |
 | `ESCAPE` + `COMPONENT_MAJOR` | -5,70% | -8,02% | -7,11% |
 
-- +0,6 gzip / 0,7 Brotli / 0,9 zstd points over untransposed escape; 0,65 / 0,67 / 0,59 over split varint.
-  z14 -7,55%.
+- +0,6 gzip / 0,7 Brotli / 0,9 zstd points over untransposed escape. z14 -7,55%.
 - Ladder: S7 + planes -0,65 points gzip (`GEOMETRY_BEST` -6,58%).
-- Tile oracle: escape + planes on 29,3% of buffers (53,4% of bytes, drop cost +0,160%); run E (split varint
-  only): +0,642%, `housenumber` +1,51 points.
 
 Source: `research-java/docs/results/openzl-pipeline.md`, `tile-oracle.md`.

@@ -21,46 +21,70 @@ corpus, 358 tiles, every layer, gzip level 6, summed over all tiles.
 | stock MLT v2 | 18.487.134 | 16.786.524 | | -20,41% |
 | stock MLT v2 with its own feature sorting | 18.317.963 | 16.643.440 | -0,85% | -21,08% |
 | stock MLT v2, gzip stream choice | 20.721.218 | 16.083.379 | -4,19% | -23,74% |
-| pipeline, plain delta + split varint on every layer | 19.383.707 | 16.202.284 | -3,48% | -23,18% |
-| pipeline, per-layer default composition | 19.186.915 | 15.785.075 | -5,97% | -25,15% |
-| pipeline, `DEFAULT` composition on every layer | 19.338.509 | 15.534.092 | -7,46% | -26,34% |
-| pipeline, tile oracle without feature reorder | 18.767.109 | 15.298.529 | -8,86% | -27,46% |
-| pipeline, tile oracle | 18.702.304 | 15.234.332 | -9,25% | -27,77% |
-| pipeline, tile oracle, gzip stream choice | 20.312.304 | 15.084.159 | **-10,14%** | **-28,48%** |
+| pipeline, plain delta + escape planes on every layer | 19.810.846 | 16.279.891 | -3,02% | -22,81% |
+| pipeline, per-layer default composition | 19.247.680 | 15.835.761 | -5,66% | -24,91% |
+| pipeline, `DEFAULT` composition on every layer | 19.342.419 | 15.555.917 | -7,33% | -26,24% |
+| pipeline, tile oracle without feature reorder | 18.998.820 | 15.384.854 | -8,35% | -27,05% |
+| pipeline, tile oracle | 18.936.228 | 15.319.927 | -8,74% | -27,36% |
+| pipeline, tile oracle, gzip stream choice | 20.552.988 | 15.172.888 | **-9,61%** | **-28,06%** |
 
 The MVT row is the source tileset (`munich-plantiler.mbtiles`, Planetiler), every tile decompressed and gzipped
 again at level 6 with Python's zlib; this reproduces the stored tiles to the byte. Every MLT row is converted from
-these tiles and holds the same features. Under gzip the MVT tiles are 1,40 times the size of the best row.
+these tiles and holds the same features. Under gzip the MVT tiles are 1,39 times the size of the best row.
 
-The tile oracle with gzip stream choice saves 1,70 MB of 16,79 MB. Four things stand out:
+The tile oracle with gzip stream choice saves 1,61 MB of 16,79 MB. Four things stand out:
 
 - The pipeline's tiles are larger before compression and smaller after it. The stages make the bytes
   easy to compress, not small on their own.
 - Choosing the stock encodings by gzip size alone makes stock tiles 4,19% smaller. Against that stock row,
-  which uses the same criterion, the pipeline's own gain is -6,21%. On top of the tile oracle the gzip
-  stream choice adds 0,99 points.
-- Of the 9,25 points with the stock stream choice, 3,48 come from writing the vertices in a gzip-friendly
-  form at all. The predictors, frames, references and stream layouts add 5,6 points, the feature reorder 0,4.
+  which uses the same criterion, the pipeline's own gain is -5,66%. On top of the tile oracle the gzip
+  stream choice adds 0,88 points.
+- Of the 8,74 points with the stock stream choice, 3,02 come from writing the vertices in a gzip-friendly
+  form at all. The predictors, frames, references and stream layouts add 5,3 points, the feature reorder 0,4.
 - All 358 tiles of both tile oracles decode, and every feature keeps its shape (the stock gzip stream
   choice tiles were not decoded). What may change is what a renderer does not
   draw differently: feature order, the start vertex of a ring, the order of points in a MultiPoint, and the
   direction of some line parts (which matters only for direction-dependent symbols such as one-way arrows).
 
-The gain sits where the geometry has structure. Each layer compressed on its own:
+The gain sits where the geometry has structure. Each layer compressed on its own (tile oracle with gzip
+stream choice):
 
 | layer | stock MLT v2 | tile oracle | change |
 |---|---|---|---|
-| building | 4.287.027 | 3.483.636 | -18,74% |
-| transportation | 3.608.695 | 3.199.356 | -11,34% |
-| poi | 3.035.607 | 3.058.335 | +0,75% |
-| landcover | 1.748.145 | 1.512.044 | -13,51% |
-| housenumber | 1.239.693 | 1.262.033 | +1,80% |
-| transportation_name | 892.802 | 838.878 | -6,04% |
-| landuse | 876.416 | 794.569 | -9,34% |
-| all 16 layers | 17.064.891 | 15.481.020 | -9,28% |
+| building | 4.287.027 | 3.460.555 | -19,28% |
+| transportation | 3.608.695 | 3.236.256 | -10,32% |
+| poi | 3.035.607 | 3.001.050 | -1,14% |
+| landcover | 1.748.145 | 1.512.349 | -13,49% |
+| housenumber | 1.239.693 | 1.268.414 | +2,32% |
+| transportation_name | 892.802 | 832.662 | -6,74% |
+| landuse | 876.416 | 796.522 | -9,12% |
+| all 16 layers | 17.064.891 | 15.433.214 | -9,56% |
 
 Buildings gain most from corner guesses, wall frames and shared walls, landcover from shared borders, roads
-from continuation and junctions. Point layers have no shape to exploit and end slightly above stock.
+from continuation and junctions. Point layers have little shape to exploit: `poi` ends 1,14% below stock,
+`housenumber` 2,32% above.
+
+## Decoding cost
+
+The smaller tiles cost decode time. Whole tiles, the same 358 tiles, parse and decode of every layer,
+decompression not timed, single-threaded, per tile the minimum of 10 runs:
+
+| encoder | decode ms | × stock |
+|---|---|---|
+| stock MLT v2 | 89 | 1,00 |
+| pipeline, per-layer default composition | 248 | 2,78 |
+| pipeline, `DEFAULT` composition on every layer | 230 | 2,58 |
+| pipeline, tile oracle, gzip stream choice | 225 | 2,52 |
+
+By zoom the ratio is lowest at z10 to z12 (1,8 to 2,5 × stock) and highest at z14 (2,6 to 2,9 ×). The tile
+oracle decodes fastest of the three; it writes 34,7% of the layers with plain `DELTA`. What the ring frame
+adds on its own is on the [frames](pipeline/04-frames.md) page. The thesis target is compressed size per
+tile, so this cost is reported, not optimised.
+
+```
+mlt convert ../data/MVT/munich-plantiler.mbtiles stock.mbtiles --mlt-version 2
+mlt-oracle decode-time stock.mbtiles default.mbtiles oracle.mbtiles --by-zoom
+```
 
 Full results, by zoom and by layer:
 [mlt-v2-rust-port.md](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/mlt-v2-rust-port.md).
@@ -78,11 +102,11 @@ flowchart TD
     topo["Topology streams<br/>types, parts, rings,<br/>vertex counts"]
     vb["Vertex buffer<br/>absolute x, y<br/>of every vertex"]
     s2["Prediction (S2)<br/>guess each vertex<br/>from decoded ones,<br/>keep the residual"]
-    s2f["Frames (S2)<br/>rotate the residual into<br/>the wall or road direction"]
+    s2f["Frames (S2)<br/>rotate the residual into<br/>the wall direction"]
     s2r["Shared references (S2)<br/>point back at vertices<br/>an earlier ring or line<br/>already holds"]
     s3["Segmentation (S3)<br/>one stream<br/>per vertex class"]
     s4["Zigzag (S4)<br/>signed to unsigned"]
-    s6["Byte width (S6)<br/>split varint<br/>or escape bytes"]
+    s6["Byte width (S6)<br/>escape bytes"]
     s7["Byte planes (S7)<br/>low bytes first,<br/>then high bytes"]
     payload["Payload of one buffer<br/>2-byte header + streams"]
     s8["Backend (S8)<br/>all layers of the tile,<br/>compressed once"]
@@ -103,29 +127,24 @@ flowchart TD
     topo -.->|"stream lengths,<br/>never written"| s3
 ```
 
-The same build-up in numbers: the research harness adds one decision at a time and measures the vertex
-buffers of all tiles under gzip, against plain delta + zigzag + varint, the smaller of the two stock
-baselines (11.237.124 bytes).
+The same build-up in numbers, on whole MLT v2 tiles (gzip, summed over the 358 tiles), one decision added
+per step:
 
-| step | gzip bytes | vs baseline | this step |
+| step | gzip bytes | vs stock | this step |
 |---|---|---|---|
-| plain delta + zigzag + varint, plus the 2-byte header | 11.243.566 | +0,06% | |
-| split varint instead of varint | 11.146.031 | -0,81% | -0,87% |
-| + Hilbert reorder (S1) | 10.781.955 | -4,05% | -3,27% |
-| + corner guess, ring frame and shared references (S2) | 10.292.463 | -8,41% | -4,54% |
-| + class streams (S3) | 10.183.793 | -9,37% | -1,06% |
-| + escape width (S6) | 10.176.922 | -9,43% | -0,07% |
-| + byte planes (S7) | 10.118.776 | -9,95% | -0,57% |
-| reorder removed again: `DEFAULT` | 10.450.157 | -7,00% | +3,27% |
+| stock MLT v2 | 16.786.524 | | |
+| every layer: plain delta + zigzag + escape planes | 16.279.891 | -3,02% | -3,02% |
+| per layer the best of the 14 compositions without a feature reorder (tile oracle) | 15.384.854 | -8,35% | -5,50% |
+| + the 28 compositions with a feature reorder | 15.319.927 | -8,74% | -0,42% |
+| + gzip stream choice for the other streams | 15.172.888 | -9,61% | -0,96% |
 
-Prediction is the largest step. The escape width alone gains almost nothing; it is there because the byte
-planes after it need a fixed width. The reorder looks large on the geometry, but it permutes the property
-columns too and costs more there than it saves here, so `DEFAULT` drops it again. Choosing the composition
-per layer or per tile instead of one for everything takes the vertex buffers further, to -11,36% and
--11,94% ([compositions](pipeline/01-composition.md)).
+The codec's own stages (prediction, frames, references, class streams) are the largest step. The reorder
+shortens the jumps between features, but it permutes the property columns too and often costs more there
+than it saves on the geometry, so the tile oracle uses it on 27,4% of the layers only
+([compositions](pipeline/01-composition.md)).
 
 ```
-./gradlew research --args="measure --step ladder --by-zoom"
+mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles --by-zoom --by-layer
 ```
 
 ## How a composition is chosen
@@ -135,7 +154,7 @@ the reorder from the two header bytes of each buffer, and the reorder needs noth
 composition was chosen never matters to the decoder. Today there are three ways to choose:
 
 - the per-layer default, one fixed composition per MVT layer, fitted once on the corpus;
-- the tile oracle, which tries 96 compositions on every layer of every tile and keeps the combination that
+- the tile oracle, which tries 42 compositions on every layer of every tile and keeps the combination that
   makes the whole gzipped tile smallest;
 - one fixed composition for every layer.
 
@@ -144,9 +163,8 @@ The [compositions](pipeline/01-composition.md) page explains each, with the sear
 ## Rules every stage follows
 
 - Nothing derivable is written. The decoder reads the topology before the vertex buffer, and from it
-  derives the runs (one per ring or line part), the class of every vertex and the length of every stream. Only two lengths are ever
-  written: the byte length of a varint stream that is not the last one, and the stream lengths of a buffer
-  with shared references.
+  derives the runs (one per ring or line part), the class of every vertex and the length of every stream. Only
+  the stream lengths of a buffer with shared references are ever written.
 - Lossless. Every composition round-trips every buffer, checked by the harness and by the test suite. The
   only freedoms used are the ones a renderer cannot see: feature order, ring start, MultiPoint order, and
   the direction of line parts reversed by the shared line references.
@@ -184,7 +202,7 @@ vertices, adding each residual to the same guess.
 1. [Compositions](pipeline/01-composition.md): what a composition is and how one is chosen.
 2. [Reorder](pipeline/02-reorder.md): emit close features next to each other.
 3. [Prediction](pipeline/03-prediction.md): guess each vertex from the ones before it.
-4. [Frames](pipeline/04-frames.md): write residuals in the direction of the wall or road.
+4. [Frames](pipeline/04-frames.md): write residuals in the direction of the wall.
 5. [Shared references](pipeline/05-shared-references.md): point back at repeated vertices.
 6. [Segmentation](pipeline/06-segmentation.md): one stream per kind of residual.
 7. [Zigzag and byte width](pipeline/07-byte-width.md): from residuals to bytes.
@@ -195,4 +213,4 @@ The stage numbers S1 to S8 are the order in which the stages were built and meas
 by the greatest common divisor of its values, fired on 0,02% of the values and was removed; the later
 numbers were kept. The byte-level format is in
 [bitstream.md](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/bitstream.md), the code in
-`research-java/src/main/java/org/maplibre/mlt/research/encoder/`, one package per stage.
+`research-rust/mlt-pipeline/src/`.

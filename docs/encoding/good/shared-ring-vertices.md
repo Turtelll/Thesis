@@ -66,8 +66,8 @@ layout. A per-layer gzip figure was not reported for this layout.
 
 **Decisive case for inclusion:** the references add 2,2 points on the tileset, and the same step is worth
 249.754 B gzip (2,22 points) in the pipeline. The per-buffer fallback (plain quad corner when the references
-do not pay) means a buffer never gets larger. Its frame variant `QUAD_CORNER_SHARED_FRAME` is the layer
-default of `building`, `landcover`, `landuse` and `water` ([ring frame prior](ring-frame-prior.md)).
+do not pay) means a buffer never gets larger. Its frame variant `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` is
+the layer default of `building`, `landcover`, `landuse`, `water` and `aeroway` ([ring frame prior](ring-frame-prior.md)).
 
 Supporting figures:
 

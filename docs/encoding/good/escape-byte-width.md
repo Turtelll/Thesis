@@ -2,8 +2,8 @@
 
 **Code names:** `ESCAPE`, pipeline S6
 
-> **Verdict: Kept.** On its own level with split varint (-5,90% vs -5,86% gzip); kept because it is the
-> fixed-width terminal the byte planes need (-6,51% with them).
+> **Verdict: Kept.** -5,90% gzip on its own; the fixed-width terminal the byte planes need (-6,51% with
+> them), and the only byte width of the grid.
 
 ## Encoding target
 all layers; byte terminal of every stream (needed for the [byte-plane transpose](byte-planes.md)).
@@ -45,8 +45,7 @@ each marker by `255 + exception` in order. `n` comes from the topology.
 **+12,27%**.
 
 **Decisive case for inclusion:** escape alone is a tie with split varint, but it is the only fixed-width
-terminal that does not lose to varint, and the planes built on it add 0,6 points (S7: -6,51%). The tile oracle
-uses escape + planes on 29,3% of buffers (53,4% of bytes) and plain escape on 25,3%.
+terminal that does not lose to varint, and the planes built on it add 0,6 points (S7: -6,51%).
 
 Supporting figures (same metric):
 

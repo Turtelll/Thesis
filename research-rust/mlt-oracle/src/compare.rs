@@ -129,7 +129,7 @@ struct TileResult {
     /// Stock with gzip stream selection.
     stock_gs_raw: usize,
     stock_gs_gzip: usize,
-    /// Every layer on plain delta + split varint through the codec: the Java `DELTA_ZIGZAG_VARINT` reference.
+    /// Every layer on plain delta + escape planes through the codec.
     plain_raw: usize,
     plain_gzip: usize,
     /// The oracle restricted to compositions without a feature reorder: the vertex codec alone.
@@ -391,7 +391,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
         ("stock v2 (default profile, no tessellation)", total.stock_gzip, total.stock_raw),
         ("stock v2 + own sort trials (hilbert, id)", sorted.1, sorted.0),
         ("stock v2 + gzip stream selection", total.stock_gs_gzip, total.stock_gs_raw),
-        ("pipeline, plain delta + split varint", total.plain_gzip, total.plain_raw),
+        ("pipeline, plain delta + escape planes", total.plain_gzip, total.plain_raw),
         ("pipeline, per-layer default (forLayer)", total.default_gzip, total.default_raw),
         ("pipeline, per-layer alone-best", total.alone_gzip, 0),
         ("pipeline, tile oracle, no feature reorder (14)", total.noreorder_gzip, total.noreorder_raw),
