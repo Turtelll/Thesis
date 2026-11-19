@@ -23,5 +23,9 @@ serde_json = { workspace = true }
 sha2 = "0.10"
 zstd = { workspace = true }
 
+[features]
+# codec-time also prints the call counters of the frame prior per predictor
+frame-stats = ["mlt-pipeline/frame-stats"]
+
 [lints]
 workspace = true

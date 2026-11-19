@@ -495,7 +495,7 @@ struct V2EncoderArgs {
     rans_vertices: bool,
     /// PATCH (research-rust): write vertex streams with the research pipeline codec (default: off)
     ///
-    /// `off` is the stock encoder, `default` the per-layer default composition, `oracle` the best of the 96
+    /// `off` is the stock encoder, `default` the per-layer default composition, `oracle` the best of the 42
     /// compositions per layer, searched on the gzip size of the whole tile, and any other value the name of one
     /// composition, used for every layer. The codec stores no tessellation, so the tiles come out without triangles.
     /// Files written this way do not decode with the stock `mlt-core`.
@@ -542,6 +542,9 @@ impl ConvertArgs {
             Some("oracle") => VertexMode::Oracle {
                 max_passes: v2.oracle_max_passes.unwrap_or(ORACLE_MAX_PASSES),
             },
+            Some(spec) if spec.starts_with("default:") => VertexMode::swap(spec).ok_or_else(|| {
+                anyhow!("--vertex-pipeline default:<FROM>=<TO> takes two predictor names (QUAD_CORNER_SHARED_FRAME, QUAD_CORNER_PREVFRAME_FIRST_ONLY, ...), not {spec:?}")
+            })?,
             Some(name) => VertexMode::fixed(name).ok_or_else(|| {
                 let names: Vec<String> = mlt_pipeline::registry::best_grid()
                     .iter()

@@ -3,6 +3,11 @@
 **Status:** measured (`research-rust`, `mlt-oracle compare`); the codec is bit-exact with this repository's Java
 **Corpus:** `munich-plantiler.mbtiles`, 358 tiles, 4.368 (tile, layer) buffers (the current baseline corpus)
 
+**Update (integer frame):** the figures below were measured with the float-frame grid. The grid and the per-layer default now use the integer frame
+([frame-decode-time.md](frame-decode-time.md), Stage 2): the gzip-stream tile oracle is 15.084.297 bytes instead of 15.084.159
+(+0,0009%), raw 20.310.621 instead of 20.312.304, and the whole-tile decode 4,73x of stock instead of 6,77x. The golden reference of the
+Rust port is now `grid-best-151` (419.328 pairs, 0 differ); the float-era dumps stay readable through `golden_grid()`.
+
 ## Question
 
 The pipeline codec ([bitstream.md](../bitstream.md)) wins against `DELTA_ZIGZAG_VARINT` inside the Java

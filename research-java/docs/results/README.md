@@ -176,6 +176,19 @@ Names below are the **new** ones; the bodies of the linked files still use the o
   golden dump) and used as the vertex encoder of MapLibre Tile v2: whole-tile gzip of the stock v2 encoder against the tile
   oracle (96 compositions, whole layers permuted so properties follow): -9,25% gzip (+1,2% raw), -5,97% with the fixed per-layer default.
 
+- [frame-decode-time.md](frame-decode-time.md) — why the frame predictors decode 4 to 8 times slower than delta (the
+  per-vertex `atan2`, rotation, vote and neighbour-search chain, and the reference hash maps) and what a bit-exact decoder
+  saves: -8 to -18% per predictor, whole tile 7,30x to 6,25x of stock. Stage 2, the integer frame (header codes 16 to 19, no
+  `atan2`/`sin`/`cos` in the decoder): +0,001% of a tile's gzip bytes, 24 to 43% less decode time per framed predictor, whole tile
+  6,77x to 4,73x of stock (-30%); it replaced the float frame in the grids and the per-layer defaults.
+
+- [previous-frame.md](previous-frame.md) — the previous ring's frame instead of the nearest ring's search plus votes
+  (`QUAD_CORNER_PREVFRAME`, header code 20; `_VOTE` 21; one vote per ring, `_FIRST` 22 and `_FIRST_ONLY` 23), after the
+  Hilbert reorder. Munich `building`, gzip: -9,20% (`QUAD_CORNER`), -11,21% (previous frame alone, 58% of the gain),
+  -12,38% (`_FIRST_ONLY`, the first edge of a ring sets its own frame, 91%) against -12,69% (`QUAD_CORNER_IFRAME`); Java
+  decode overhead of `_FIRST_ONLY` 17 to 36% of `IFRAME`'s. Tokyo 82%; on axis-aligned Chicago every frame (`IFRAME` too)
+  loses to plain `QUAD_CORNER`, so the selector takes none there; two safeguards (axis dead zone, blend, code 24) are not needed. The Hilbert order is not what makes it work. `_FIRST_ONLY` is ported to Rust, bit for bit with Java (52.416 row/buffer pairs): on the Munich tile (five layers) it keeps 81% of the frame's gain (0,17% of the tile short of `IFRAME`) for 38 to 40% of its decode overhead (3,1 x stock instead of 4,0 x). Its shared-reference variant (`QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY`, code 25, Rust too): 83% of `QUAD_CORNER_SHARED_IFRAME`'s whole-tile gain (0,14% of the tile short of it) for 40% of its decode overhead (3,85 x stock instead of 4,8 x). **Adopted** (codes 23 and 25 are the ring frames of the grid and the per-layer defaults, 16/17 and the other variants retired for now): the per-layer default of the Munich tile +0,14% (15.807.921 against 15.785.379 B), the tile oracle +0,13% (15.103.506 against 15.084.297 B), whole-tile decode of the default 3,8 x stock instead of 4,7 x.
+
 - [tile-oracle.md](tile-oracle.md) — the real per-(tile, layer) oracle (`measure --step best`): the
   best of 252 compositions (96 since the retirement; every predictor x streams x terminal x reorder) per buffer, chosen alone and
   on the compressed tile, against the fixed per-layer default; and which options of the grid the oracle

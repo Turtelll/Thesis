@@ -184,7 +184,7 @@ public final class ChoiceCorrelation {
         System.out.printf("%n%s: mean features of the buffers per value %s chose%n", stage.name().toLowerCase(), reference);
         final var header = new StringBuilder(String.format("  %-18s %8s %9s %8s %7s %7s %7s %9s %9s %7s",
                 "value", "buffers", "vertices", "v/feat", "point", "line", "poly", "step", "jump", "jump×"));
-        for (final var prediction : Prediction.values()) {
+        for (final var prediction : Prediction.grid()) {
             header.append(String.format(" %9s", "H " + abbreviation(prediction)));
         }
         header.append(String.format(" %7s", ">=255"));
@@ -201,8 +201,8 @@ public final class ChoiceCorrelation {
                     mean(list, BufferFeatures::meanStep),
                     mean(list, BufferFeatures::meanJump),
                     mean(list, BufferFeatures::jumpRatio)));
-            for (final var prediction : Prediction.values()) {
-                final var p = prediction.ordinal();
+            for (final var prediction : Prediction.grid()) {
+                final var p = prediction.gridIndex();
                 line.append(String.format(" %9.2f", mean(list, f -> f.entropy()[p])));
             }
             line.append(String.format(" %6.2f%%", 100 * mean(list, BufferFeatures::wideShare)));
@@ -232,7 +232,7 @@ public final class ChoiceCorrelation {
         try (var out = Files.newBufferedWriter(path)) {
             final var header = new StringBuilder("z,x,y,layer,vertices,features,pointShare,lineShare,polygonShare,"
                     + "meanStep,meanJump,jumpRatio");
-            for (final var prediction : Prediction.values()) {
+            for (final var prediction : Prediction.grid()) {
                 header.append(",entropy_").append(prediction).append(",zero_").append(prediction);
             }
             header.append(",wideShare");
@@ -250,8 +250,8 @@ public final class ChoiceCorrelation {
                         "%d,%d,%d,%s,%d,%d,%.4f,%.4f,%.4f,%.3f,%.3f,%.4f",
                         e.z(), e.x(), e.y(), e.layerName(), f.vertices(), f.features(), f.pointShare(),
                         f.lineShare(), f.polygonShare(), f.meanStep(), f.meanJump(), f.jumpRatio()));
-                for (final var prediction : Prediction.values()) {
-                    final var p = prediction.ordinal();
+                for (final var prediction : Prediction.grid()) {
+                    final var p = prediction.gridIndex();
                     line.append(String.format(java.util.Locale.ROOT, ",%.4f,%.4f", f.entropy()[p], f.zeroShare()[p]));
                 }
                 line.append(String.format(java.util.Locale.ROOT, ",%.5f", f.wideShare()));
@@ -275,6 +275,16 @@ public final class ChoiceCorrelation {
             case QUAD_CORNER_SHARED_FRAME -> "qcsf";
             case LINE_CONTINUATION_FRAME_HEADING -> "lcfh";
             case LINE_CONTINUATION_SHARED_FRAME_HEADING -> "lcsfh";
+            case QUAD_CORNER_IFRAME -> "qci";
+            case QUAD_CORNER_SHARED_IFRAME -> "qcsi";
+            case LINE_CONTINUATION_IFRAME_HEADING -> "lcih";
+            case LINE_CONTINUATION_SHARED_IFRAME_HEADING -> "lcsih";
+            case QUAD_CORNER_PREVFRAME -> "qcp";
+            case QUAD_CORNER_PREVFRAME_VOTE -> "qcpv";
+            case QUAD_CORNER_PREVFRAME_FIRST -> "qcpf";
+            case QUAD_CORNER_PREVFRAME_FIRST_ONLY -> "qcpo";
+            case QUAD_CORNER_PREVFRAME_FIRST_BLEND -> "qcpb";
+            case QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY -> "qcspo";
         };
     }
 }

@@ -69,41 +69,47 @@ public final class LayerCompositions {
      * {@code transportation_name} (+701 property bytes, -2.885 geometry), {@code waterway}, {@code water},
      * {@code aeroway} (smaller on both sides). The fit is geometry only; the property side is the
      * single-layer-tile measure above. A layer not listed takes {@link PipelineRegistry#DEFAULT}.
+     *
+     * <p>The ring frames of the layers are the one-vote frames, {@code QUAD_CORNER_PREVFRAME_FIRST_ONLY} and {@code
+     * QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY}, which took the place of {@code QUAD_CORNER_IFRAME} and {@code
+     * QUAD_CORNER_SHARED_IFRAME} in every layer that had them; the rest of each composition (reorder, streams,
+     * terminal) is the one the nearest-ring frame was fitted with and was not fitted again
+     * (docs/results/previous-frame.md).
      */
     private static final Map<String, Composition> BY_LAYER = Map.ofEntries(
             // (the layers on CHAIN_LAYERS carry .withReorder(Reorder.CHAIN) below)
-            Map.entry(PLACE, composition(Prediction.QUAD_CORNER_FRAME,
+            Map.entry(PLACE, composition(Prediction.QUAD_CORNER_PREVFRAME_FIRST_ONLY,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
             // the greedy chain, not Hilbert, and the references to earlier line parts' positions: fitted on
             // geometry plus property columns compressed together (docs/results/line-shared-vertices.md)
-            Map.entry(TRANSPORTATION, composition(Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING,
+            Map.entry(TRANSPORTATION, composition(Prediction.LINE_CONTINUATION_SHARED_IFRAME_HEADING,
                     Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)
                     .withReorder(Reorder.CHAIN)),
-            Map.entry(LANDCOVER, composition(Prediction.QUAD_CORNER_SHARED_FRAME,
+            Map.entry(LANDCOVER, composition(Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY,
                     Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
-            Map.entry(TRANSPORTATION_NAME, composition(Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING,
+            Map.entry(TRANSPORTATION_NAME, composition(Prediction.LINE_CONTINUATION_SHARED_IFRAME_HEADING,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE).withReorder(Reorder.CHAIN)),
-            Map.entry(LANDUSE, composition(Prediction.QUAD_CORNER_SHARED_FRAME,
+            Map.entry(LANDUSE, composition(Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY,
                     Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
-            Map.entry(WATER, composition(Prediction.QUAD_CORNER_SHARED_FRAME,
+            Map.entry(WATER, composition(Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY,
                     Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES).withReorder(Reorder.CHAIN)),
             Map.entry(PARK, composition(Prediction.QUAD_CORNER_SHARED,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
-            Map.entry(BOUNDARY, composition(Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING,
+            Map.entry(BOUNDARY, composition(Prediction.LINE_CONTINUATION_SHARED_IFRAME_HEADING,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
             Map.entry(POI, composition(Prediction.DELTA,
                     Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
-            Map.entry(BUILDING, composition(Prediction.QUAD_CORNER_SHARED_FRAME,
+            Map.entry(BUILDING, composition(Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY,
                     Segmentation.CLASS, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
             Map.entry(WATER_NAME, composition(Prediction.LINE_CONTINUATION,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
             Map.entry(HOUSENUMBER, composition(Prediction.LINE_CONTINUATION,
                     Segmentation.FLAT, ByteWidth.ESCAPE, Transpose.INTERLEAVED_PLANES)),
-            Map.entry(WATERWAY, composition(Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING,
+            Map.entry(WATERWAY, composition(Prediction.LINE_CONTINUATION_SHARED_IFRAME_HEADING,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE).withReorder(Reorder.CHAIN)),
-            Map.entry(MOUNTAIN_PEAK, composition(Prediction.LINE_CONTINUATION_FRAME_HEADING,
+            Map.entry(MOUNTAIN_PEAK, composition(Prediction.LINE_CONTINUATION_IFRAME_HEADING,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)),
-            Map.entry(AEROWAY, composition(Prediction.QUAD_CORNER_SHARED_FRAME,
+            Map.entry(AEROWAY, composition(Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE).withReorder(Reorder.CHAIN)),
             Map.entry(AERODROME_LABEL, composition(Prediction.DELTA,
                     Segmentation.FLAT, ByteWidth.VARINT_SPLIT, Transpose.NONE)));

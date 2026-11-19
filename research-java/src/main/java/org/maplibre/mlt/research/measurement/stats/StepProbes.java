@@ -151,7 +151,7 @@ public final class StepProbes {
      * residuals are the {@code FLAT} ones (no segmentation: S3 regroups them).
      */
     static final class PredictProbe implements Probe {
-        private final Prediction[] predictors = Prediction.values();
+        private final Prediction[] predictors = Prediction.grid().toArray(Prediction[]::new);
         // layer -> per predictor: histogram of zigzag values
         private final Map<String, List<Map<Integer, Long>>> histograms = new TreeMap<>();
         private final Map<String, long[]> vertices = new TreeMap<>();

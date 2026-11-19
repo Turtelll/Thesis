@@ -34,7 +34,8 @@ backends, extraction or the command line.
   **`encoder/prediction/mechanism/`** holds the mechanisms the predictions are built from, each a
   self-contained idea with its own mechanism test: `ClassifiedPredictor` (a per-vertex class plus what
   each class predicts), `SegmentQuadCorner`, `LineContinuation` and the
-  ring/line frame prior `FramePrior`. Nothing here is an `Encoding`.
+  ring/line frame prior `FramePrior` (a float mode, header codes 5/8/11/13, and the integer mode the grids use, 16-19:
+  no `atan2`/`sin`/`cos` on the decoder's side, docs/results/frame-decode-time.md). Nothing here is an `Encoding`.
 - **`encoder/retired/`** — predictors and options the tile oracle showed to be dead weight, kept as code
   and tests but not reachable from `Prediction`, the grids or the registry: `QuadCornerLine`,
   `TurnScalar` and `TurnScalarPredictor` (docs/results/tile-oracle.md, `Retiring the options`). It may

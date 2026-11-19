@@ -1,17 +1,12 @@
 //! Stages S4, S6 and S7 for one stream: zigzag, byte width and byte planes, written as the stream's
-//! bytes (`encoder/stream/StreamCodec.java`, `ByteWidth`, `Transpose`, `IntCodec.VarintSplit`,
-//! `PayloadBytes`). Only the two terminals of the 96-composition grid are ported: escape with byte
-//! planes, and split varint.
+//! bytes (`encoder/stream/StreamCodec.java`, `ByteWidth`, `Transpose`, `PayloadBytes`). Only the terminal of the tile oracle's grid is ported: escape with byte planes.
 
-/// How a stream's unsigned values become bytes: the two byte terminals of the tile oracle's grid.
+/// How a stream's unsigned values become bytes: the byte terminal of the tile oracle's grid.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Terminal {
     /// `ByteWidth.ESCAPE` with `Transpose.INTERLEAVED_PLANES`: a 1-byte main stream where `0xFF`
     /// marks an exception, the exceptions at their own width, all as byte planes.
     EscapePlanes,
-    /// `ByteWidth.VARINT_SPLIT` with `Transpose.NONE`: the first byte of every varint in one run,
-    /// the continuation bytes after it.
-    VarintSplit,
 }
 
 impl Terminal {
@@ -19,7 +14,6 @@ impl Terminal {
     #[must_use]
     pub fn width_code(self) -> u8 {
         match self {
-            Self::VarintSplit => 1,
             Self::EscapePlanes => 3,
         }
     }
@@ -28,16 +22,14 @@ impl Terminal {
     #[must_use]
     pub fn transpose_code(self) -> u8 {
         match self {
-            Self::VarintSplit => 0,
             Self::EscapePlanes => 1,
         }
     }
 
-    /// The terminal a header's width and transpose codes name, if it is one of the two.
+    /// The terminal a header's width and transpose codes name, if it is the one.
     #[must_use]
     pub fn from_codes(width: u8, transpose: u8) -> Option<Self> {
         match (width, transpose) {
-            (1, 0) => Some(Self::VarintSplit),
             (3, 1) => Some(Self::EscapePlanes),
             _ => None,
         }
@@ -47,7 +39,6 @@ impl Terminal {
     #[must_use]
     pub fn name(self) -> &'static str {
         match self {
-            Self::VarintSplit => "VARINT_SPLIT",
             Self::EscapePlanes => "ESCAPE_PLANES",
         }
     }
@@ -121,11 +112,6 @@ impl<'a> Reader<'a> {
     pub fn remaining(&self) -> usize {
         self.data.len() - self.position
     }
-
-    pub fn read_rest(&mut self) -> &'a [u8] {
-        let n = self.remaining();
-        self.read_bytes(n)
-    }
 }
 
 /// The narrowest of 1, 2, 4 bytes that holds the unsigned `max`.
@@ -180,55 +166,10 @@ fn read_planes(data: &[u8], n: usize, width: usize) -> Vec<u32> {
         .collect()
 }
 
-fn varint_split_encode(values: &[u32]) -> Vec<u8> {
-    let mut heads = Vec::with_capacity(values.len());
-    let mut tails = Vec::new();
-    for &v in values {
-        let mut rest = v >> 7;
-        heads.push(((v & 0x7F) as u8) | if rest != 0 { 0x80 } else { 0 });
-        while rest != 0 {
-            let low = (rest & 0x7F) as u8;
-            rest >>= 7;
-            tails.push(low | if rest != 0 { 0x80 } else { 0 });
-        }
-    }
-    heads.extend_from_slice(&tails);
-    heads
-}
-
-fn varint_split_decode(data: &[u8], n: usize) -> Vec<u32> {
-    let mut tail = n;
-    let mut values = Vec::with_capacity(n);
-    for &head in &data[..n] {
-        let mut value = u32::from(head & 0x7F);
-        let mut more = head & 0x80 != 0;
-        let mut shift = 7u32;
-        while more {
-            let b = data[tail];
-            tail += 1;
-            value |= u32::from(b & 0x7F).wrapping_shl(shift);
-            more = b & 0x80 != 0;
-            shift += 7;
-        }
-        values.push(value);
-    }
-    values
-}
-
 /// Appends one non-empty stream of signed residuals (`x, y` interleaved).
-///
-/// `last`: whether no non-empty stream follows; a varint body's byte length is written unless it is
-/// the last, which takes the rest of the payload.
-pub fn encode(out: &mut Vec<u8>, signed: &[i32], terminal: Terminal, last: bool) {
+pub fn encode(out: &mut Vec<u8>, signed: &[i32], terminal: Terminal) {
     let mapped: Vec<u32> = signed.iter().map(|&n| zigzag(n)).collect();
     match terminal {
-        Terminal::VarintSplit => {
-            let body = varint_split_encode(&mapped);
-            if !last {
-                put_varint(out, body.len() as u32);
-            }
-            out.extend_from_slice(&body);
-        }
         Terminal::EscapePlanes => write_escape_planes(out, &mapped),
     }
 }
@@ -270,17 +211,8 @@ fn write_escape_planes(out: &mut Vec<u8>, mapped: &[u32]) {
 }
 
 /// The inverse of [`encode`]: the signed residuals of a stream of `value_count` values.
-pub fn decode(input: &mut Reader<'_>, value_count: usize, terminal: Terminal, last: bool) -> Vec<i32> {
+pub fn decode(input: &mut Reader<'_>, value_count: usize, terminal: Terminal) -> Vec<i32> {
     let mapped = match terminal {
-        Terminal::VarintSplit => {
-            let body = if last {
-                input.read_rest()
-            } else {
-                let len = input.read_varint() as usize;
-                input.read_bytes(len)
-            };
-            varint_split_decode(body, value_count)
-        }
         Terminal::EscapePlanes => read_escape_planes(input, value_count),
     };
     mapped.into_iter().map(unzigzag).collect()
@@ -330,16 +262,13 @@ mod tests {
             vec![i32::MIN, i32::MAX, 0, 1],
             (0..500).map(|i| (i * 7919) % 2000 - 1000).collect(),
         ];
-        for terminal in [Terminal::EscapePlanes, Terminal::VarintSplit] {
-            for s in &streams {
-                for last in [true, false] {
-                    let mut out = Vec::new();
-                    encode(&mut out, s, terminal, last);
-                    let mut r = Reader::new(&out);
-                    assert_eq!(&decode(&mut r, s.len(), terminal, last), s);
-                    assert_eq!(r.remaining(), 0);
-                }
-            }
+        let terminal = Terminal::EscapePlanes;
+        for s in &streams {
+            let mut out = Vec::new();
+            encode(&mut out, s, terminal);
+            let mut r = Reader::new(&out);
+            assert_eq!(&decode(&mut r, s.len(), terminal), s);
+            assert_eq!(r.remaining(), 0);
         }
     }
 }

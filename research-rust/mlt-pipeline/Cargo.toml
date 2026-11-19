@@ -10,6 +10,10 @@ license.workspace = true
 libm = "0.2"
 rustc-hash.workspace = true
 
+[features]
+# call counters of the frame prior (`frame::stats`), for `mlt-oracle codec-time`
+frame-stats = []
+
 [dev-dependencies]
 proptest = "1.11"
 

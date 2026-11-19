@@ -1,30 +1,83 @@
-//! `encoder/prediction/mechanism/FramePrior.java`: the frame of a ring or line part predicted from
-//! the runs already decoded, and the exactly invertible integer rotation of an edge into it.
+//! `encoder/prediction/mechanism/FramePrior.java`: the frame of a ring predicted from the rings
+//! already decoded (`QUAD_CORNER_PREVFRAME_FIRST_ONLY`), and the exactly invertible integer rotation
+//! of an edge into it.
 //!
-//! Every floating-point step mirrors Java's `StrictMath` (fdlibm) bit for bit: `libm` is the musl
-//! port of the same fdlibm kernels, `round` is Java's `Math.round` (ties toward +infinity), and the
-//! degree conversions are the multiplications by Java's constants.
+//! The tables are built from `libm` (the musl port of the fdlibm kernels behind Java's `StrictMath`)
+//! and `round` is Java's `Math.round` (ties toward +infinity), so they match Java bit for bit.
 
 use crate::buffer::V;
 use std::sync::OnceLock;
 
+/// Opt-in call counters (`--features frame-stats`): how often the steps of the frame prior run, so
+/// the cost model of a decode can be checked against data. A no-op otherwise.
+pub mod stats {
+    /// What is counted.
+    #[derive(Clone, Copy)]
+    pub enum Counter {
+        /// Edge votes (`vote`, one `sqrt` and two divisions each).
+        Vote,
+        /// `frame_index` calls (one per framed vertex).
+        FrameIndex,
+        /// Rotations that are not the identity (table loads and three shifts).
+        Rotate,
+        /// Rings remembered.
+        Remember,
+    }
+
+    /// The counter names, in `Counter` order.
+    pub const NAMES: [&str; 4] = ["vote", "frame_index", "rotate", "remember"];
+
+    #[cfg(feature = "frame-stats")]
+    mod on {
+        use super::Counter;
+        use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+
+        static COUNTS: [AtomicU64; 4] = [const { AtomicU64::new(0) }; 4];
+
+        #[inline]
+        pub fn bump(counter: Counter, by: u64) {
+            COUNTS[counter as usize].fetch_add(by, Relaxed);
+        }
+
+        pub fn reset() {
+            for c in &COUNTS {
+                c.store(0, Relaxed);
+            }
+        }
+
+        pub fn snapshot() -> [u64; 4] {
+            std::array::from_fn(|i| COUNTS[i].load(Relaxed))
+        }
+    }
+
+    #[cfg(feature = "frame-stats")]
+    pub use on::{reset, snapshot};
+
+    /// Counts one event (or `by`) when the `frame-stats` feature is on.
+    #[inline(always)]
+    pub fn bump(counter: Counter, by: u64) {
+        #[cfg(feature = "frame-stats")]
+        on::bump(counter, by);
+        #[cfg(not(feature = "frame-stats"))]
+        let _ = (counter, by);
+    }
+}
+
+use stats::{Counter, bump};
+
+/// Builds the rotation tables now instead of on the first rotation (the cold-start cost a reader
+/// pays once per process).
+pub fn init_tables() {
+    let _ = int_tables();
+}
+
 const PRIOR_WEIGHT: f64 = 50.0;
-const CELL: i32 = 128;
-const GRID: usize = 96;
-const ORIGIN: i32 = 16;
 const MIN_RING: usize = 3;
-const MIN_LINE: usize = 2;
-const ZERO_FRAME: i32 = 32768;
 
 const DEGREES_TO_RADIANS: f64 = 0.017_453_292_519_943_295;
-const RADIANS_TO_DEGREES: f64 = 57.295_779_513_082_32;
 
 fn to_radians(degrees: f64) -> f64 {
     degrees * DEGREES_TO_RADIANS
-}
-
-fn to_degrees(radians: f64) -> f64 {
-    radians * RADIANS_TO_DEGREES
 }
 
 /// Java's `Math.round(double)`: the nearest integer, ties toward positive infinity, saturating,
@@ -42,93 +95,95 @@ fn round(x: f64) -> i64 {
     rounded as i64
 }
 
-struct Tables {
-    tan_half: Vec<f64>,
-    sin: Vec<f64>,
+/// Bits of the integer frame index (4096 frames over 90 deg, 0.022 deg apart).
+const INT_FRAMES: i32 = 4096;
+const INT_ZERO_FRAME: i32 = INT_FRAMES / 2;
+const Q16: u32 = 16;
+const Q16_HALF: i64 = 1 << (Q16 - 1);
+
+/// What the integer frame reads instead of calling trigonometry (`FramePrior.IntTables` in Java):
+/// built once from `libm` (fdlibm, as Java's `StrictMath`), rounded to integers.
+struct IntTables {
+    /// `round(atan(k / 4096) * 8192 / pi)`, `k = 0..=4096`: a slope's angle in 1/16384 turns.
+    atan: Vec<i32>,
+    /// `(round(tan(a / 2) * 65536), round(sin(a) * 65536))` per frame, `a = -(q * 90 / 4096 - 45)` deg.
+    shear: Vec<[i32; 2]>,
 }
 
-fn tables() -> &'static Tables {
-    static TABLES: OnceLock<Tables> = OnceLock::new();
+fn int_tables() -> &'static IntTables {
+    static TABLES: OnceLock<IntTables> = OnceLock::new();
     TABLES.get_or_init(|| {
-        let mut tan_half = Vec::with_capacity(65536);
-        let mut sin = Vec::with_capacity(65536);
-        for index in 0..65536 {
-            let alpha = to_radians(-degrees(index));
-            tan_half.push(libm::tan(alpha / 2.0));
-            sin.push(libm::sin(alpha));
-        }
-        Tables { tan_half, sin }
+        let atan = (0..=4096)
+            .map(|k| round(libm::atan(f64::from(k) / 4096.0) * (8192.0 / std::f64::consts::PI)) as i32)
+            .collect();
+        let shear = (0..INT_FRAMES)
+            .map(|q| {
+                let alpha = to_radians(-(f64::from(q) * 90.0 / f64::from(INT_FRAMES) - 45.0));
+                [round(libm::tan(alpha / 2.0) * 65536.0) as i32, round(libm::sin(alpha) * 65536.0) as i32]
+            })
+            .collect();
+        IntTables { atan, shear }
     })
 }
 
-fn degrees(index: i32) -> f64 {
-    f64::from(index) * 90.0 / 65536.0 - 45.0
-}
-
-/// Folds degrees into [-45, 45).
-fn fold(degrees: f64) -> f64 {
-    ((degrees + 45.0) % 90.0 + 90.0) % 90.0 - 45.0
-}
-
-/// Quantizes a frame in [-45, 45) to a 16-bit index.
-fn index_of(theta: f64) -> i32 {
-    (round((theta + 45.0) / 90.0 * 65536.0) & 0xFFFF) as i32
-}
-
-/// The direction of an edge as `(quarter turns 0..=3, frame index)`.
-fn heading(ex: i32, ey: i32) -> (i32, i32) {
-    if ex == 0 && ey == 0 {
-        return (0, ZERO_FRAME);
+/// The direction of `(x, y)` in units of 1/16384 turn, `-8192..=8192` (`atan2` times `8192 / pi`),
+/// from one division and one table read; `(0, 0)` is 0. IEEE arithmetic and integers only.
+#[inline]
+fn direction(y: f64, x: f64) -> i32 {
+    let (ax, ay) = (x.abs(), y.abs());
+    if !(ax > 0.0 || ay > 0.0) {
+        return 0;
     }
-    let t = (to_degrees(libm::atan2(f64::from(ey), f64::from(ex))) + 45.0) / 90.0;
-    let whole = t.floor();
-    let mut quarters = whole as i32;
-    let mut index = round((t - whole) * 65536.0);
-    if index == 65536 {
-        index = 0;
-        quarters = quarters.wrapping_add(1);
+    let swap = ay > ax;
+    let slope = if swap { ax / ay } else { ay / ax };
+    let mut t = int_tables().atan[(slope * 4096.0 + 0.5) as usize];
+    if swap {
+        t = 4096 - t;
     }
-    (quarters.rem_euclid(4), index as i32)
+    if x < 0.0 {
+        t = 8192 - t;
+    }
+    if y < 0.0 { -t } else { t }
 }
 
-/// The frame state of one pass over a buffer.
+/// The integer frame index of the summed votes: a quarter of their direction, rounded.
+#[inline]
+fn int_frame_index(sum_sin: f64, sum_cos: f64) -> i32 {
+    (((direction(sum_sin, sum_cos) + 2) >> 2) + INT_ZERO_FRAME) & (INT_FRAMES - 1)
+}
+
+/// The frame state of one pass over a buffer: the previous ring's frame, one vote per ring.
+///
+/// A ring's first edge is coded in the frame of the ring decoded before it; that edge's own
+/// direction (modulo 90 deg) is the frame of every edge after it, and is what the next ring starts
+/// from. A ring is voted for once, by that one edge: no per-edge vote, no pass over the finished
+/// ring. A ring whose first edge has no direction leaves the remembered frame as it was.
 pub struct FramePrior {
-    ring_count: usize,
-    theta: Vec<f64>,
-    centroid_x: Vec<f64>,
-    centroid_y: Vec<f64>,
-    next: Vec<i32>,
-    head: Vec<i32>,
-    sum_cos: f64,
-    sum_sin: f64,
-    vote_cos: f64,
-    vote_sin: f64,
     x: i32,
     y: i32,
-}
-
-impl Default for FramePrior {
-    fn default() -> Self {
-        Self::new()
-    }
+    /// The unit vector of the last remembered ring's first-edge vote.
+    last_cos: f64,
+    last_sin: f64,
+    /// The frame index of the ring being coded: the last ring's as one wall of `PRIOR_WEIGHT`,
+    /// then the first edge's vote.
+    fixed_frame: i32,
+    /// Whether the ring being coded has seen its first edge.
+    first_edge_seen: bool,
+    /// The unit vector of that first edge's vote, if it had a direction.
+    first: Option<(f64, f64)>,
 }
 
 impl FramePrior {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            ring_count: 0,
-            theta: Vec::new(),
-            centroid_x: Vec::new(),
-            centroid_y: Vec::new(),
-            next: Vec::new(),
-            head: vec![-1; GRID * GRID],
-            sum_cos: 0.0,
-            sum_sin: 0.0,
-            vote_cos: 0.0,
-            vote_sin: 0.0,
             x: 0,
             y: 0,
+            last_cos: 1.0,
+            last_sin: 0.0,
+            fixed_frame: INT_ZERO_FRAME,
+            first_edge_seen: false,
+            first: None,
         }
     }
 
@@ -143,12 +198,11 @@ impl FramePrior {
         self.y
     }
 
-    /// A run's start vertex is decoded: seed the frame with the nearest decoded run's.
-    pub fn begin_ring(&mut self, start: V) {
-        let nearest = self.nearest(f64::from(start.x), f64::from(start.y));
-        let prior = if nearest < 0 { 0.0 } else { self.theta[nearest as usize] };
-        self.sum_cos = PRIOR_WEIGHT * libm::cos(to_radians(4.0 * prior));
-        self.sum_sin = PRIOR_WEIGHT * libm::sin(to_radians(4.0 * prior));
+    /// A ring's start vertex is decoded: seed the frame with the last ring's.
+    pub fn begin_ring(&mut self) {
+        self.fixed_frame = int_frame_index(PRIOR_WEIGHT * self.last_sin, PRIOR_WEIGHT * self.last_cos);
+        self.first_edge_seen = false;
+        self.first = None;
     }
 
     /// Rotates an edge into the current frame; the result is in `x()`, `y()`.
@@ -164,161 +218,80 @@ impl FramePrior {
     }
 
     fn rotate(&mut self, q: i32, dx: i32, dy: i32) {
-        if q == ZERO_FRAME {
+        if q == INT_ZERO_FRAME {
             self.x = dx;
             self.y = dy;
             return;
         }
-        let t = tables().tan_half[q as usize];
-        let s = tables().sin[q as usize];
-        let x1 = i64::from(dx).wrapping_sub(round(t * f64::from(dy)));
-        let y1 = i64::from(dy).wrapping_add(round(s * x1 as f64));
-        self.x = x1.wrapping_sub(round(t * y1 as f64)) as i32;
+        bump(Counter::Rotate, 1);
+        let [t, s] = int_tables().shear[q as usize];
+        let (t, s) = (i64::from(t), i64::from(s));
+        let x1 = i64::from(dx) - ((t * i64::from(dy) + Q16_HALF) >> Q16);
+        let y1 = i64::from(dy) + ((s * x1 + Q16_HALF) >> Q16);
+        self.x = (x1 - ((t * y1 + Q16_HALF) >> Q16)) as i32;
         self.y = y1 as i32;
     }
 
     fn unrotate(&mut self, q: i32, rx: i32, ry: i32) {
-        if q == ZERO_FRAME {
+        if q == INT_ZERO_FRAME {
             self.x = rx;
             self.y = ry;
             return;
         }
-        let t = tables().tan_half[q as usize];
-        let s = tables().sin[q as usize];
-        let x1 = i64::from(rx).wrapping_add(round(t * f64::from(ry)));
-        let dy = i64::from(ry).wrapping_sub(round(s * x1 as f64));
-        self.x = x1.wrapping_add(round(t * dy as f64)) as i32;
+        bump(Counter::Rotate, 1);
+        let [t, s] = int_tables().shear[q as usize];
+        let (t, s) = (i64::from(t), i64::from(s));
+        let x1 = i64::from(rx) + ((t * i64::from(ry) + Q16_HALF) >> Q16);
+        let dy = i64::from(ry) - ((s * x1 + Q16_HALF) >> Q16);
+        self.x = (x1 + ((t * dy + Q16_HALF) >> Q16)) as i32;
         self.y = dy as i32;
     }
 
-    /// Rotates `(dx, dy)` into the direction of the edge `(ex, ey)`.
-    pub fn forward_heading(&mut self, ex: i32, ey: i32, dx: i32, dy: i32) {
-        let (quarters, index) = heading(ex, ey);
-        let mut qx = dx;
-        let mut qy = dy;
-        for _ in 0..quarters {
-            let turned = qy;
-            qy = qx.wrapping_neg();
-            qx = turned;
+    /// The edge `from -> to` of the current ring is decoded: only the first votes for the ring's
+    /// frame; a zero edge has no direction and leaves the previous ring's frame.
+    pub fn edge(&mut self, from: V, to: V) {
+        if !self.first_edge_seen {
+            let (c, s) = vote(to.x.wrapping_sub(from.x), to.y.wrapping_sub(from.y));
+            if c != 0.0 || s != 0.0 {
+                self.fixed_frame = int_frame_index(s, c);
+                let length = (c * c + s * s).sqrt();
+                self.first = Some((c / length, s / length));
+            }
         }
-        self.rotate(index, qx, qy);
+        self.first_edge_seen = true;
     }
 
-    /// The exact inverse of `forward_heading` for the same edge.
-    pub fn inverse_heading(&mut self, ex: i32, ey: i32, rx: i32, ry: i32) {
-        let (quarters, index) = heading(ex, ey);
-        self.unrotate(index, rx, ry);
-        let mut qx = self.x;
-        let mut qy = self.y;
-        for _ in 0..quarters {
-            let turned = qy.wrapping_neg();
-            qy = qx;
-            qx = turned;
-        }
-        self.x = qx;
-        self.y = qy;
-    }
-
-    /// An edge of the current run is decoded: it votes for the run's frame.
-    pub fn edge(&mut self, dx: i32, dy: i32) {
-        let (c, s) = vote(dx, dy);
-        self.vote_cos = c;
-        self.vote_sin = s;
-        self.sum_cos += c;
-        self.sum_sin += s;
-    }
-
-    /// The ring `vertices[start, end)` is complete.
-    pub fn end_ring(&mut self, vertices: &[V], start: usize, end: usize) {
-        if end - start < MIN_RING {
+    /// The ring of `len` vertices begun by the last `begin_ring` is complete: it is remembered by
+    /// its first edge's frame (unchanged if that edge had none).
+    pub fn end_ring(&mut self, len: usize) {
+        if len < MIN_RING {
             return;
         }
-        self.remember(vertices, start, end, true);
-    }
-
-    /// The open run `vertices[start, end)` (a line part) is complete.
-    pub fn end_line(&mut self, vertices: &[V], start: usize, end: usize) {
-        if end - start < MIN_LINE {
-            return;
+        bump(Counter::Remember, 1);
+        if let Some((cos, sin)) = self.first {
+            self.last_cos = cos;
+            self.last_sin = sin;
         }
-        self.remember(vertices, start, end, false);
-    }
-
-    fn remember(&mut self, vertices: &[V], start: usize, end: usize, closed: bool) {
-        let mut cx = 0.0f64;
-        let mut cy = 0.0f64;
-        for v in &vertices[start..end] {
-            cx += f64::from(v.x);
-            cy += f64::from(v.y);
-        }
-        cx /= (end - start) as f64;
-        cy /= (end - start) as f64;
-        let cell = cell(cy) * GRID + cell(cx);
-        let theta = own_frame(vertices, start, end, closed);
-        self.theta.push(theta);
-        self.centroid_x.push(cx);
-        self.centroid_y.push(cy);
-        self.next.push(self.head[cell]);
-        self.head[cell] = self.ring_count as i32;
-        self.ring_count += 1;
     }
 
     fn frame_index(&self) -> i32 {
-        index_of(fold(to_degrees(libm::atan2(self.sum_sin, self.sum_cos)) / 4.0))
-    }
-
-    /// Index of the decoded run whose centroid is nearest `(px, py)`, or -1.
-    fn nearest(&self, px: f64, py: f64) -> i32 {
-        if self.ring_count == 0 {
-            return -1;
-        }
-        let cx = cell(px) as i32;
-        let cy = cell(py) as i32;
-        let grid = GRID as i32;
-        let mut best = -1i32;
-        let mut best_distance = f64::MAX;
-        for radius in 0..grid {
-            for gy in 0.max(cy - radius)..=(grid - 1).min(cy + radius) {
-                let full_row = (gy - cy).abs() == radius;
-                let step = if full_row { 1 } else { 1.max(2 * radius) };
-                let mut gx = cx - radius;
-                while gx <= cx + radius {
-                    if (0..grid).contains(&gx) {
-                        let mut index = self.head[(gy * grid + gx) as usize];
-                        while index >= 0 {
-                            let i = index as usize;
-                            let ddx = self.centroid_x[i] - px;
-                            let ddy = self.centroid_y[i] - py;
-                            let distance = ddx * ddx + ddy * ddy;
-                            if distance < best_distance {
-                                best_distance = distance;
-                                best = index;
-                            }
-                            index = self.next[i];
-                        }
-                    }
-                    gx += step;
-                }
-            }
-            if best >= 0 && best_distance <= f64::from(radius) * f64::from(CELL) * f64::from(radius) * f64::from(CELL) {
-                break;
-            }
-        }
-        best
+        bump(Counter::FrameIndex, 1);
+        self.fixed_frame
     }
 }
 
-/// The grid cell along one axis, clamped to the grid.
-fn cell(coordinate: f64) -> usize {
-    let c = ((coordinate / f64::from(CELL)).floor() as i32).wrapping_add(ORIGIN);
-    c.clamp(0, GRID as i32 - 1) as usize
+impl Default for FramePrior {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-/// An edge's vote for its run's frame: its length times `e^(4i phi)`, IEEE arithmetic only.
+/// An edge's vote for its ring's frame: its length times `e^(4i phi)`, IEEE arithmetic only.
 fn vote(dx: i32, dy: i32) -> (f64, f64) {
     if dx == 0 && dy == 0 {
         return (0.0, 0.0);
     }
+    bump(Counter::Vote, 1);
     let ex = f64::from(dx);
     let ey = f64::from(dy);
     let a = ex * ex - ey * ey;
@@ -326,22 +299,6 @@ fn vote(dx: i32, dy: i32) -> (f64, f64) {
     let squared = ex * ex + ey * ey;
     let cube = squared * libm::sqrt(squared);
     ((a * a - b * b) / cube, 2.0 * a * b / cube)
-}
-
-/// Length-weighted mean wall direction modulo 90 deg of a complete run.
-fn own_frame(v: &[V], start: usize, end: usize, closed: bool) -> f64 {
-    let n = end - start;
-    let mut c = 0.0f64;
-    let mut s = 0.0f64;
-    let edges = if closed { n } else { n - 1 };
-    for k in 0..edges {
-        let p = v[start + k];
-        let q = v[start + (k + 1) % n];
-        let (vc, vs) = vote(q.x.wrapping_sub(p.x), q.y.wrapping_sub(p.y));
-        c += vc;
-        s += vs;
-    }
-    if c == 0.0 && s == 0.0 { 0.0 } else { fold(to_degrees(libm::atan2(s, c)) / 4.0) }
 }
 
 #[cfg(test)]
@@ -362,28 +319,121 @@ mod tests {
     }
 
     #[test]
-    fn rotation_is_a_bijection() {
-        let mut prior = FramePrior::new();
-        prior.begin_ring(V::new(10, 10));
-        prior.edge(30, 12);
-        prior.edge(-12, 30);
-        for &(dx, dy) in &[(30, 12), (-12, 30), (1, 0), (0, -7), (4000, -4000), (-1, -1), (0, 0)] {
+    fn the_direction_table_stays_within_one_unit_of_atan2() {
+        let mut angle = -180.0f64;
+        while angle <= 180.0 {
+            for length in [1.0f64, 3.0, 250.0, 123_456.0] {
+                let (y, x) = (length * libm::sin(to_radians(angle)), length * libm::cos(to_radians(angle)));
+                let exact = libm::atan2(y, x) * (8192.0 / std::f64::consts::PI);
+                let tabulated = f64::from(direction(y, x));
+                assert!((tabulated - exact).abs() < 1.01, "{angle} deg: {tabulated} vs {exact}");
+            }
+            angle += 0.37;
+        }
+        assert_eq!(direction(0.0, 0.0), 0);
+        assert_eq!(direction(0.0, 5.0), 0);
+        assert_eq!(direction(0.0, -5.0), 8192);
+        assert_eq!(direction(5.0, 0.0), 4096);
+        assert_eq!(direction(-5.0, 0.0), -4096);
+        assert_eq!(direction(7.0, 7.0), 2048);
+        assert_eq!(int_tables().atan[4096], 2048);
+        assert_eq!(int_tables().shear[INT_ZERO_FRAME as usize], [0, 0]);
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig::with_cases(5_000))]
+
+        #[test]
+        fn the_integer_rotation_is_a_bijection_in_every_frame(
+            wall_x in -8000i32..8000, wall_y in -8000i32..8000, dx in -9000i32..9000, dy in -9000i32..9000,
+        ) {
+            let mut prior = FramePrior::new();
+            prior.begin_ring();
+            prior.edge(V::new(0, 0), V::new(wall_x, wall_y));
             prior.forward(dx, dy);
             let (rx, ry) = (prior.x(), prior.y());
             prior.inverse(rx, ry);
-            assert_eq!((prior.x(), prior.y()), (dx, dy));
+            proptest::prop_assert_eq!((prior.x(), prior.y()), (dx, dy));
         }
     }
 
+    /// A ring fed to the prior the way `FramePass` does: begin, one edge per vertex, end.
+    fn feed_ring(prior: &mut FramePrior, ring: &[V]) {
+        prior.begin_ring();
+        for w in ring.windows(2) {
+            prior.edge(w[0], w[1]);
+        }
+        prior.end_ring(ring.len());
+    }
+
+    /// A rectangle with sides along `angle` degrees, `a` and `b` long.
+    fn tilted_rect(angle: f64, a: f64, b: f64, origin: (i32, i32)) -> Vec<V> {
+        let (c, s) = (libm::cos(to_radians(angle)), libm::sin(to_radians(angle)));
+        let p = |u: f64, v: f64| V::new(origin.0 + (u * c - v * s).round() as i32, origin.1 + (u * s + v * c).round() as i32);
+        vec![p(0.0, 0.0), p(a, 0.0), p(a, b), p(0.0, b)]
+    }
+
     #[test]
-    fn heading_rotation_is_a_bijection() {
+    fn the_first_edge_sets_the_frame_of_the_edges_after_it() {
         let mut prior = FramePrior::new();
-        for &(ex, ey) in &[(5, 0), (0, 5), (-5, 0), (0, -5), (3, 4), (-7, 2), (0, 0), (100, -1)] {
-            for &(dx, dy) in &[(1, 0), (0, 1), (-3, 9), (200, -150), (0, 0)] {
-                prior.forward_heading(ex, ey, dx, dy);
-                let (rx, ry) = (prior.x(), prior.y());
-                prior.inverse_heading(ex, ey, rx, ry);
-                assert_eq!((prior.x(), prior.y()), (dx, dy), "edge ({ex}, {ey})");
+        let ring = tilted_rect(33.0, 3000.0, 2000.0, (100, 100));
+        prior.begin_ring();
+        // the first edge is coded in the previous ring's frame (none yet: the tile's axes)
+        prior.forward(ring[1].x - ring[0].x, ring[1].y - ring[0].y);
+        assert_eq!((prior.x(), prior.y()), (ring[1].x - ring[0].x, ring[1].y - ring[0].y));
+        prior.edge(ring[0], ring[1]);
+        // the next wall (across the first) is nearly axis-parallel in the first edge's frame
+        prior.forward(ring[2].x - ring[1].x, ring[2].y - ring[1].y);
+        assert!(prior.x().abs() <= 8 && (prior.y() - 2000).abs() <= 8, "({}, {})", prior.x(), prior.y());
+        prior.edge(ring[1], ring[2]);
+        // later edges do not move it
+        let before = prior.fixed_frame;
+        prior.edge(ring[2], ring[3]);
+        assert_eq!(prior.fixed_frame, before);
+    }
+
+    #[test]
+    fn the_next_ring_starts_in_the_frame_of_the_last_rings_first_edge() {
+        let mut prior = FramePrior::new();
+        feed_ring(&mut prior, &tilted_rect(33.0, 3000.0, 2000.0, (0, 0)));
+        let second = tilted_rect(33.0, 800.0, 500.0, (5000, 5000));
+        prior.begin_ring();
+        prior.forward(second[1].x - second[0].x, second[1].y - second[0].y);
+        assert!(prior.x() > 790 && prior.y().abs() <= 8, "({}, {})", prior.x(), prior.y());
+    }
+
+    #[test]
+    fn a_zero_first_edge_keeps_the_previous_frame() {
+        let mut prior = FramePrior::new();
+        feed_ring(&mut prior, &tilted_rect(33.0, 3000.0, 2000.0, (0, 0)));
+        let degenerate = [V::new(7, 7), V::new(7, 7), V::new(50, 90), V::new(9, 400)];
+        feed_ring(&mut prior, &degenerate);
+        // the frame of the ring after it is still the 33 degree one
+        prior.begin_ring();
+        assert_eq!(prior.fixed_frame, int_frame_index(PRIOR_WEIGHT * prior.last_sin, PRIOR_WEIGHT * prior.last_cos));
+        assert_ne!(prior.fixed_frame, INT_ZERO_FRAME);
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig::with_cases(3_000))]
+
+        #[test]
+        fn the_first_only_rotation_is_a_bijection(
+            rings in proptest::collection::vec(proptest::collection::vec((-9000i32..9000, -9000i32..9000), 1..8), 1..6),
+            dx in -9000i32..9000, dy in -9000i32..9000,
+        ) {
+            let mut prior = FramePrior::new();
+            for ring in &rings {
+                let ring: Vec<V> = ring.iter().map(|&(x, y)| V::new(x, y)).collect();
+                prior.begin_ring();
+                for w in ring.windows(2) {
+                    prior.forward(dx, dy);
+                    let (rx, ry) = (prior.x(), prior.y());
+                    prior.inverse(rx, ry);
+                    proptest::prop_assert_eq!((prior.x(), prior.y()), (dx, dy));
+                    prior.edge(w[0], w[1]);
+                }
+                prior.end_ring(ring.len());
             }
         }
     }

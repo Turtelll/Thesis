@@ -19,6 +19,9 @@ cargo test -p mlt-pipeline
 cargo build --release -p mlt-oracle
 mlt-oracle golden-check                                   # 96-grid rows present in ../data/golden/v-final-full, matched by name
 mlt-oracle golden-check --golden ../data/golden/grid-best # all 96 rows (research dump --grid best)
+mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles    # the 96-composition grid has the one-vote ring frames, codes 23 and 25
+mlt-oracle golden-check --golden ../data/golden/grid-best-153-onevote # the 96 rows of the grid (research dump --grid best); the older dumps grid-best-151, grid-iframe-150, prevframe-23-25 read through golden_grid()
+mlt-oracle golden-check --golden ../data/golden/prevframe-23-25 # the 24 rows of codes 23 and 25 (QUAD_CORNER_PREVFRAME_FIRST_ONLY and its shared variant; research dump --grid prevframe)
 mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles --by-zoom --by-layer --csv out.csv
 mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles --write-tiles target-results/tiles   # also write <z>_<x>_<y>.stock.mlt / .oracle.mlt
 python check_tiles.py target-results/tiles out.csv        # independent gzip -6 sizes (Python zlib) of the written tiles, checked against the csv
@@ -31,8 +34,9 @@ mlt-oracle decode-time target-results/munich-stock.mbtiles target-results/munich
 cargo build --release -p mlt-cli-pipeline                 # builds target/release/mlt
 mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline default   # per-layer default composition (forLayer)
 mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline oracle    # tile oracle: best of 96 compositions per layer on the gzip size of the tile, the other streams picked by gzip size
-mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline PIPE_QUAD_CORNER_SHARED_FRAME_CLASS_ZIGZAG_ESCAPE_PLANES   # one composition for every layer
+mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline PIPE_QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY_CLASS_ZIGZAG_ESCAPE_PLANES   # one composition for every layer
 mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline oracle --verify   # decode every tile, compare with the stock decode
+mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline default:QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY=QUAD_CORNER_SHARED_FRAME   # the per-layer default with one predictor replaced by another (the retired float ring frame, code 8, here)
 mlt ui out.mbtiles                                        # terminal visualizer: the world map of an MLT .mbtiles
 mlt ui tile.mlt | mlt ui <directory> | mlt ls | mlt decode | mlt dump | mlt hexdump   # read pipeline tiles as well
 python check_convert.py --subset ../data/MVT/munich-plantiler.mbtiles target-results/munich40.mbtiles 40   # the first 40 tiles, as a small tileset
@@ -120,3 +124,12 @@ The `.mbtiles` that `mlt convert` writes carry `format = mlt`, which is how `mlt
 golden dump, per buffer and per grid composition. It holds because the port uses wrapping integer
 arithmetic where Java does, `libm` (fdlibm) for trig, Java's `Math.round`, `i64` Hilbert keys and the
 Java tie-breaks; gzip sizes use real zlib level 6 (`flate2` with the `zlib` feature), as `java.util.zip` does.
+
+The grids and defaults use the **integer frame** (the line frames `LINE_CONTINUATION_*IFRAME_HEADING`, header codes 18-19, and the one-vote ring frames, codes 23-25, below): votes in IEEE basic
+operations and `sqrt`, an integer `atan` table and Q16 shear tables, so a frame decode calls no `atan2`, `sin`, `cos` or `tan`
+(only the start-up tables use `libm`). It is the same size as the float frame to 0.001% of a tile and decodes 24 to 43% faster per predictor
+([frame-decode-time.md](../research-java/docs/results/frame-decode-time.md)). The float-frame predictors (codes 5, 8, 11, 13) are
+still decodable and writable (`--vertex-pipeline <name>`), and `golden-check` reads the old dumps (`grid-best-150`, `v-final-full`, ...)
+through `golden_grid()`; the dump of the grid before the one-vote ring frames is `grid-best-151`, of today's `grid-best-153-onevote`.
+
+The ring frames are `QUAD_CORNER_PREVFRAME_FIRST_ONLY` (code 23) and `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` (code 25, with the shared-vertex references) ([previous-frame.md](../research-java/docs/results/previous-frame.md)): the previous ring's frame, one vote per ring. They are in `Prediction::ALL`, so in `best_grid()`, `Composition::DEFAULT` and `for_layer`; `golden-check` reads the Java dump `--grid best` (or `--grid prevframe`) bit for bit. The float ring frame (5, 8) is retired for now (the nearest ring's integer frame, codes 16, 17, is removed from this codec): still decodable and writable by name (`--vertex-pipeline default:<NEW>=<OLD>` writes the old default), in no grid or default. `codec-time` has the rows of all of them (`QCI`, `QCSI`, `QCP1`, `QCSP1`).

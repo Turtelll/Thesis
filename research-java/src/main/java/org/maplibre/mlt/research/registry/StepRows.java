@@ -50,6 +50,82 @@ final class StepRows {
     }
 
     /**
+     * The previous-ring frame ({@link Prediction#QUAD_CORNER_PREVFRAME}) beside plain {@code QUAD_CORNER} and the
+     * nearest-ring integer frame ({@link Prediction#QUAD_CORNER_IFRAME}) it replaces, per segmentation, with no
+     * reorder (the control: the previous ring is then an arbitrary one), with the Hilbert reorders it is meant
+     * for, and on the terminal {@code building} uses. Read the by-layer table: every layer with polygon rings
+     * shows it, a layer without rings shows the three rows equal.
+     */
+    static List<Encoding> prevFrameRows() {
+        final var rows = new ArrayList<Encoding>();
+        final var predictors = List.of(Prediction.QUAD_CORNER, Prediction.QUAD_CORNER_IFRAME, Prediction.QUAD_CORNER_PREVFRAME,
+                Prediction.QUAD_CORNER_PREVFRAME_VOTE, Prediction.QUAD_CORNER_PREVFRAME_FIRST,
+                Prediction.QUAD_CORNER_PREVFRAME_FIRST_ONLY);
+        for (final var terminal : List.of(PipelineRegistry.DEFAULT, LayerCompositions.forLayer(LayerCompositions.BUILDING))) {
+            for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID, Reorder.HILBERT_CENTROID_ROT_MP)) {
+                for (final var predictor : predictors) {
+                    for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
+                        final var row = PipelineRegistry.row(terminal.withReorder(reorder).withPredictor(predictor)
+                                .withSegmentation(segmentation));
+                        // the two terminals can coincide on a combination: a duplicate name is summed twice
+                        if (rows.stream().noneMatch(r -> r.name().equals(row.name()))) {
+                            rows.add(row);
+                        }
+                    }
+                }
+            }
+        }
+        return rows;
+    }
+
+    /**
+     * The one-vote previous-ring frame with the shared-vertex references ({@code
+     * QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY}) beside its plain counterpart, the nearest-ring frame with and without
+     * references and plain {@code QUAD_CORNER}, {@code QUAD_CORNER_SHARED}: the six predictors, flat and class streams,
+     * without and then with the {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder, on {@link PipelineRegistry#DEFAULT}'s
+     * terminal and on the one {@code building} uses. The references rotate the rings that share a wall to start where it
+     * begins, which the one-vote frame reads its first edge from, so the pair is not independent.
+     */
+    static List<Encoding> prevSharedRows() {
+        final var rows = new ArrayList<Encoding>();
+        for (final var terminal : List.of(PipelineRegistry.DEFAULT, LayerCompositions.forLayer(LayerCompositions.BUILDING))) {
+            for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP)) {
+                for (final var predictor : List.of(Prediction.QUAD_CORNER, Prediction.QUAD_CORNER_IFRAME,
+                        Prediction.QUAD_CORNER_PREVFRAME_FIRST_ONLY, Prediction.QUAD_CORNER_SHARED,
+                        Prediction.QUAD_CORNER_SHARED_IFRAME, Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY)) {
+                    for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
+                        final var row = PipelineRegistry.row(terminal.withReorder(reorder).withPredictor(predictor)
+                                .withSegmentation(segmentation));
+                        if (rows.stream().noneMatch(r -> r.name().equals(row.name()))) {
+                            rows.add(row);
+                        }
+                    }
+                }
+            }
+        }
+        return rows;
+    }
+
+    /**
+     * The one-vote previous-ring frame with the first edge blended into the previous ring's frame ({@code
+     * QUAD_CORNER_PREVFRAME_FIRST_BLEND}) beside plain {@code QUAD_CORNER}, the nearest-ring frame, the previous
+     * ring's frame alone and the one-vote frames that replace it, class streams, on {@link
+     * Reorder#HILBERT_CENTROID_ROT_MP} and the terminal of {@link PipelineRegistry#DEFAULT}: the six rows that
+     * answer whether the blend closes the loss on an axis-aligned street grid without costing Munich.
+     * Short on purpose; {@code prevframe} is the full grid.
+     */
+    static List<Encoding> prevBlendRows() {
+        final var rows = new ArrayList<Encoding>();
+        for (final var predictor : List.of(Prediction.QUAD_CORNER, Prediction.QUAD_CORNER_IFRAME,
+                Prediction.QUAD_CORNER_PREVFRAME, Prediction.QUAD_CORNER_PREVFRAME_FIRST_ONLY,
+                Prediction.QUAD_CORNER_PREVFRAME_FIRST, Prediction.QUAD_CORNER_PREVFRAME_FIRST_BLEND)) {
+            rows.add(PipelineRegistry.row(PipelineRegistry.DEFAULT.withReorder(Reorder.HILBERT_CENTROID_ROT_MP)
+                    .withPredictor(predictor).withSegmentation(Segmentation.CLASS)));
+        }
+        return rows;
+    }
+
+    /**
      * The shared-vertex references on the {@code building} layer: {@code QUAD_CORNER} and its ring
      * frame against {@code QUAD_CORNER_SHARED} and {@code QUAD_CORNER_SHARED_FRAME}, flat and class
      * streams, without and then with the {@link Reorder#HILBERT_CENTROID_ROT_MP} reorder, on {@link

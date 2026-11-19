@@ -7,19 +7,45 @@ use crate::reorder::Reorder;
 use crate::segmentation::Segmentation;
 use crate::stream::Terminal;
 
-/// The 96 compositions: three reorders x eight predictors x flat or class streams x the two byte
-/// terminals, in the Java grid's order (the first of equal sizes wins, so the order is part of the
-/// result). It holds [`Composition::DEFAULT`] and every [`for_layer`] composition.
+/// The grid of `predictors`: three reorders x the predictors x flat or class streams, in the Java
+/// grid's order (the first of equal sizes wins, so the order is part of the result).
+fn grid_of(predictors: &[Prediction]) -> Vec<Composition> {
+    let mut grid = Vec::with_capacity(predictors.len() * 6);
+    for reorder in [Reorder::None, Reorder::HilbertCentroidRotMp, Reorder::Chain] {
+        for &predictor in predictors {
+            for segmentation in [Segmentation::Flat, Segmentation::Class] {
+                grid.push(Composition { reorder, predictor, segmentation, terminal: Terminal::EscapePlanes });
+            }
+        }
+    }
+    grid
+}
+
+/// The 42 compositions: three reorders x seven predictors x flat or class streams. The ring frames
+/// are the one-vote frames (codes 23 and 25), lines have no frame ([`Prediction::ALL`]); it holds
+/// [`Composition::DEFAULT`] and every [`for_layer`] composition.
 #[must_use]
 pub fn best_grid() -> Vec<Composition> {
-    let mut grid = Vec::with_capacity(96);
-    for reorder in [Reorder::None, Reorder::HilbertCentroidRotMp, Reorder::Chain] {
-        for predictor in Prediction::ALL {
-            for segmentation in [Segmentation::Flat, Segmentation::Class] {
-                for terminal in [Terminal::EscapePlanes, Terminal::VarintSplit] {
-                    grid.push(Composition { reorder, predictor, segmentation, terminal });
-                }
-            }
+    grid_of(&Prediction::ALL)
+}
+
+/// `QUAD_CORNER_PREVFRAME_FIRST_ONLY` (code 23) and `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` (code 25) over
+/// the grid's reorders and streams: 2 x 3 x 2 = 12 compositions (`CompositionGrids.prevFrameGrid`,
+/// `research dump --grid prevframe`). The ring frames of [`best_grid`] since they replaced the integer frame
+/// of the nearest ring, so this is a subset of it: `golden-check` reads a `--grid prevframe` dump with it.
+#[must_use]
+pub fn prevframe_grid() -> Vec<Composition> {
+    grid_of(&[Prediction::QuadCornerPrevFrameFirstOnly, Prediction::QuadCornerSharedPrevFrameFirstOnly])
+}
+
+/// Every composition a Java golden dump can hold a row of: [`best_grid`], then the rows of
+/// [`prevframe_grid`] it does not contain (what `golden-check` looks the dump's row names up in).
+#[must_use]
+pub fn golden_grid() -> Vec<Composition> {
+    let mut grid = best_grid();
+    for c in prevframe_grid() {
+        if !grid.contains(&c) {
+            grid.push(c);
         }
     }
     grid
@@ -35,23 +61,23 @@ fn hilbert(predictor: Prediction, segmentation: Segmentation, terminal: Terminal
 pub fn for_layer(layer: &str) -> Composition {
     use Prediction as P;
     use Segmentation::{Class, Flat};
-    use Terminal::{EscapePlanes as Esc, VarintSplit as Var};
+    use Terminal::EscapePlanes as Esc;
     let chain = |c: Composition| c.with_reorder(Reorder::Chain);
     match layer {
-        "place" => hilbert(P::QuadCornerFrame, Flat, Var),
-        "transportation" => chain(hilbert(P::LineContinuationSharedFrameHeading, Class, Esc)),
-        "landcover" | "landuse" | "building" => hilbert(P::QuadCornerSharedFrame, Class, Esc),
-        "transportation_name" => chain(hilbert(P::LineContinuationSharedFrameHeading, Flat, Var)),
-        "water" => chain(hilbert(P::QuadCornerSharedFrame, Class, Esc)),
-        "park" => hilbert(P::QuadCornerShared, Flat, Var),
-        "boundary" => hilbert(P::LineContinuationSharedFrameHeading, Flat, Var),
+        "place" => hilbert(P::QuadCornerPrevFrameFirstOnly, Flat, Esc),
+        "transportation" => chain(hilbert(P::LineContinuationShared, Class, Esc)),
+        "landcover" | "landuse" | "building" => hilbert(P::QuadCornerSharedPrevFrameFirstOnly, Class, Esc),
+        "transportation_name" => chain(hilbert(P::LineContinuationShared, Flat, Esc)),
+        "water" => chain(hilbert(P::QuadCornerSharedPrevFrameFirstOnly, Class, Esc)),
+        "park" => hilbert(P::QuadCornerShared, Flat, Esc),
+        "boundary" => hilbert(P::LineContinuationShared, Flat, Esc),
         "poi" => hilbert(P::Delta, Class, Esc),
-        "water_name" => hilbert(P::LineContinuation, Flat, Var),
+        "water_name" => hilbert(P::LineContinuation, Flat, Esc),
         "housenumber" => hilbert(P::LineContinuation, Flat, Esc),
-        "waterway" => chain(hilbert(P::LineContinuationSharedFrameHeading, Flat, Var)),
-        "mountain_peak" => hilbert(P::LineContinuationFrameHeading, Flat, Var),
-        "aeroway" => chain(hilbert(P::QuadCornerSharedFrame, Flat, Var)),
-        "aerodrome_label" => hilbert(P::Delta, Flat, Var),
+        "waterway" => chain(hilbert(P::LineContinuationShared, Flat, Esc)),
+        "mountain_peak" => hilbert(P::LineContinuation, Flat, Esc),
+        "aeroway" => chain(hilbert(P::QuadCornerSharedPrevFrameFirstOnly, Flat, Esc)),
+        "aerodrome_label" => hilbert(P::Delta, Flat, Esc),
         _ => Composition::DEFAULT,
     }
 }
@@ -62,11 +88,11 @@ mod tests {
     use std::collections::HashSet;
 
     #[test]
-    fn the_grid_has_96_distinct_compositions_with_distinct_names() {
+    fn the_grid_has_42_distinct_compositions_with_distinct_names() {
         let grid = best_grid();
-        assert_eq!(grid.len(), 96);
+        assert_eq!(grid.len(), 42);
         let names: HashSet<String> = grid.iter().map(Composition::name).collect();
-        assert_eq!(names.len(), 96);
+        assert_eq!(names.len(), 42);
     }
 
     #[test]
@@ -83,13 +109,14 @@ mod tests {
 
     #[test]
     fn names_follow_the_java_grid() {
+        // the one-vote ring frames took the slots of the float and then the integer ring frame (Java: `Prediction.grid()`)
         assert_eq!(
             Composition::DEFAULT.name(),
-            "PIPE_QUAD_CORNER_SHARED_FRAME_CLASS_ZIGZAG_ESCAPE_PLANES"
+            "PIPE_QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY_CLASS_ZIGZAG_ESCAPE_PLANES"
         );
         assert_eq!(
             for_layer("transportation").name(),
-            "PIPE_CHAIN_LINE_CONTINUATION_SHARED_FRAME_HEADING_CLASS_ZIGZAG_ESCAPE_PLANES"
+            "PIPE_CHAIN_LINE_CONTINUATION_SHARED_CLASS_ZIGZAG_ESCAPE_PLANES"
         );
     }
 }

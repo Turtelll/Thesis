@@ -47,30 +47,69 @@ Two bytes. The reorder is not part of it.
 | 0 | 5 | residual map | `ZIGZAG`=0 (the only one) |
 | 0 | 6-7 | transpose | `NONE`=0, `INTERLEAVED_PLANES`=1, `PLANE_MAJOR`=2, `COMPONENT_MAJOR`=3 |
 | 1 | 0-3 | byte width | `VARINT`=0, `VARINT_SPLIT`=1, `MIN_FIXED`=2, `ESCAPE`=3, `FORCE_4`=4 |
-| 1 | 4 | predictor, bit 3 | `Prediction` code >> 3 (the predictors outgrew the 3 bits of byte 0) |
-| 1 | 5-7 | free | 0; **three bits of headroom** |
+| 1 | 4-7 | predictor, high bits | `Prediction` code >> 3 (the predictors outgrew the 3 bits of byte 0; codes up to 127) |
 
 The predictor field holds an explicit, stable **code** per `Prediction` constant
 (`Prediction.code()`, not the declaration order), so retiring a predictor never shifts the others.
-Eight are live:
+Seventeen are live. The grids and the per-layer defaults use the first three, `QUAD_CORNER_SHARED`, the two
+integer line-frame predictors (codes 18, 19) and the two one-vote ring frames (codes 23 and 25,
+[results/previous-frame.md](results/previous-frame.md)). The other ring frames are retired for now (marked below): the
+float frame (5, 8), the nearest ring's integer frame (16, 17) and the other previous-ring variants (20, 21, 22, 24) stay decodable
+and writable by name but are in no grid, default or selector. The float line frames (11, 13) stay out of the grids as before
+(see [results/frame-decode-time.md](results/frame-decode-time.md)):
 
 | Code | Predictor |
 |---|---|
 | 0 | `DELTA` |
 | 1 | `QUAD_CORNER` |
 | 2 | `LINE_CONTINUATION` |
-| 5 | `QUAD_CORNER_FRAME` |
+| 5 | `QUAD_CORNER_FRAME` (float frame; retired) |
 | 7 | `QUAD_CORNER_SHARED` |
-| 8 | `QUAD_CORNER_SHARED_FRAME` |
-| 11 | `LINE_CONTINUATION_FRAME_HEADING` |
-| 13 | `LINE_CONTINUATION_SHARED_FRAME_HEADING` |
+| 8 | `QUAD_CORNER_SHARED_FRAME` (float frame; retired) |
+| 11 | `LINE_CONTINUATION_FRAME_HEADING` (float frame) |
+| 13 | `LINE_CONTINUATION_SHARED_FRAME_HEADING` (float frame) |
+| 16 | `QUAD_CORNER_IFRAME` (integer frame of the nearest ring; retired, replaced by 23) |
+| 17 | `QUAD_CORNER_SHARED_IFRAME` (retired, replaced by 25) |
+| 18 | `LINE_CONTINUATION_IFRAME_HEADING` |
+| 19 | `LINE_CONTINUATION_SHARED_IFRAME_HEADING` |
+| 20 | `QUAD_CORNER_PREVFRAME` (retired: integer frame of the previous ring, fixed per ring) |
+| 21 | `QUAD_CORNER_PREVFRAME_VOTE` (retired: the previous ring's frame plus the ring's own votes) |
+| 22 | `QUAD_CORNER_PREVFRAME_FIRST` (retired: previous ring's frame for the first edge, the ring's own first edge after it) |
+| 23 | `QUAD_CORNER_PREVFRAME_FIRST_ONLY` (the ring frame of the grids and the per-layer defaults: as 22, a ring remembered by its first edge, one vote per ring) |
+| 24 | `QUAD_CORNER_PREVFRAME_FIRST_BLEND` (retired: as 23, the first edge votes on top of the previous ring's frame) |
+| 25 | `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` (the shared ring frame of the grids and the per-layer defaults: 23 on the shared-vertex references, as 17 is 16; a buffer the references do not shrink is written as 23) |
 
 The codes 3 (`QUAD_CORNER_LINE`), 4 (`TURN_SCALAR`), 6 (`QUAD_CORNER_LINE_FRAME`), 9
 (`LINE_CONTINUATION_FRAME`), 10 (`LINE_CONTINUATION_HEADING`) and 12 (`LINE_CONTINUATION_SHARED`)
 belong to predictors that were retired (the code of the first two is in `encoder/retired/`, see
 [results/tile-oracle.md](results/tile-oracle.md)); a payload carrying one no longer decodes, and the
-codes are not reused. The bytes of every kept row are unchanged. The four predictor bits hold 16
-codes; bits 5-7 of byte 1 are the reserve beyond that.
+codes are not reused. The bytes of every kept row are unchanged (the grid's rows with codes 16 and 17 became rows with codes 23 and 25, a different row, not a changed one). The five bits that hold the code
+(byte 0 bits 0-2, byte 1 bits 4-5 in use) leave room up to code 127 without a header change.
+
+### The integer frame (codes 16-19)
+
+The frame predictors rotate the plain-delta edges of a run into the frame of the nearest decoded run
+(`FramePrior`). The float frame (5, 8, 11, 13) needs `atan2`, `sin`, `cos`, `tan` of the platform's libm
+for its frame index and shears, so two implementations agree only by matching fdlibm. The integer frame
+computes the same thing without libm in the decoder:
+
+- **Votes** are unchanged: `|z| e^(4i phi)` of every edge, summed with IEEE `+ - * /` and `sqrt` only
+  (correctly rounded, hence portable), plus the prior of weight 50 from the nearest decoded run's unit vector.
+- **Frame index**: 12 bits, 4096 frames over 90 degrees, zero frame 2048:
+  `(((direction(sumSin, sumCos) + 2) >> 2) + 2048) & 4095`. `direction(y, x)` is the angle in units of
+  1/16384 turn from the octant and quadrant, one division and an integer `ATAN` table of 4097 entries
+  (`ATAN[(int)(slope * 4096 + 0.5)]`; pi = 8192).
+- **Rotation**: three lifting shears with Q16 integer tables `TAN_HALF` and `SIN` (rounded from fdlibm
+  once, at start): `x1 = dx - ((t*dy + 32768) >> 16)`, `y1 = dy + ((s*x1 + 32768) >> 16)`,
+  `x = x1 - ((t*y1 + 32768) >> 16)`; an exact bijection like the float one, so nothing is signalled.
+- **Run record**: the unit vector of the run's own votes (`own / |own|`, default `(1, 0)`) instead of an
+  angle, so the prior needs no `sin`/`cos` per run.
+- **Heading** (`LINE_CONTINUATION_IFRAME_HEADING`): `shifted = direction(ey, ex) + 2048`, quarter turns
+  `floorDiv(shifted, 4096) mod 4`, index `shifted - quarters * 4096`, rotated with the same shears.
+
+The tables are derived once from fdlibm values (`StrictMath` in Java, `libm` in Rust) rounded to integers; they
+are the only place a floating-point function enters, and a different rounding of one entry would change bytes,
+which `golden-check` and the Java golden dump `grid-best-151` pin.
 
 A fixed-width byte width with a transpose other than `NONE` and `INTERLEAVED_PLANES` is applied
 to residual streams only; the **side stream** of a predictor with side values (none is live; the retired `TURN_SCALAR`'s
@@ -79,8 +118,9 @@ to residual streams only; the **side stream** of a predictor with side values (n
 
 ### Shared-reference block
 
-Present only when the predictor is `QUAD_CORNER_SHARED`, `QUAD_CORNER_SHARED_FRAME` or
-`LINE_CONTINUATION_SHARED_FRAME_HEADING`. A shared predictor's
+Present only when the predictor is `QUAD_CORNER_SHARED`, `QUAD_CORNER_SHARED_FRAME`,
+`QUAD_CORNER_SHARED_IFRAME`, `LINE_CONTINUATION_SHARED_FRAME_HEADING` or
+`LINE_CONTINUATION_SHARED_IFRAME_HEADING`. A shared predictor's
 buffer is written as its plain predictor (header id of the plain one, no block) whenever the
 references do not make it smaller, so a decoder needs no mode byte.
 

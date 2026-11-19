@@ -69,9 +69,10 @@ public record BufferFeatures(
         final var before = meanJump(ctx);
         final var after = meanJump(Reorder.HILBERT_CENTROID_ROT_MP.apply(ctx));
 
-        final var predictions = Prediction.values();
-        final var entropy = new double[predictions.length];
-        final var zeroShare = new double[predictions.length];
+        // indexed by the position in Prediction.grid()
+        final var predictions = Prediction.grid();
+        final var entropy = new double[predictions.size()];
+        final var zeroShare = new double[predictions.size()];
         var wideShare = 0.0;
         final var topo = new BufferContext(
                 List.of(), ctx.geometryTypes(), ctx.numGeometries(), ctx.numParts(), ctx.numRings());
@@ -89,7 +90,7 @@ public record BufferFeatures(
                     values++;
                 }
             }
-            final var p = prediction.ordinal();
+            final var p = prediction.gridIndex();
             entropy[p] = n == 0 ? 0 : 2.0 * entropyBits(histogram, values);
             zeroShare[p] = values == 0 ? 0 : (double) histogram.getOrDefault(0, 0L) / values;
             if (prediction == Prediction.QUAD_CORNER) {
@@ -119,7 +120,7 @@ public record BufferFeatures(
                 best = p;
             }
         }
-        return Prediction.values()[best];
+        return Prediction.grid().get(best);
     }
 
     private static double meanJump(BufferContext ctx) {

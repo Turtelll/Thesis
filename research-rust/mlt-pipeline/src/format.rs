@@ -23,7 +23,7 @@ impl Composition {
     /// `PipelineRegistry.DEFAULT`.
     pub const DEFAULT: Self = Self {
         reorder: Reorder::None,
-        predictor: Prediction::QuadCornerSharedFrame,
+        predictor: Prediction::QuadCornerSharedPrevFrameFirstOnly,
         segmentation: Segmentation::Class,
         terminal: Terminal::EscapePlanes,
     };
@@ -95,7 +95,7 @@ pub fn encode_reordered(reordered: &Buffer, c: &Composition) -> Encoded {
     }
     let plain = encode_streams(reordered, &c.with_predictor(c.predictor.plain()));
     let scan = match c.predictor {
-        Prediction::QuadCornerShared | Prediction::QuadCornerSharedFrame => {
+        Prediction::QuadCornerShared | Prediction::QuadCornerSharedPrevFrameFirstOnly => {
             refs::scan_rings(&reordered.vertices, &reordered.topology)
         }
         _ => refs::scan_lines(&reordered.vertices, &reordered.topology),
@@ -144,10 +144,9 @@ fn encode_shared(rotated: &Buffer, scan: &Scan, c: &Composition) -> Vec<u8> {
 }
 
 fn write_streams(out: &mut Vec<u8>, c: &Composition, streams: &[Vec<i32>]) {
-    let last = streams.iter().rposition(|s| !s.is_empty());
-    for (s, values) in streams.iter().enumerate() {
+    for values in streams {
         if !values.is_empty() {
-            stream::encode(out, values, c.terminal, Some(s) == last);
+            stream::encode(out, values, c.terminal);
         }
     }
 }
@@ -176,7 +175,7 @@ pub fn decode(payload: &[u8], topology: &Topology, vertex_count: usize) -> Vec<V
         let counts: Vec<usize> = (0..layout.stream_count()).map(|_| input.read_varint() as usize).collect();
         layout = Layout { value_counts: counts, ..layout };
         walk = Some(match c.predictor {
-            Prediction::QuadCornerShared | Prediction::QuadCornerSharedFrame => {
+            Prediction::QuadCornerShared | Prediction::QuadCornerSharedPrevFrameFirstOnly => {
                 Box::new(RingWalk::for_decoding(topology, vertex_count, flags, indices))
             }
             _ => Box::new(LineWalk::for_decoding(topology, vertex_count, flags, indices)),
@@ -184,10 +183,9 @@ pub fn decode(payload: &[u8], topology: &Topology, vertex_count: usize) -> Vec<V
     }
 
     let counts = &layout.value_counts;
-    let last = counts.iter().rposition(|&n| n > 0);
     let mut streams: Vec<Vec<i32>> = Vec::with_capacity(counts.len());
-    for (s, &n) in counts.iter().enumerate() {
-        streams.push(if n == 0 { Vec::new() } else { stream::decode(&mut input, n, c.terminal, Some(s) == last) });
+    for &n in counts {
+        streams.push(if n == 0 { Vec::new() } else { stream::decode(&mut input, n, c.terminal) });
     }
     assert_eq!(input.remaining(), 0, "bytes left after the last stream");
     segmentation::join(&layout, &predictor, &streams, vertex_count, walk.as_deref_mut())

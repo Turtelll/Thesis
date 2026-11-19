@@ -1,5 +1,5 @@
 //! S1: feature reordering (`encoder/reorder/{Reorder, GeometryReorder}.java`), the two reorders the
-//! 96-composition grid uses: `HILBERT_CENTROID_ROT_MP` and `CHAIN`.
+//! 42-composition grid uses: `HILBERT_CENTROID_ROT_MP` and `CHAIN`.
 //!
 //! Nothing is transmitted: a decoder emits the order it reads. In a tile a reorder is two things,
 //! so the codec exposes both:

@@ -38,12 +38,17 @@ public final class PipelineRegistry {
     static final Composition AFTER_S1 = AFTER_S0.withReorder(Reorder.HILBERT_CENTROID_ROT_MP);
 
     /**
-     * S2: {@code QUAD_CORNER_SHARED_FRAME}, the predictor with the smallest total over the corpus among the ones the
-     * pipeline still has (-8,41% gzip, measure --step s2; the per-layer choice is {@link LayerCompositions}'s).
-     * It replaced {@code QUAD_CORNER_LINE} when that one was retired (docs/results/tile-oracle.md, "Pruning the
-     * grid"), which makes every stage after S2, and {@link #DEFAULT}, differ from the figures of docs/results/openzl-pipeline.md.
+     * S2: {@code QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY}, the shared ring frame with one vote per ring. It replaced
+     * {@code QUAD_CORNER_SHARED_IFRAME} (the nearest ring's frame), which was the predictor with the smallest total
+     * over the corpus: the choice is the better size-to-decode-time trade, 83% of that frame's whole-tile gain for 40%
+     * of its decode overhead (docs/results/previous-frame.md), so it is no longer the smallest row of {@code
+     * measure --step s2}; the per-layer choice is {@link LayerCompositions}'s. Before it, {@code
+     * QUAD_CORNER_SHARED_IFRAME} replaced the float {@code QUAD_CORNER_SHARED_FRAME} (-0,005% smaller, 24-43% slower
+     * to decode, docs/results/frame-decode-time.md) and {@code QUAD_CORNER_LINE} when that one was retired
+     * (docs/results/tile-oracle.md, "Pruning the grid"), which makes every stage after S2, and {@link #DEFAULT},
+     * differ from the figures of docs/results/openzl-pipeline.md.
      */
-    static final Composition AFTER_S2 = AFTER_S1.withPredictor(Prediction.QUAD_CORNER_SHARED_FRAME);
+    static final Composition AFTER_S2 = AFTER_S1.withPredictor(Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY);
 
     /** S3: one stream per predictor class (-1,2 points over FLAT); the role split and class sort lose. */
     static final Composition AFTER_S3 = AFTER_S2.withSegmentation(Segmentation.CLASS);
@@ -100,7 +105,7 @@ public final class PipelineRegistry {
                 new Stage("identity (plain varint)", Composition.IDENTITY),
                 new Stage("S0 split varint", AFTER_S0),
                 new Stage("S1 + Hilbert reorder", AFTER_S1),
-                new Stage("S2 + QUAD_CORNER_SHARED_FRAME", AFTER_S2),
+                new Stage("S2 + QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY", AFTER_S2),
                 new Stage("S3 + class streams", AFTER_S3),
                 new Stage("S6 + escape width", AFTER_S6),
                 new Stage("S7 + byte planes (GEOMETRY_BEST)", AFTER_S7),
@@ -110,7 +115,7 @@ public final class PipelineRegistry {
     /** The step names, in order. */
     public static List<String> steps() {
         return List.of("s0", "s1", "s2", "s3", "s4", "s6", "s7", "s8", "selector", "frame", "framelayers",
-                "shared", "framelines", "linesshared");
+                "shared", "framelines", "linesshared", "prevframe", "prevblend", "prevshared");
     }
 
     /** The rows measured by one step. */
@@ -119,7 +124,7 @@ public final class PipelineRegistry {
             case "s0" -> List.of(
                     row(Composition.IDENTITY), row(Composition.IDENTITY.withWidth(ByteWidth.VARINT_SPLIT)));
             case "s1" -> CompositionGrids.s1Orders().stream().map(order -> row(AFTER_S0.withReorder(order))).toList();
-            case "s2" -> Arrays.stream(Prediction.values())
+            case "s2" -> Prediction.grid().stream()
                     .map(predictor -> row(AFTER_S1.withPredictor(predictor)))
                     .toList();
             case "s3" -> StepRows.s3Rows();
@@ -138,6 +143,11 @@ public final class PipelineRegistry {
             case "shared" -> StepRows.sharedRows();
             // the ring frame on line parts: LINE_CONTINUATION beside LINE_CONTINUATION_FRAME
             case "framelines" -> StepRows.frameLineRows();
+            // the previous ring's frame beside the nearest ring's (QUAD_CORNER_IFRAME), with and without Hilbert order
+            case "prevframe" -> StepRows.prevFrameRows();
+            // the first edge blended into the previous ring's frame, six rows
+            case "prevblend" -> StepRows.prevBlendRows();
+            case "prevshared" -> StepRows.prevSharedRows();
             // the references to earlier line parts' positions beside the line predictors
             case "linesshared" -> StepRows.lineSharedRows();
             // not a step of the build-up: the cumulative stages, for the benchmark run
@@ -156,6 +166,8 @@ public final class PipelineRegistry {
             // the grid of the per-(tile, layer) oracle; the oracles themselves need a compressor and are
             // built by MeasureHarness. Not in steps(), so all() does not take the grid
             case "best" -> CompositionGrids.bestGrid().stream().map(PipelineRegistry::row).toList();
+            // the float and the integer frame side by side; like "best", not in steps()
+            case "iframe" -> CompositionGrids.frameGrid().stream().map(PipelineRegistry::row).toList();
             default -> throw new IllegalArgumentException("unknown step: " + name + " (known: " + steps() + ")");
         };
     }

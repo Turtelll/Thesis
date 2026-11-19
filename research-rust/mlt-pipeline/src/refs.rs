@@ -143,7 +143,8 @@ impl State {
         Self {
             ring_start: vec![0; vertex_count],
             ring_end: vec![0; vertex_count],
-            seen: FxHashMap::default(),
+            // at most one entry per vertex: sized once instead of growing (and rehashing) per ring
+            seen: FxHashMap::with_capacity_and_hasher(vertex_count, rustc_hash::FxBuildHasher),
             window: VecDeque::new(),
             window_vertices: 0,
             distinct: FxHashMap::default(),
@@ -312,8 +313,12 @@ struct Dictionary {
 }
 
 impl Dictionary {
-    fn new() -> Self {
-        Self { index: FxHashMap::default(), entries: Vec::new() }
+    /// At most one entry per vertex of the buffer.
+    fn new(vertex_count: usize) -> Self {
+        Self {
+            index: FxHashMap::with_capacity_and_hasher(vertex_count, rustc_hash::FxBuildHasher),
+            entries: Vec::with_capacity(vertex_count),
+        }
     }
 
     fn size(&self) -> usize {
@@ -356,7 +361,7 @@ fn reference(dictionary: &Dictionary, vertex: V, flags: &mut BitWriter, indices:
     index >= 0
 }
 
-/// The references of one buffer under `LINE_CONTINUATION_SHARED_FRAME_HEADING`: its line parts
+/// The references of one buffer under `LINE_CONTINUATION_SHARED`: its line parts
 /// reversed where that lets the entry flag catch the part, which vertices are references, the bits.
 #[must_use]
 pub fn scan_lines(original: &[V], topology: &Topology) -> Option<Scan> {
@@ -364,7 +369,7 @@ pub fn scan_lines(original: &[V], topology: &Topology) -> Option<Scan> {
     let n = original.len();
     let mut out: Vec<V> = Vec::with_capacity(n);
     let mut referenced = vec![false; n];
-    let mut dictionary = Dictionary::new();
+    let mut dictionary = Dictionary::new(n);
     let mut flags = BitWriter::default();
     let mut indices = BitWriter::default();
     for r in 0..runs.count() {
@@ -405,7 +410,7 @@ impl<'a> LineWalk<'a> {
     pub fn for_decoding(topology: &Topology, vertex_count: usize, flags: &'a [u8], indices: &'a [u8]) -> Self {
         let runs = Runs::of(topology, vertex_count)
             .expect("the runs of a shared-reference buffer must follow from the topology");
-        Self { runs, flags: BitReader::new(flags), indices: BitReader::new(indices), dictionary: Dictionary::new(), run: 0 }
+        Self { runs, flags: BitReader::new(flags), indices: BitReader::new(indices), dictionary: Dictionary::new(vertex_count), run: 0 }
     }
 
     fn advance(&mut self, i: usize) {

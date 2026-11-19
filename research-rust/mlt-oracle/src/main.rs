@@ -3,8 +3,10 @@
 //! * `golden-check`: the Rust codec against the Java golden master;
 //! * `compare`: whole-tile MLT v2 bytes under gzip, the stock encoder against the tile oracle;
 //! * `diff`: two tilesets (MVT or MLT, stock or pipeline) hold the same tiles, layers and features;
-//! * `decode-time`: whole-tile decode time of MLT tilesets, stock v2 as reference.
+//! * `decode-time`: whole-tile decode time of MLT tilesets, stock v2 as reference;
+//! * `codec-time`: decode time of the pipeline codec alone, per predictor.
 
+mod codec_time;
 mod compare;
 mod decode_time;
 mod diff;
@@ -18,8 +20,9 @@ fn main() {
         Some("compare") => compare::run(&args[1..]),
         Some("diff") => diff::run(&args[1..]),
         Some("decode-time") => decode_time::run(&args[1..]),
+        Some("codec-time") => codec_time::run(&args[1..]),
         Some("--help" | "-h") | None => {
-            println!("usage: mlt-oracle <golden-check|compare|diff|decode-time> [options]; each command prints its usage on --help");
+            println!("usage: mlt-oracle <golden-check|compare|diff|decode-time|codec-time> [options]; each command prints its usage on --help");
             Ok(())
         }
         Some(other) => Err(format!("unknown command {other}")),

@@ -1,11 +1,11 @@
 //! `golden-check`: the Rust codec against the Java golden master (`research dump`). For every
-//! (tile, layer) buffer of an extraction and every composition of the 96-grid the dump holds a row for,
+//! (tile, layer) buffer of an extraction and every composition of the 42-grid the dump holds a row for,
 //! the payload's SHA-256 and length and the SHA-256 of the emitted topology must equal the Java ones,
 //! and the payload must decode back to the emitted vertices.
 
 use crate::extraction::{self, ManifestEntry};
 use flate2::read::GzDecoder;
-use mlt_pipeline::registry::best_grid;
+use mlt_pipeline::registry::golden_grid;
 use mlt_pipeline::{Buffer, Composition, Reorder, decode, encode_reordered};
 use rayon::prelude::*;
 use sha2::{Digest, Sha256};
@@ -15,7 +15,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 
 const USAGE: &str = "golden-check [--in <extractionDir>] [--golden <dumpDir>] [--layer <name>] [--limit-buffers <n>]\n\
-  Encodes every buffer of the extraction with every composition of the 96-grid that the Java golden\n\
+  Encodes every buffer of the extraction with every composition of the golden grid (the 42 of --grid best, the 48 integer-frame ones of --grid iframe) that the Java golden\n\
   dump holds a row for, and compares payload SHA-256, payload length and emitted-topology SHA-256.";
 
 #[derive(Clone)]
@@ -79,7 +79,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
         }
     }
 
-    let grid = best_grid();
+    let grid = golden_grid();
     let index: HashMap<String, usize> = grid.iter().enumerate().map(|(i, c)| (c.name(), i)).collect();
     let (goldens, covered) = read_golden(&golden.join("buffers.tsv.gz"), &index, grid.len())?;
     println!(
@@ -139,11 +139,14 @@ pub fn run(args: &[String]) -> Result<(), String> {
     println!("\n{checked} (row, buffer) pairs compared against the golden master, {bad} differ");
     if !missing.is_empty() {
         println!(
-            "{} grid compositions have no row in the dump (run `research dump --grid best` to add them):",
+            "{} grid compositions have no row in the dump (run `research dump --grid best` or `--grid iframe` to add them):",
             missing.len()
         );
-        for name in &missing {
-            println!("  {name}");
+        // a dump holds the rows of one grid (--grid best or iframe): the other grid's are expected to be absent
+        if covered.is_empty() {
+            for name in &missing {
+                println!("  {name}");
+            }
         }
     }
     if bad > 0 { Err(format!("{bad} mismatches")) } else { Ok(()) }

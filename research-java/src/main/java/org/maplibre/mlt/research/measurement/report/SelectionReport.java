@@ -20,7 +20,7 @@ import java.util.TreeMap;
  */
 public final class SelectionReport {
 
-    private static final Prediction[] PREDICTORS = Prediction.values();
+    private static final Prediction[] PREDICTORS = Prediction.grid().toArray(Prediction[]::new);
 
     /** buffers, curve reorder, chain reorder, then one slot per predictor, class streams, planes, escape without planes, split varint. */
     private static final int BUFFERS = 0;
@@ -53,7 +53,10 @@ public final class SelectionReport {
         } else if (c.reorder().reorders()) {
             slots[CHAIN]++;
         }
-        slots[FIRST_PREDICTOR + c.predictor().ordinal()]++;
+        final var predictor = c.predictor().gridIndex();
+        if (predictor >= 0) {
+            slots[FIRST_PREDICTOR + predictor]++;
+        }
         if (c.segmentation() == Segmentation.CLASS) {
             slots[CLASS]++;
         }
@@ -110,6 +113,16 @@ public final class SelectionReport {
             case QUAD_CORNER_SHARED_FRAME -> "qcsf";
             case LINE_CONTINUATION_FRAME_HEADING -> "lcfh";
             case LINE_CONTINUATION_SHARED_FRAME_HEADING -> "lcsfh";
+            case QUAD_CORNER_IFRAME -> "qci";
+            case QUAD_CORNER_SHARED_IFRAME -> "qcsi";
+            case LINE_CONTINUATION_IFRAME_HEADING -> "lcih";
+            case LINE_CONTINUATION_SHARED_IFRAME_HEADING -> "lcsih";
+            case QUAD_CORNER_PREVFRAME -> "qcp";
+            case QUAD_CORNER_PREVFRAME_VOTE -> "qcpv";
+            case QUAD_CORNER_PREVFRAME_FIRST -> "qcpf";
+            case QUAD_CORNER_PREVFRAME_FIRST_ONLY -> "qcpo";
+            case QUAD_CORNER_PREVFRAME_FIRST_BLEND -> "qcpb";
+            case QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY -> "qcspo";
         };
     }
 }

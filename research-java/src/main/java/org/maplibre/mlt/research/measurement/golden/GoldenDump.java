@@ -83,15 +83,31 @@ public final class GoldenDump {
     /** {@code --grid best}: the 96 compositions of the tile oracle's grid, no baselines, no per-layer row. */
     public static final String GRID_BEST = "best";
 
+    /**
+     * {@code --grid iframe}: the 96 compositions of {@link CompositionGrids#frameGrid()}, the float and the integer frame
+     * side by side (the 48 integer ones are the reference of the Rust port's integer frame).
+     */
+    public static final String GRID_IFRAME = "iframe";
+
+    /**
+     * {@code --grid prevframe}: the 12 compositions of {@link CompositionGrids#prevFrameGrid()}
+     * ({@code QUAD_CORNER_PREVFRAME_FIRST_ONLY}, the reference of its Rust port).
+     */
+    public static final String GRID_PREVFRAME = "prevframe";
+
     static List<Row> rows(String grid) {
         if (grid == null) {
             return rows();
         }
-        if (!GRID_BEST.equals(grid)) {
-            throw new IllegalArgumentException("unknown grid " + grid + " (known: " + GRID_BEST + ")");
-        }
+        final var compositions = switch (grid) {
+            case GRID_BEST -> CompositionGrids.bestGrid();
+            case GRID_IFRAME -> CompositionGrids.frameGrid();
+            case GRID_PREVFRAME -> CompositionGrids.prevFrameGrid();
+            default -> throw new IllegalArgumentException("unknown grid " + grid + " (known: " + GRID_BEST + ", "
+                    + GRID_IFRAME + ", " + GRID_PREVFRAME + ")");
+        };
         final var rows = new ArrayList<Row>();
-        for (final var composition : CompositionGrids.bestGrid()) {
+        for (final var composition : compositions) {
             final var encoding = new PipelineEncoding(composition);
             rows.add(new Row(encoding.name(), encoding));
         }

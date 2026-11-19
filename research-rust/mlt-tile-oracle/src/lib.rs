@@ -6,8 +6,9 @@
 //!
 //! * [`VertexMode::Default`]: `for_layer(layer name)`;
 //! * [`VertexMode::Fixed`]: one composition for every layer;
+//! * [`VertexMode::DefaultSwap`]: `for_layer` with one predictor replaced by another (an experimental one);
 //! * [`VertexMode::Oracle`]: `TileSelector.oracle`, a coordinate descent over the gzip size of the whole tile
-//!   across the 96 compositions of `bestGrid()`. Every candidate also picks the encodings of the other streams
+//!   across the 42 compositions of `bestGrid()`. Every candidate also picks the encodings of the other streams
 //!   (ids, geometry lengths, properties) by gzip size ([`gzip_config`]) instead of the stock raw byte length.
 //!
 //! A composition's reorder permutes whole layers (id and every property column follow), so each candidate
@@ -17,8 +18,8 @@ use flate2::Compression;
 use flate2::write::GzEncoder;
 use mlt_core::encoder::{EncoderConfig, Network, Profile, Tessellation, WireVersion};
 use mlt_core::{Decoder, Parser, TileLayer};
-use mlt_pipeline::registry::{best_grid, for_layer};
-use mlt_pipeline::{Composition, Reorder};
+use mlt_pipeline::registry::{best_grid, for_layer, golden_grid};
+use mlt_pipeline::{Composition, Prediction, Reorder};
 use rayon::prelude::*;
 use std::io::Write;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -37,12 +38,24 @@ pub enum VertexMode {
     Oracle { max_passes: usize },
     /// One composition (of `best_grid()`) for every layer.
     Fixed(Composition),
+    /// `for_layer(layer name)` with one predictor replaced by another wherever the default uses it (the other
+    /// choices of the composition stay): how an experimental predictor is measured on the layers it would
+    /// stand in for, `--vertex-pipeline default:<FROM>=<TO>`.
+    DefaultSwap(Prediction, Prediction),
 }
 
 impl VertexMode {
-    /// A composition of `best_grid()` by its `Composition::name()`.
+    /// `default:<FROM>=<TO>` with two predictors by their Java names (`Prediction::name`).
+    pub fn swap(spec: &str) -> Option<Self> {
+        let (from, to) = spec.strip_prefix("default:")?.split_once('=')?;
+        let find = |name: &str| Prediction::EVERY.into_iter().find(|p| p.name() == name);
+        Some(Self::DefaultSwap(find(from)?, find(to)?))
+    }
+
+    /// A composition of `golden_grid()` (`best_grid()` and the float-frame rows it replaced) by its
+    /// `Composition::name()`.
     pub fn fixed(name: &str) -> Option<Self> {
-        best_grid().into_iter().find(|c| c.name() == name).map(Self::Fixed)
+        golden_grid().into_iter().find(|c| c.name() == name).map(Self::Fixed)
     }
 }
 
@@ -98,11 +111,15 @@ pub fn encode_tile(layers: Vec<TileLayer>, base: EncoderConfig, mode: VertexMode
             }
             Ok(TileEncoding { bytes, lengths, layers: choices, geometry: Vec::new() })
         }
-        VertexMode::Default | VertexMode::Fixed(_) => {
+        VertexMode::Default | VertexMode::Fixed(_) | VertexMode::DefaultSwap(..) => {
             let mut parts: Vec<(Vec<u8>, Option<Composition>)> = Vec::new();
             for layer in &layers {
                 let composition = match mode {
                     VertexMode::Fixed(c) => c,
+                    VertexMode::DefaultSwap(from, to) => {
+                        let c = for_layer(layer.name());
+                        if c.predictor == from { c.with_predictor(to) } else { c }
+                    }
                     _ => for_layer(layer.name()),
                 };
                 parts.push(match encode_with(layer, composition, base) {

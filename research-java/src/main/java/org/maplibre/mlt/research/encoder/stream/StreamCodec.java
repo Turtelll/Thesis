@@ -20,6 +20,20 @@ public final class StreamCodec {
     private StreamCodec() {
     }
 
+    // TEMP instrumentation
+    static final boolean FORCE = System.getenv("TMP_FORCE_ESCAPE") != null;
+    static final long[] TMP_N = new long[4];
+    static final long[] TMP_VALUES = new long[1];
+    static final long[] TMP_SAVED = new long[2];
+
+    static {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> System.err.println(
+                "TMPSTAT force=" + FORCE + " streams=" + TMP_N[0] + " width1=" + TMP_N[1]
+                        + " escaped(pays)=" + TMP_N[2] + " plain(escape not smaller)=" + TMP_N[3]
+                        + " bytesSavedByEscape=" + TMP_SAVED[0] + " bytesLostIfForced=" + TMP_SAVED[1]
+                        + " values=" + TMP_VALUES[0])));
+    }
+
     /** What one stream is written with: the residual map, the byte width and the transpose. */
     public record Format(ResidualMap map, ByteWidth width, Transpose transpose) {
 
@@ -65,7 +79,26 @@ public final class StreamCodec {
         final var span = span(mapped);
         final var width = ByteWidth.minWidth(span.max);
         final var exceptionWidth = ByteWidth.minWidth(span.maxException);
-        if (escapePays(config, mapped.length, width, exceptionWidth, span.exceptions)) {
+        if (config.width() == ByteWidth.ESCAPE) {
+            TMP_N[0]++;
+            TMP_VALUES[0] += mapped.length;
+            final var pays = escapePays(config, mapped.length, width, exceptionWidth, span.exceptions);
+            final var plainBytes = (long) mapped.length * width;
+            final var escBytes = (long) mapped.length + (long) span.exceptions * exceptionWidth;
+            if (width == 1) {
+                TMP_N[1]++;
+            } else if (pays) {
+                TMP_N[2]++;
+                TMP_SAVED[0] += plainBytes - escBytes;
+            } else {
+                TMP_N[3]++;
+                TMP_SAVED[1] += escBytes - plainBytes;
+            }
+            if (width > 1 && (pays || FORCE)) {
+                writeEscaped(out, mapped, transpose, span.exceptions, exceptionWidth);
+                return;
+            }
+        } else if (escapePays(config, mapped.length, width, exceptionWidth, span.exceptions)) {
             writeEscaped(out, mapped, transpose, span.exceptions, exceptionWidth);
             return;
         }

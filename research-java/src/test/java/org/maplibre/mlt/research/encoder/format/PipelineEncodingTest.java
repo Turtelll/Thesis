@@ -39,6 +39,7 @@ public class PipelineEncodingTest {
     var byName = new java.util.LinkedHashMap<String, Encoding>();
     PipelineRegistry.all().forEach(row -> byName.putIfAbsent(row.name(), row));
     PipelineRegistry.step("best").forEach(row -> byName.putIfAbsent(row.name(), row));
+    PipelineRegistry.step("iframe").forEach(row -> byName.putIfAbsent(row.name(), row));
     return List.copyOf(byName.values());
   }
 

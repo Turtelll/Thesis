@@ -35,7 +35,7 @@ public final class CompositionGrids {
     static List<Encoding> fitRows(List<Reorder> reorders) {
         final var rows = new ArrayList<Encoding>();
         for (final var reorder : reorders) {
-            for (final var predictor : Prediction.values()) {
+            for (final var predictor : Prediction.grid()) {
                 for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
                     rows.add(PipelineRegistry.row(PipelineRegistry.DEFAULT.withReorder(reorder).withPredictor(predictor)
                             .withSegmentation(segmentation).withWidth(ByteWidth.ESCAPE)
@@ -75,9 +75,56 @@ public final class CompositionGrids {
     public static List<Composition> bestGrid() {
         final var configs = new ArrayList<Composition>();
         for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP, Reorder.CHAIN)) {
-            for (final var predictor : Prediction.values()) {
+            for (final var predictor : Prediction.grid()) {
                 for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
                     final var base = PipelineRegistry.DEFAULT.withReorder(reorder).withPredictor(predictor).withSegmentation(segmentation);
+                    configs.add(base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.INTERLEAVED_PLANES));
+                    configs.add(base.withWidth(ByteWidth.VARINT_SPLIT).withTranspose(Transpose.NONE));
+                }
+            }
+        }
+        return configs;
+    }
+
+    /**
+     * The framed predictors, float and integer frame side by side ({@code --step iframe}): the four with
+     * the float frame ({@link Prediction#QUAD_CORNER_FRAME}, {@link Prediction#QUAD_CORNER_SHARED_FRAME},
+     * {@link Prediction#LINE_CONTINUATION_FRAME_HEADING}, {@link Prediction#LINE_CONTINUATION_SHARED_FRAME_HEADING})
+     * and the four of {@link Prediction#integerFrames()}, each over the grid's reorders, streams and
+     * terminals: 8 x 3 x 2 x 2 = 96 compositions, the integer ones 48 of them. Read the per-layer table
+     * pairwise: a float row and the integer row of the same name without the {@code I}. Not part of
+     * {@link PipelineRegistry#all()}; {@code PipelineEncodingTest} round-trips it.
+     */
+    public static List<Composition> frameGrid() {
+        final var configs = new ArrayList<Composition>();
+        final var predictors = new ArrayList<Prediction>(Prediction.floatFrames());
+        predictors.addAll(Prediction.integerFrames());
+        for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP, Reorder.CHAIN)) {
+            for (final var predictor : predictors) {
+                for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
+                    final var base = PipelineRegistry.DEFAULT.withReorder(reorder).withPredictor(predictor).withSegmentation(segmentation);
+                    configs.add(base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.INTERLEAVED_PLANES));
+                    configs.add(base.withWidth(ByteWidth.VARINT_SPLIT).withTranspose(Transpose.NONE));
+                }
+            }
+        }
+        return configs;
+    }
+
+    /**
+     * {@link Prediction#QUAD_CORNER_PREVFRAME_FIRST_ONLY} (code 23) and its shared-reference variant {@link
+     * Prediction#QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY} (code 25) over the grid's reorders, streams and
+     * terminals: 2 x 3 x 2 x 2 = 24 compositions (the dump {@code --grid prevframe}, the reference of their Rust
+     * port), the plain one's first. Not part of {@link PipelineRegistry#all()}.
+     */
+    public static List<Composition> prevFrameGrid() {
+        final var configs = new ArrayList<Composition>();
+        for (final var predictor : List.of(Prediction.QUAD_CORNER_PREVFRAME_FIRST_ONLY,
+                Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY)) {
+            for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP, Reorder.CHAIN)) {
+                for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
+                    final var base = PipelineRegistry.DEFAULT.withReorder(reorder).withPredictor(predictor)
+                            .withSegmentation(segmentation);
                     configs.add(base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.INTERLEAVED_PLANES));
                     configs.add(base.withWidth(ByteWidth.VARINT_SPLIT).withTranspose(Transpose.NONE));
                 }
@@ -97,7 +144,8 @@ public final class CompositionGrids {
     public static List<Composition> candidateConfigs(Reorder reorder) {
         final var base = PipelineRegistry.DEFAULT.withReorder(reorder);
         final var predictors = List.of(
-                Prediction.QUAD_CORNER_SHARED_FRAME, Prediction.QUAD_CORNER, Prediction.LINE_CONTINUATION, Prediction.DELTA);
+                Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY, Prediction.QUAD_CORNER, Prediction.LINE_CONTINUATION,
+                Prediction.DELTA);
         final var segmentations = List.of(Segmentation.CLASS, Segmentation.FLAT);
         final var terminals = List.of(
                 base.withWidth(ByteWidth.ESCAPE).withTranspose(Transpose.INTERLEAVED_PLANES),

@@ -42,7 +42,26 @@ class LayerDefaultTest {
   void transportationChainsItsRoadsAndReferencesEarlierJunctions() {
     var config = LayerCompositions.forLayer("transportation");
     assertEquals(Reorder.CHAIN, config.reorder());
-    assertEquals(Prediction.LINE_CONTINUATION_SHARED_FRAME_HEADING, config.predictor());
+    assertEquals(Prediction.LINE_CONTINUATION_SHARED_IFRAME_HEADING, config.predictor());
+  }
+
+  @Test
+  void ringFramesAreTheOneVoteFramesAndTheRetiredOnesAreOutOfEveryDefaultAndGrid() {
+    assertEquals(Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY, PipelineRegistry.DEFAULT.predictor());
+    assertEquals(
+        Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY, LayerCompositions.forLayer("building").predictor());
+    assertEquals(Prediction.QUAD_CORNER_PREVFRAME_FIRST_ONLY, LayerCompositions.forLayer("place").predictor());
+    assertTrue(Prediction.grid().contains(Prediction.QUAD_CORNER_PREVFRAME_FIRST_ONLY));
+    assertTrue(Prediction.grid().contains(Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY));
+    for (var predictor : Prediction.values()) {
+      if (predictor.retiredRingFrame()) {
+        assertTrue(!Prediction.grid().contains(predictor), predictor + " is retired but in the grid");
+        for (var layer : LayerCompositions.fittedLayers()) {
+          assertTrue(LayerCompositions.forLayer(layer).predictor() != predictor, predictor + " in " + layer);
+        }
+        assertTrue(CompositionGrids.bestGrid().stream().noneMatch(c -> c.predictor() == predictor), predictor.name());
+      }
+    }
   }
 
   @Test

@@ -8,7 +8,7 @@
 //! * **per-layer default**: every vertex stream written by the pipeline codec with `for_layer(layer)`;
 //! * **alone-best**: per layer the composition whose layer bytes gzip smallest alone;
 //! * **tile oracle, raw-length stream selection**: `TileSelector.oracle`, coordinate descent over the gzip size of
-//!   the whole tile across all 96 compositions of `bestGrid()`, from the smaller of the default and the alone-best
+//!   the whole tile across all 42 compositions of `bestGrid()`, from the smaller of the default and the alone-best
 //!   tile, with the other streams (ids, geometry lengths, properties) encoded as stock picks them: raw byte length;
 //! * **stock + gzip stream selection**: stock with every stream-encoding competition decided by gzip size
 //!   (`gzip_config`);
@@ -17,7 +17,7 @@
 //!   this row.
 //!
 //! A composition's reorder permutes whole layers (id and every property column follow), so each of the
-//! 96 candidates is a complete layer encoding. The pipeline codec is the vertex stream of the patched
+//! 42 candidates is a complete layer encoding. The pipeline codec is the vertex stream of the patched
 //! `mlt-core` copy (`research-rust/mlt-core-pipeline`).
 
 use flate2::read::GzDecoder;
@@ -38,7 +38,7 @@ const USAGE: &str = "compare --mbtiles <file> [--csv <file>] [--by-zoom] [--by-l
   Whole-tile MLT v2 under gzip (zlib level 6): stock vs the pipeline codec as the vertex encoder.\n\
   --write-tiles writes <z>_<x>_<y>.stock.mlt and .oracle.mlt, so the sizes can be checked with other tools\n\
   (`gzip -6 -c file | wc -c` is the compressed size compare reports).\n\
-  --verify-all-compositions round-trips every one of the 96 grid compositions on every pipelined\n\
+  --verify-all-compositions round-trips every one of the 42 grid compositions on every pipelined\n\
   layer (not just the oracle's chosen one), through the real tile container.";
 
 struct Options {
@@ -188,7 +188,7 @@ fn process(z: u32, x: u32, y: u32, data: &[u8], o: &Options, grid: &[Composition
         reorder: Reorder::None,
         predictor: mlt_pipeline::Prediction::Delta,
         segmentation: mlt_pipeline::Segmentation::Flat,
-        terminal: mlt_pipeline::Terminal::VarintSplit,
+        terminal: mlt_pipeline::Terminal::EscapePlanes,
     };
     let plain = fixed_choice(&trials, grid, plain_composition);
     let (verified, geometry) = if o.verify {
@@ -394,9 +394,9 @@ pub fn run(args: &[String]) -> Result<(), String> {
         ("pipeline, plain delta + split varint", total.plain_gzip, total.plain_raw),
         ("pipeline, per-layer default (forLayer)", total.default_gzip, total.default_raw),
         ("pipeline, per-layer alone-best", total.alone_gzip, 0),
-        ("pipeline, tile oracle, no feature reorder (32)", total.noreorder_gzip, total.noreorder_raw),
-        ("pipeline, tile oracle (96), raw-length streams", total.rawsel_gzip, total.rawsel_raw),
-        ("pipeline, tile oracle (96) + gzip streams", total.oracle_gzip, total.oracle_raw),
+        ("pipeline, tile oracle, no feature reorder (14)", total.noreorder_gzip, total.noreorder_raw),
+        ("pipeline, tile oracle (42), raw-length streams", total.rawsel_gzip, total.rawsel_raw),
+        ("pipeline, tile oracle (42) + gzip streams", total.oracle_gzip, total.oracle_raw),
     ];
     for (label, gzip, raw) in rows {
         if gzip == 0 {

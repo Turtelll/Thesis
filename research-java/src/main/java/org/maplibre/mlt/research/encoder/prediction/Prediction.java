@@ -10,7 +10,9 @@ import org.maplibre.mlt.research.encoder.prediction.mechanism.FramePrior;
 import org.maplibre.mlt.research.encoder.prediction.mechanism.SegmentQuadCorner;
 import org.maplibre.mlt.research.encoder.reference.RingReferences;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * S2: prediction. Turns absolute coordinates into signed residuals. The delta chain is continuous
@@ -72,7 +74,76 @@ public enum Prediction {
      * decoded for them. A buffer the references do not shrink is written as plain {@link
      * #LINE_CONTINUATION_FRAME_HEADING}, so a layer without junctions pays nothing.
      */
-    LINE_CONTINUATION_SHARED_FRAME_HEADING(13);
+    LINE_CONTINUATION_SHARED_FRAME_HEADING(13),
+
+    /**
+     * {@link #QUAD_CORNER_FRAME} with the integer frame ({@link FramePrior#FramePrior(boolean)}): the
+     * same prior from the nearest decoded ring and the same rotation of the residual, with no
+     * trigonometry on the decoder's side. The residuals differ from the float frame's in the last unit
+     * of a rotation, so it is its own predictor, not a replacement of the code 5.
+     */
+    QUAD_CORNER_IFRAME(16),
+
+    /** {@link #QUAD_CORNER_SHARED} with the integer ring frame ({@link #QUAD_CORNER_IFRAME}). */
+    QUAD_CORNER_SHARED_IFRAME(17),
+
+    /** {@link #LINE_CONTINUATION_FRAME_HEADING} with the integer frame and the integer heading. */
+    LINE_CONTINUATION_IFRAME_HEADING(18),
+
+    /** {@link #LINE_CONTINUATION_SHARED_FRAME_HEADING} with the integer frame and heading. */
+    LINE_CONTINUATION_SHARED_IFRAME_HEADING(19),
+
+    /**
+     * {@link #QUAD_CORNER_IFRAME} with the frame of the <em>previous ring</em> instead of the nearest
+     * one refined by the ring's own walls ({@link FramePrior#previousRun()}): no neighbour search, no
+     * per-edge vote, one frame index per ring. Meant to follow a Hilbert reorder, where the previous ring
+     * is a spatial neighbour; the reorder is not part of the payload, so nothing here enforces it. Retired
+     * ({@link #retiredRingFrame()}): out of {@link #grid()} and the per-layer defaults, still decodable
+     * (docs/results/previous-frame.md).
+     */
+    QUAD_CORNER_PREVFRAME(20),
+
+    /**
+     * {@link #QUAD_CORNER_PREVFRAME} with the ring's own decoded edges voting on top of the previous
+     * ring's frame, as {@link #QUAD_CORNER_IFRAME} does on top of the nearest ring's ({@link
+     * FramePrior#previousRunVoting()}): the control that separates what the neighbour search buys from
+     * what the votes buy.
+     */
+    QUAD_CORNER_PREVFRAME_VOTE(21),
+
+    /**
+     * One vote per ring ({@link FramePrior#previousRunFirstEdge()}): the first edge of a ring in the previous
+     * ring's frame, the edges after it in the frame of the ring's own first edge. The ring is remembered by
+     * the votes of all its edges.
+     */
+    QUAD_CORNER_PREVFRAME_FIRST(22),
+
+    /**
+     * {@link #QUAD_CORNER_PREVFRAME_FIRST} with the ring remembered by its first edge as well ({@link
+     * FramePrior#previousRunFirstEdgeOnly()}): a ring is voted for exactly once. The ring frame of the grid and of
+     * the per-layer defaults, in the place of {@link #QUAD_CORNER_IFRAME}: it keeps 91% (Munich) and 82% (Tokyo) of
+     * that frame's gain on {@code building} at about 40% of its decode overhead (docs/results/previous-frame.md).
+     * Meant to follow a Hilbert reorder, as the layers that use it do.
+     */
+    QUAD_CORNER_PREVFRAME_FIRST_ONLY(23),
+
+    /**
+     * {@link #QUAD_CORNER_PREVFRAME_FIRST_ONLY} where the first edge votes on top of the previous ring's
+     * frame (weight 50, as the prior of the nearest-ring frame) instead of replacing it ({@link
+     * FramePrior#previousRunFirstEdgeBlended()}): a short first edge cannot override the neighbour's frame.
+     */
+    QUAD_CORNER_PREVFRAME_FIRST_BLEND(24),
+
+    /**
+     * {@link #QUAD_CORNER_SHARED} with the one-vote previous-ring frame of {@link
+     * #QUAD_CORNER_PREVFRAME_FIRST_ONLY}: the shared-vertex references of the rings, and the frame of the
+     * residuals the references leave. The references rotate rings to start where a shared stretch begins and
+     * remove the referenced vertices from the streams; they still count as decoded for the frame, as under {@link
+     * #QUAD_CORNER_SHARED_IFRAME}. A buffer the references do not shrink is written as plain {@link
+     * #QUAD_CORNER_PREVFRAME_FIRST_ONLY}. The shared ring frame of the grid and of the per-layer defaults, in the
+     * place of {@link #QUAD_CORNER_SHARED_IFRAME}.
+     */
+    QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY(25);
 
     // Retired codes, free: 3 QUAD_CORNER_LINE, 4 TURN_SCALAR, 6 QUAD_CORNER_LINE_FRAME, 9 LINE_CONTINUATION_FRAME,
     // 10 LINE_CONTINUATION_HEADING, 12 LINE_CONTINUATION_SHARED (see encoder.retired and docs/results/tile-oracle.md).
@@ -106,12 +177,85 @@ public enum Prediction {
         return plain() != this;
     }
 
+    /**
+     * Whether this predictor is one of the four of {@link #integerFrames()} (codes 16 to 19): the integer frame of the
+     * nearest ring or line run. The one-vote frames (codes 23 and 25) use an integer frame too and are not among them.
+     */
+    public boolean integerFrame() {
+        return switch (this) {
+            case QUAD_CORNER_IFRAME, QUAD_CORNER_SHARED_IFRAME, LINE_CONTINUATION_IFRAME_HEADING,
+                    LINE_CONTINUATION_SHARED_IFRAME_HEADING -> true;
+            default -> false;
+        };
+    }
+
+    /** Whether this predictor uses the float frame (codes 5, 8, 11, 13), superseded by the integer frame. */
+    public boolean floatFrame() {
+        return switch (this) {
+            case QUAD_CORNER_FRAME, QUAD_CORNER_SHARED_FRAME, LINE_CONTINUATION_FRAME_HEADING,
+                    LINE_CONTINUATION_SHARED_FRAME_HEADING -> true;
+            default -> false;
+        };
+    }
+
+    /**
+     * Whether this predictor is a ring frame retired for now in favour of {@link #QUAD_CORNER_PREVFRAME_FIRST_ONLY}
+     * and {@link #QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY}: the float frame (codes 5, 8), the integer frame of the
+     * nearest ring (16, 17) and the other previous-ring variants (20, 21, 22, 24). They stay decodable and writable
+     * by name and are rows of the steps that measured them, but are in no grid, per-layer default or selector.
+     */
+    public boolean retiredRingFrame() {
+        return switch (this) {
+            case QUAD_CORNER_FRAME, QUAD_CORNER_SHARED_FRAME, QUAD_CORNER_IFRAME, QUAD_CORNER_SHARED_IFRAME,
+                    QUAD_CORNER_PREVFRAME, QUAD_CORNER_PREVFRAME_VOTE, QUAD_CORNER_PREVFRAME_FIRST,
+                    QUAD_CORNER_PREVFRAME_FIRST_BLEND -> true;
+            default -> false;
+        };
+    }
+
+    /**
+     * The grid's predictors in the order the oracle iterates (a tie goes to the first): the ring frame is in the slot
+     * the float and then the integer ring frame had, the line frames in those of their integer frame.
+     */
+    private static final List<Prediction> GRID = List.of(
+            DELTA, QUAD_CORNER, LINE_CONTINUATION, QUAD_CORNER_PREVFRAME_FIRST_ONLY, QUAD_CORNER_SHARED,
+            QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY, LINE_CONTINUATION_IFRAME_HEADING,
+            LINE_CONTINUATION_SHARED_IFRAME_HEADING);
+
+    /**
+     * The predictors of the grids ({@code --step best}, the fit, the selectors): eight, the one-vote ring frames
+     * (codes 23 and 25) in the slots of the float and later the integer ring frame, the integer line frames (18, 19)
+     * as before. The retired frames ({@link #retiredRingFrame()}) and the float line frames are measured by the steps
+     * that name them, {@link #floatFrames()}, {@link #integerFrames()}.
+     */
+    public static List<Prediction> grid() {
+        return GRID;
+    }
+
+    /** The index of this predictor in {@link #grid()}, {@code -1} when it is not a grid predictor. */
+    public int gridIndex() {
+        return GRID.indexOf(this);
+    }
+
+    /** The predictors with the integer frame. */
+    public static List<Prediction> integerFrames() {
+        return Arrays.stream(values()).filter(Prediction::integerFrame).toList();
+    }
+
+    /** The predictors with the float frame, out of the grids. */
+    public static List<Prediction> floatFrames() {
+        return Arrays.stream(values()).filter(Prediction::floatFrame).toList();
+    }
+
     /** The predictor a buffer without references falls back to: itself unless {@link #shared()}. */
     public Prediction plain() {
         return switch (this) {
             case QUAD_CORNER_SHARED -> QUAD_CORNER;
             case QUAD_CORNER_SHARED_FRAME -> QUAD_CORNER_FRAME;
             case LINE_CONTINUATION_SHARED_FRAME_HEADING -> LINE_CONTINUATION_FRAME_HEADING;
+            case QUAD_CORNER_SHARED_IFRAME -> QUAD_CORNER_IFRAME;
+            case LINE_CONTINUATION_SHARED_IFRAME_HEADING -> LINE_CONTINUATION_IFRAME_HEADING;
+            case QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY -> QUAD_CORNER_PREVFRAME_FIRST_ONLY;
             default -> this;
         };
     }
@@ -123,8 +267,10 @@ public enum Prediction {
      */
     public RingReferences.Scan scan(BufferContext ctx) {
         return switch (this) {
-            case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME -> RingReferences.scan(ctx);
-            case LINE_CONTINUATION_SHARED_FRAME_HEADING -> LineReferences.scan(ctx);
+            case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME, QUAD_CORNER_SHARED_IFRAME,
+                    QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY -> RingReferences.scan(ctx);
+            case LINE_CONTINUATION_SHARED_FRAME_HEADING, LINE_CONTINUATION_SHARED_IFRAME_HEADING ->
+                    LineReferences.scan(ctx);
             default -> throw new UnsupportedOperationException(this + " has no references");
         };
     }
@@ -132,9 +278,10 @@ public enum Prediction {
     /** The decoder's side of {@link #scan}: needs the topology streams and the flag and index bits. */
     public RingReferences.ReferenceWalk walkForDecoding(BufferContext topo, int vertexCount, byte[] flags, byte[] indices) {
         return switch (this) {
-            case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME ->
+            case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME, QUAD_CORNER_SHARED_IFRAME,
+                    QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY ->
                     RingReferences.Walk.forDecoding(topo, vertexCount, flags, indices);
-            case LINE_CONTINUATION_SHARED_FRAME_HEADING ->
+            case LINE_CONTINUATION_SHARED_FRAME_HEADING, LINE_CONTINUATION_SHARED_IFRAME_HEADING ->
                     LineReferences.walkForDecoding(topo, vertexCount, flags, indices);
             default -> throw new UnsupportedOperationException(this + " has no references");
         };
@@ -151,12 +298,38 @@ public enum Prediction {
             case QUAD_CORNER -> new SegmentQuadCorner();
             case LINE_CONTINUATION -> new LineContinuation();
             case QUAD_CORNER_FRAME ->
-                    new FramedPredictor(new SegmentQuadCorner(), "QUAD_CORNER_FRAME", true, false, false);
+                    new FramedPredictor(new SegmentQuadCorner(), "QUAD_CORNER_FRAME", true, false, false,
+                            FramePrior::new);
             case LINE_CONTINUATION_FRAME_HEADING ->
-                    new FramedPredictor(new LineContinuation(), "LINE_CONTINUATION_FRAME_HEADING", false, true, true);
+                    new FramedPredictor(
+                            new LineContinuation(), "LINE_CONTINUATION_FRAME_HEADING", false, true, true,
+                            FramePrior::new);
+            case QUAD_CORNER_IFRAME ->
+                    new FramedPredictor(new SegmentQuadCorner(), "QUAD_CORNER_IFRAME", true, false, false,
+                            () -> new FramePrior(true));
+            case QUAD_CORNER_PREVFRAME ->
+                    new FramedPredictor(new SegmentQuadCorner(), "QUAD_CORNER_PREVFRAME", true, false, false,
+                            FramePrior::previousRun);
+            case QUAD_CORNER_PREVFRAME_VOTE ->
+                    new FramedPredictor(new SegmentQuadCorner(), "QUAD_CORNER_PREVFRAME_VOTE", true, false, false,
+                            FramePrior::previousRunVoting);
+            case QUAD_CORNER_PREVFRAME_FIRST ->
+                    new FramedPredictor(new SegmentQuadCorner(), "QUAD_CORNER_PREVFRAME_FIRST", true, false, false,
+                            FramePrior::previousRunFirstEdge);
+            case QUAD_CORNER_PREVFRAME_FIRST_ONLY ->
+                    new FramedPredictor(new SegmentQuadCorner(), "QUAD_CORNER_PREVFRAME_FIRST_ONLY", true, false, false,
+                            FramePrior::previousRunFirstEdgeOnly);
+            case QUAD_CORNER_PREVFRAME_FIRST_BLEND ->
+                    new FramedPredictor(new SegmentQuadCorner(), "QUAD_CORNER_PREVFRAME_FIRST_BLEND", true, false,
+                            false, FramePrior::previousRunFirstEdgeBlended);
+            case LINE_CONTINUATION_IFRAME_HEADING ->
+                    new FramedPredictor(
+                            new LineContinuation(), "LINE_CONTINUATION_IFRAME_HEADING", false, true, true,
+                            () -> new FramePrior(true));
             // the residual predictor of a shared row is its plain one; the references are PipelineEncoding's
-            case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME, LINE_CONTINUATION_SHARED_FRAME_HEADING ->
-                    plain().predictor();
+            case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME, LINE_CONTINUATION_SHARED_FRAME_HEADING,
+                    QUAD_CORNER_SHARED_IFRAME, LINE_CONTINUATION_SHARED_IFRAME_HEADING,
+                    QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY -> plain().predictor();
         };
     }
     /**
@@ -205,6 +378,7 @@ public enum Prediction {
         private final boolean framesRings;
         private final boolean framesLines;
         private final boolean heading;
+        private final Supplier<FramePrior> priors;
 
         private int[] starts = new int[0];
         private boolean[] ring = new boolean[0];
@@ -216,7 +390,13 @@ public enum Prediction {
         private int vertexCount;
 
         FramedPredictor(
-                ClassifiedPredictor inner, String name, boolean framesRings, boolean framesLines, boolean heading) {
+                ClassifiedPredictor inner,
+                String name,
+                boolean framesRings,
+                boolean framesLines,
+                boolean heading,
+                Supplier<FramePrior> priors) {
+            this.priors = priors;
             this.inner = inner;
             this.name = name;
             this.framesRings = framesRings;
@@ -281,7 +461,7 @@ public enum Prediction {
 
         private final class FramePass implements Pass {
 
-            private final FramePrior prior = new FramePrior();
+            private final FramePrior prior = priors.get();
             private int run;
 
             /** The last edge accepted, the heading of the vertex after it. */
