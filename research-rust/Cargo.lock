@@ -2682,7 +2682,6 @@ dependencies = [
 name = "mlt-pipeline"
 version = "0.1.0"
 dependencies = [
- "libm",
  "proptest",
  "rustc-hash",
 ]

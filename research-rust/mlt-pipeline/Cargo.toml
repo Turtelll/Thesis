@@ -7,7 +7,6 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-libm = "0.2"
 rustc-hash.workspace = true
 
 [features]

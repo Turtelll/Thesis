@@ -122,12 +122,11 @@ The `.mbtiles` that `mlt convert` writes carry `format = mlt`, which is how `mlt
 
 `golden-check` compares payload SHA-256 and length, the emitted topology and the decode against the
 golden dump, per buffer and per grid composition. It holds because the port uses wrapping integer
-arithmetic where Java does, `libm` (fdlibm) for trig, Java's `Math.round`, `i64` Hilbert keys and the
-Java tie-breaks; gzip sizes use real zlib level 6 (`flate2` with the `zlib` feature), as `java.util.zip` does.
+arithmetic where Java does, `i64` Hilbert keys and the Java tie-breaks; gzip sizes use real zlib level 6 (`flate2` with the `zlib` feature), as `java.util.zip` does.
 
 The grids and defaults use the **integer frame** (the line frames `LINE_CONTINUATION_*IFRAME_HEADING`, header codes 18-19, and the one-vote ring frames, codes 23-25, below): votes in IEEE basic
 operations and `sqrt`, an integer `atan` table and Q16 shear tables, so a frame decode calls no `atan2`, `sin`, `cos` or `tan`
-(only the start-up tables use `libm`). It is the same size as the float frame to 0.001% of a tile and decodes 24 to 43% faster per predictor
+(only the start-up tables, built from the std `f64` functions, not a `StrictMath` port). It is the same size as the float frame to 0.001% of a tile and decodes 24 to 43% faster per predictor
 ([frame-decode-time.md](../research-java/docs/results/frame-decode-time.md)). The float-frame predictors (codes 5, 8, 11, 13) are
 still decodable and writable (`--vertex-pipeline <name>`), and `golden-check` reads the old dumps (`grid-best-150`, `v-final-full`, ...)
 through `golden_grid()`; the dump of the grid before the one-vote ring frames is `grid-best-151`, of today's `grid-best-153-onevote`.
