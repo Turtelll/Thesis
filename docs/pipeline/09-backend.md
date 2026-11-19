@@ -55,7 +55,7 @@ Decompress the tile, then decode each buffer from its header, running the stages
   the best single composition).
 - No bit-packing. Stock MLT can write vertices with FastPFOR, a bit-packed integer codec that is small raw
   but opaque to a byte-oriented compressor: it is 6,65% larger per tile under gzip than plain varint. On
-  whole MLT v2 tiles, simply writing every vertex buffer as plain delta + split varint is already 3,48%
+  whole MLT v2 tiles, simply writing every vertex buffer as plain delta + escape planes is already 3,02%
   smaller than stock, about a third of the pipeline's total gain. The likely cause is that stock MLT picks
   its integer codec by raw size, which is not the smaller one after gzip. An entropy coder (rANS) inside the
   payload was tried and retired for the same reason.

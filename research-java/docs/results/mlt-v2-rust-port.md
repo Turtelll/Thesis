@@ -8,6 +8,44 @@
 (+0,0009%), raw 20.310.621 instead of 20.312.304, and the whole-tile decode 4,73x of stock instead of 6,77x. The golden reference of the
 Rust port is now `grid-best-151` (419.328 pairs, 0 differ); the float-era dumps stay readable through `golden_grid()`.
 
+**Update (42-composition grid, 2026-11-19):** the Rust grid is now 3 reorders x 7 predictors (the one-vote ring frames,
+codes 23 and 25; no line frame) x flat/class streams, escape planes only (`VARINT_SPLIT` removed), and `for_layer` follows
+(commit fcefca6). Re-measured, `mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles --by-zoom --by-layer`
+(17 min 54 s) and `mlt convert --verify` (`check_convert.py --sum`):
+
+| row | gzip bytes | vs stock | raw bytes | vs stock |
+|---|---|---|---|---|
+| stock v2 | 16.786.524 | ref | 18.487.134 | ref |
+| stock v2 + own sort trials | 16.643.440 | -0,85% | 18.317.963 | -0,92% |
+| stock v2 + gzip stream selection | 16.083.379 | -4,19% | 20.721.218 | +12,08% |
+| pipeline, plain delta + escape planes | 16.279.891 | -3,02% | 19.810.846 | +7,16% |
+| pipeline, per-layer default (`for_layer`) | 15.835.761 | -5,66% | 19.247.680 | +4,11% |
+| pipeline, `DEFAULT` for every layer (`mlt convert`) | 15.555.917 | -7,33% | 19.342.419 | +4,63% |
+| pipeline, per-layer alone-best | 15.327.252 | -8,69% | - | - |
+| pipeline, tile oracle, no feature reorder (14) | 15.384.854 | -8,35% | 18.998.820 | +2,77% |
+| pipeline, tile oracle (42), raw-length streams | 15.319.927 | -8,74% | 18.936.228 | +2,43% |
+| pipeline, tile oracle (42) + gzip streams | 15.172.888 | **-9,61%** | 20.552.988 | +11,17% |
+
+- Against the 96-composition grid: per-layer default +0,32% (15.785.075 before), tile oracle raw-length streams +0,56%
+  (15.234.332), with gzip streams +0,59% (15.084.159). Plain delta + escape planes is 0,48% larger than plain delta + split
+  varint was (16.202.284).
+- Verification: 358 of 358 tiles decode as the codec emitted them; 0 of 482.944 features hold another shape
+  (21.904 reversed, 32.980 reordered).
+- By layer (gzip-stream oracle, each layer alone, vs stock): `building` -19,28%, `landcover` -13,49%, `transportation` -10,32%,
+  `landuse` -9,12%, `transportation_name` -6,74%, `poi` -1,14%, `housenumber` +2,32%; all layers -9,56%.
+- Picks (gzip-stream oracle, 4.368 layers): reorder none 72,6%, Hilbert 21,9%, chain 5,5%; `DELTA` 34,7%,
+  `LINE_CONTINUATION_SHARED` 15,9%, `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` 13,1%, `QUAD_CORNER` 12,7%, `LINE_CONTINUATION` 9,4%,
+  `QUAD_CORNER_PREVFRAME_FIRST_ONLY` 7,4%, `QUAD_CORNER_SHARED` 6,9%; `CLASS` 58,7%, `FLAT` 41,3%.
+- `mlt convert`: `default` 5,5 s, `DEFAULT` 7,4 s, `oracle` 368,7 s; `default` and `oracle` equal the `compare`
+  rows to the byte (the `oracle` archive is the gzip-stream oracle).
+- Decode (`mlt-oracle decode-time <stock> <default> <DEFAULT> <oracle> --by-zoom`, 358 tiles, min of 10 reps after 2 warmup,
+  single-threaded, decompression untimed; stock from `mlt convert --mlt-version 2`): stock 89,27 ms, per-layer default
+  248,21 ms (2,78x), `DEFAULT` 230,35 ms (2,58x), oracle 225,20 ms (2,52x). z14 2,91x / 2,71x / 2,64x, z10 to z12 1,82x to
+  2,48x. The earlier figures (oracle 4,73x, default about 3,8x) are from other sessions with stock at 212 ms, so only the
+  ratios compare; the old archives were not re-run.
+
+The figures below are the 96-grid ones.
+
 ## Question
 
 The pipeline codec ([bitstream.md](../bitstream.md)) wins against `DELTA_ZIGZAG_VARINT` inside the Java

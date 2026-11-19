@@ -1,13 +1,13 @@
 # Per-layer composition
 
-**Code names:** `PipelineRegistry.forLayer` / `LayerCompositions`
+**Code names:** `for_layer` (`research-rust/mlt-pipeline/src/registry.rs`)
 
-> **Verdict: Kept.** -11,36% gzip on the tileset, the result of the thesis pipeline; within 0,65% of a free
-> per-(tile, layer) oracle, with nothing signalled beyond the 2-byte header.
+> **Verdict: Kept.** -5,66% gzip on whole MLT v2 tiles against stock, with no search in the encoder and
+> nothing signalled beyond the 2-byte header.
 
 ## Encoding target
-every MVT layer gets its own fixed composition (Polygon layers: shared frame; line layers: shared heading
-frame; poi, aerodrome_label: delta); `DEFAULT` for unknown layers.
+every MVT layer gets its own fixed composition (Polygon layers: shared ring frame; line layers: shared line
+continuation; poi, aerodrome_label: delta); `DEFAULT` for unknown layers.
 
 ## Idea
 The best predictor follows the geometry of the layer: corner predictors for buildings, continuation for roads,
@@ -21,30 +21,27 @@ cheap, stable proxy for the geometry, so a fixed table fitted once should captur
 with a trivial encoder.
 
 ## How the encoding works
-- `LayerCompositions.forLayer(layer)` maps an MVT layer name to a `Composition` (reorder, predictor, segmentation,
-  map, width, transpose), fitted as the per-layer winner of the oracle grid under gzip.
-- Today (`LayerCompositions.java`; all zigzag; reorder `HILBERT_CENTROID_ROT_MP` unless `CHAIN` is noted):
+- `for_layer(layer)` maps an MVT layer name to a `Composition` (reorder, predictor, segmentation, terminal).
+  All zigzag, escape width and byte planes; reorder `HILBERT_CENTROID_ROT_MP` unless `CHAIN` is noted:
 
-  | layer | predictor | streams | terminal |
-  |---|---|---|---|
-  | building, landcover, landuse | `QUAD_CORNER_SHARED_FRAME` | `CLASS` | escape + planes |
-  | water (`CHAIN`) | `QUAD_CORNER_SHARED_FRAME` | `CLASS` | escape + planes |
-  | aeroway (`CHAIN`) | `QUAD_CORNER_SHARED_FRAME` | `FLAT` | split varint |
-  | park | `QUAD_CORNER_SHARED` | `FLAT` | split varint |
-  | place | `QUAD_CORNER_FRAME` | `FLAT` | split varint |
-  | transportation (`CHAIN`) | `LINE_CONTINUATION_SHARED_FRAME_HEADING` | `CLASS` | escape + planes |
-  | transportation_name, waterway (`CHAIN`) | `LINE_CONTINUATION_SHARED_FRAME_HEADING` | `FLAT` | split varint |
-  | boundary | `LINE_CONTINUATION_SHARED_FRAME_HEADING` | `FLAT` | split varint |
-  | mountain_peak | `LINE_CONTINUATION_FRAME_HEADING` | `FLAT` | split varint |
-  | water_name | `LINE_CONTINUATION` | `FLAT` | split varint |
-  | housenumber | `LINE_CONTINUATION` | `FLAT` | escape + planes |
-  | poi | `DELTA` | `CLASS` | escape + planes |
-  | aerodrome_label | `DELTA` | `FLAT` | split varint |
+  | layer | predictor | streams |
+  |---|---|---|
+  | building, landcover, landuse | `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` | `CLASS` |
+  | water (`CHAIN`) | `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` | `CLASS` |
+  | aeroway (`CHAIN`) | `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` | `FLAT` |
+  | park | `QUAD_CORNER_SHARED` | `FLAT` |
+  | place | `QUAD_CORNER_PREVFRAME_FIRST_ONLY` | `FLAT` |
+  | transportation (`CHAIN`) | `LINE_CONTINUATION_SHARED` | `CLASS` |
+  | transportation_name, waterway (`CHAIN`) | `LINE_CONTINUATION_SHARED` | `FLAT` |
+  | boundary | `LINE_CONTINUATION_SHARED` | `FLAT` |
+  | mountain_peak, water_name, housenumber | `LINE_CONTINUATION` | `FLAT` |
+  | poi | `DELTA` | `CLASS` |
+  | aerodrome_label | `DELTA` | `FLAT` |
 
-  `DEFAULT` (no reorder, `QUAD_CORNER_SHARED_FRAME`, class streams, zigzag, escape, planes) is the fallback.
-- Fitted per layer with `measure --step fit` (geometry only, buffers compressed alone under gzip); `transportation`
-  fitted on geometry plus property columns; `CHAIN` where its property columns are no larger than Hilbert's net of the
-  geometry gain.
+  `DEFAULT` (no reorder, `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY`, class streams) is the fallback.
+- The table was fitted on the geometry buffers alone (buffers compressed alone under gzip) over an earlier,
+  larger grid; `transportation` on geometry plus property columns. It is not re-fitted for the 42-composition
+  grid: where the fit chose an option the grid no longer has, the table holds its nearest kept one.
 - Every buffer is encoded with its layer's composition; the payload header records the stage choices.
 
 ## How the decoder works
@@ -52,20 +49,15 @@ Read the two header bytes (predictor, segmentation, map, transpose, width) and d
 taken from the layer's composition (nothing to undo).
 
 ## Results
-**Headline** (gzip per tile vs `DELTA_ZIGZAG_VARINT`, `munich-plantiler`, geometry only): **tileset -11,36%**
-(9.960.430 B), against -9,95% for the best single composition for all layers.
-
-**Decisive case for inclusion:** 1,4 points better than any single composition, and only 0,65% short of the
-tile oracle (-11,94%), which picks the best composition per (tile, layer) for free. The best fixed composition
-per layer on the grid equals `forLayer` on 14 of 16 layers (over all -0,10%). It needs no search in the encoder and no extra
-signalling.
+**Headline** (whole MLT v2 tiles, `munich-plantiler`, 358 tiles, gzip level 6, `mlt-oracle compare`):
+**15.835.761 B, -5,66%** against stock MLT v2 (16.786.524 B).
 
 Supporting figures (same metric):
 
-- Today: 9.960.430 B gzip (-11,36%), 9.306.400 B Brotli (-17,18%), 9.773.069 B zstd (-13,03%).
-- First fit (gated reorder): -3,79% vs `DEFAULT` -3,63% gzip; with the frame on `building` -7,36% / -13,55% /
-  -9,16%; plus `landcover`, `landuse`, `aeroway` -7,45% / -13,66% / -9,29%; with line heading frame -8,64% gzip.
-- `poi` and `housenumber` stay above the plain varint baseline under gzip (+3,28%, +3,75% at the first fit).
-- Whole-tile size (with property cost of the reorders) not measured per layer.
+- The tile oracle, which searches the 42 compositions per (tile, layer) on the whole tile, is 3,26% smaller
+  (15.319.927 B, same stream choice as the default).
+- Per layer (each layer compressed alone): `building` -18,53%, `landcover` -11,10%, `transportation` -7,42%;
+  `poi` +12,37%, `aeroway` +3,01%, `housenumber` +1,87% above stock. The reorders were fitted on the geometry
+  alone and do not see what they cost the property columns.
 
-Source: `research-java/docs/results/openzl-pipeline.md`, `tile-oracle.md`.
+Source: `research-java/docs/results/mlt-v2-rust-port.md`.
