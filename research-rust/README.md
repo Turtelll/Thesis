@@ -8,7 +8,7 @@ Result: [`research-java/docs/results/mlt-v2-rust-port.md`](../research-java/docs
 |---|---|
 | `mlt-pipeline` | the codec: reorder, predict, segment, zigzag, byte width, transpose, the 2-byte self-describing header, the shared-reference blocks. Bit-exact with Java (`golden-check`). No dependency on mlt-core. |
 | `mlt-core-pipeline` | a copy of `maplibre-tile-spec/rust/mlt-core` at the pinned commit (`062d6c72`, 0.22.1) with a small patch, library name `mlt_core`. The submodule itself is untouched. |
-| `mlt-tile-oracle` | the tile oracle as a library: `encode_tile(layers, base, VertexMode, verify)` writes the layers of a tile with the codec as vertex stream (per-layer default, one fixed composition, or the gzip descent over the 96 compositions, every candidate with its other streams picked by gzip size: `gzip_config`), plus the geometry check. Shared by `mlt-oracle` and the `mlt` CLI. |
+| `mlt-tile-oracle` | the tile oracle as a library: `encode_tile(layers, base, VertexMode, verify)` writes the layers of a tile with the codec as vertex stream (per-layer default, one fixed composition, or the gzip descent over the 42 compositions, every candidate with its other streams picked by gzip size: `gzip_config`), plus the geometry check. Shared by `mlt-oracle` and the `mlt` CLI. |
 | `mlt-oracle` | the measurement CLI: `golden-check` (codec against the Java golden master), `compare` (whole-tile gzip, stock vs the tile oracle) and `diff` (two tilesets hold the same features). |
 | `mlt-cli-pipeline` | a copy of `maplibre-tile-spec/rust/mlt` (the `mlt` CLI, 0.6.1) at the same commit, linked against `mlt-core-pipeline`, with `mlt convert --vertex-pipeline` and an MLT-aware `.mbtiles` map in `mlt ui`. Binary name `mlt`. |
 
@@ -19,7 +19,7 @@ cargo test -p mlt-pipeline
 cargo build --release -p mlt-oracle
 mlt-oracle golden-check                                   # 96-grid rows present in ../data/golden/v-final-full, matched by name
 mlt-oracle golden-check --golden ../data/golden/grid-best # all 96 rows (research dump --grid best)
-mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles    # the 96-composition grid has the one-vote ring frames, codes 23 and 25
+mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles    # the 42-composition grid has the one-vote ring frames, codes 23 and 25
 mlt-oracle golden-check --golden ../data/golden/grid-best-153-onevote # the 96 rows of the grid (research dump --grid best); the older dumps grid-best-151, grid-iframe-150, prevframe-23-25 read through golden_grid()
 mlt-oracle golden-check --golden ../data/golden/prevframe-23-25 # the 24 rows of codes 23 and 25 (QUAD_CORNER_PREVFRAME_FIRST_ONLY and its shared variant; research dump --grid prevframe)
 mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles --by-zoom --by-layer --csv out.csv
@@ -33,7 +33,7 @@ mlt-oracle decode-time target-results/munich-stock.mbtiles target-results/munich
 ```
 cargo build --release -p mlt-cli-pipeline                 # builds target/release/mlt
 mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline default   # per-layer default composition (forLayer)
-mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline oracle    # tile oracle: best of 96 compositions per layer on the gzip size of the tile, the other streams picked by gzip size
+mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline oracle    # tile oracle: best of 42 compositions per layer on the gzip size of the tile, the other streams picked by gzip size
 mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline PIPE_QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY_CLASS_ZIGZAG_ESCAPE_PLANES   # one composition for every layer
 mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline oracle --verify   # decode every tile, compare with the stock decode
 mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline default:QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY=QUAD_CORNER_SHARED_FRAME   # the per-layer default with one predictor replaced by another (the retired float ring frame, code 8, here)
@@ -54,7 +54,7 @@ quality 9, zstd 19. An `.mbtiles` written this way carries a `compression` metad
 the compressed size, no longer the raw one. `check_convert.py` needs `pip install brotli zstandard` for those two.
 
 `--vertex-pipeline` takes `off` (the stock encoder, the default), `default`, `oracle` (`--oracle-max-passes <n>`, default 10) or the
-name of one of the 96 compositions of `bestGrid()` (a wrong name prints them all). It is a version 2 option, so it needs
+name of one of the 42 compositions of `bestGrid()` (a wrong name prints them all). It is a version 2 option, so it needs
 `--mlt-version 2`, and it sits in the encode path every input of `convert` shares (`.mbtiles`, `.pmtiles`, a directory of tiles, an `.mlt`
 input to re-encode, GeoJSON tiling); only `.mbtiles` input has been run and checked so far. The codec stores no triangles and orders the features by the composition's reorder, so it rejects `--tessellate` other
 than `off`, `--sort`, `--rans-vertices` and `--fields` (rotated rings and reversed lines would misalign per-vertex m-values).
