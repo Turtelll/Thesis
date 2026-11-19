@@ -23,7 +23,6 @@ corpus, 358 tiles, every layer, gzip level 6, summed over all tiles.
 | stock MLT v2, gzip stream choice | 20.721.218 | 16.083.379 | -4,19% | -23,74% |
 | pipeline, plain delta + escape planes on every layer | 19.810.846 | 16.279.891 | -3,02% | -22,81% |
 | pipeline, per-layer default composition | 19.247.680 | 15.835.761 | -5,66% | -24,91% |
-| pipeline, `DEFAULT` composition on every layer | 19.342.419 | 15.555.917 | -7,33% | -26,24% |
 | pipeline, tile oracle without feature reorder | 18.998.820 | 15.384.854 | -8,35% | -27,05% |
 | pipeline, tile oracle | 18.936.228 | 15.319.927 | -8,74% | -27,36% |
 | pipeline, tile oracle, gzip stream choice | 20.552.988 | 15.172.888 | **-9,61%** | **-28,06%** |
@@ -73,11 +72,10 @@ decompression not timed, single-threaded, per tile the minimum of 10 runs:
 |---|---|---|
 | stock MLT v2 | 89 | 1,00 |
 | pipeline, per-layer default composition | 248 | 2,78 |
-| pipeline, `DEFAULT` composition on every layer | 230 | 2,58 |
 | pipeline, tile oracle, gzip stream choice | 225 | 2,52 |
 
 By zoom the ratio is lowest at z10 to z12 (1,8 to 2,5 × stock) and highest at z14 (2,6 to 2,9 ×). The tile
-oracle decodes fastest of the three; it writes 34,7% of the layers with plain `DELTA`. What the ring frame
+oracle decodes faster than the per-layer default; it writes 34,7% of the layers with plain `DELTA`. What the ring frame
 adds on its own is on the [frames](pipeline/04-frames.md) page. The thesis target is compressed size per
 tile, so this cost is reported, not optimised.
 

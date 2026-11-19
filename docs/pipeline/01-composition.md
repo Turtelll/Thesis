@@ -127,9 +127,7 @@ corpus against 6 seconds for the per-layer default.
 
 ### 3. One composition for every layer
 
-`--vertex-pipeline <NAME>` writes every layer with the same composition. With `DEFAULT`
-(`PIPE_QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY_CLASS_ZIGZAG_ESCAPE_PLANES`, no reorder) this already beats the
-per-layer default on whole tiles (by 1,77%), because it leaves the property columns in their original order.
+`--vertex-pipeline <NAME>` writes every layer with the same composition.
 
 ## Why choose on the whole tile
 
@@ -148,7 +146,6 @@ Whole MLT v2 tiles, gzip, against stock MLT v2 (16.786.524 bytes), `mlt convert`
 | composition | gzip | vs stock | encode time | decode (× stock) |
 |---|---|---|---|---|
 | per-layer default | 15.835.761 | -5,66% | 6 s | 2,78 |
-| `DEFAULT` for every layer | 15.555.917 | -7,33% | 7 s | 2,58 |
 | tile oracle (with gzip stream choice) | 15.172.888 | -9,61% | 369 s | 2,52 |
 
 Decode is whole-tile, single-threaded, decompression not timed (`mlt-oracle decode-time`, stock 89 ms for
