@@ -19,9 +19,10 @@ cargo test -p mlt-pipeline
 cargo build --release -p mlt-oracle
 mlt-oracle golden-check                                   # 96-grid rows present in ../data/golden/v-final-full, matched by name
 mlt-oracle golden-check --golden ../data/golden/grid-best # all 96 rows (research dump --grid best)
-mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles    # the 42-composition grid has the one-vote ring frames, codes 23 and 25
-mlt-oracle golden-check --golden ../data/golden/grid-best-153-onevote # the 96 rows of the grid (research dump --grid best); the older dumps grid-best-151, grid-iframe-150, prevframe-23-25 read through golden_grid()
-mlt-oracle golden-check --golden ../data/golden/prevframe-23-25 # the 24 rows of codes 23 and 25 (QUAD_CORNER_PREVFRAME_FIRST_ONLY and its shared variant; research dump --grid prevframe)
+mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles    # the 42-composition grid has the one-vote ring frames, codes 23 and 27, and the raw-index ring references, 26 and 27
+mlt-oracle golden-check --golden ../data/golden/grid-best-153-onevote # the rows of the grid without ring references (research dump --grid best; the Java grid's codes 7 and 25 are not in this codec)
+mlt-oracle golden-check --golden ../data/golden/prevframe-23-25 # the rows of code 23 (QUAD_CORNER_PREVFRAME_FIRST_ONLY; research dump --grid prevframe)
+mlt-oracle golden-check --golden ../data/golden/rawshared-26-27 # the rows of codes 26 and 27, the ring references of the grid (research dump --grid rawshared)
 mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles --by-zoom --by-layer --csv out.csv
 mlt-oracle compare --mbtiles ../data/MVT/munich-plantiler.mbtiles --write-tiles target-results/tiles   # also write <z>_<x>_<y>.stock.mlt / .oracle.mlt
 python check_tiles.py target-results/tiles out.csv        # independent gzip -6 sizes (Python zlib) of the written tiles, checked against the csv
@@ -34,9 +35,9 @@ mlt-oracle decode-time target-results/munich-stock.mbtiles target-results/munich
 cargo build --release -p mlt-cli-pipeline                 # builds target/release/mlt
 mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline default   # per-layer default composition (forLayer)
 mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline oracle    # tile oracle: best of 42 compositions per layer on the gzip size of the tile, the other streams picked by gzip size
-mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline PIPE_QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY_CLASS_ZIGZAG_ESCAPE_PLANES   # one composition for every layer
+mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline PIPE_QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY_CLASS_ZIGZAG_ESCAPE_PLANES   # one composition for every layer
 mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline oracle --verify   # decode every tile, compare with the stock decode
-mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline default:QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY=QUAD_CORNER_SHARED_FRAME   # the per-layer default with one predictor replaced by another (the retired float ring frame, code 8, here)
+mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline default:QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY=QUAD_CORNER_SHARED_RAW   # the per-layer default with one predictor replaced by another (the ring frame dropped, code 27 to 26, here)
 mlt ui out.mbtiles                                        # terminal visualizer: the world map of an MLT .mbtiles
 mlt ui tile.mlt | mlt ui <directory> | mlt ls | mlt decode | mlt dump | mlt hexdump   # read pipeline tiles as well
 python check_convert.py --subset ../data/MVT/munich-plantiler.mbtiles target-results/munich40.mbtiles 40   # the first 40 tiles, as a small tileset
@@ -129,6 +130,8 @@ operations and `sqrt`, an integer `atan` table and Q16 shear tables, so a frame 
 (only the start-up tables, built from the std `f64` functions, not a `StrictMath` port). It is the same size as the float frame to 0.001% of a tile and decodes 24 to 43% faster per predictor
 ([frame-decode-time.md](../research-java/docs/results/frame-decode-time.md)). The float-frame predictors (codes 5, 8, 11, 13) are
 still decodable and writable (`--vertex-pipeline <name>`), and `golden-check` reads the old dumps (`grid-best-150`, `v-final-full`, ...)
-through `golden_grid()`; the dump of the grid before the one-vote ring frames is `grid-best-151`, of today's `grid-best-153-onevote`.
+through `best_grid()`; the dump of the grid before the one-vote ring frames is `grid-best-151`, of today's `grid-best-153-onevote`.
 
-The ring frames are `QUAD_CORNER_PREVFRAME_FIRST_ONLY` (code 23) and `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` (code 25, with the shared-vertex references) ([previous-frame.md](../research-java/docs/results/previous-frame.md)): the previous ring's frame, one vote per ring. They are in `Prediction::ALL`, so in `best_grid()`, `Composition::DEFAULT` and `for_layer`; `golden-check` reads the Java dump `--grid best` (or `--grid prevframe`) bit for bit. The float ring frame (5, 8) is retired for now (the nearest ring's integer frame, codes 16, 17, is removed from this codec): still decodable and writable by name (`--vertex-pipeline default:<NEW>=<OLD>` writes the old default), in no grid or default. `codec-time` has the rows of all of them (`QCI`, `QCSI`, `QCP1`, `QCSP1`).
+The ring frames are `QUAD_CORNER_PREVFRAME_FIRST_ONLY` (code 23) and `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` (code 27, with the shared-vertex references) ([previous-frame.md](../research-java/docs/results/previous-frame.md)): the previous ring's frame, one vote per ring. They are in `Prediction::ALL`, so in `best_grid()`, `Composition::DEFAULT` and `for_layer`; `golden-check` reads the Java dump `--grid best` (or `--grid prevframe`) bit for bit. The float ring frame (5, 8) is retired for now (the nearest ring's integer frame, codes 16, 17, is removed from this codec): still decodable and writable by name (`--vertex-pipeline default:<NEW>=<OLD>` writes the old default), in no grid or default. `codec-time` has the rows of all of them (`QCI`, `QCSI`, `QCP1`, `QCSRP1`).
+
+The ring references are `QUAD_CORNER_SHARED_RAW` (code 26) and code 27: the entry index is a slot into the raw vertices of the window, which the decoder reads without hashing the window ([shared-decode-time.md](../research-java/docs/results/shared-decode-time.md)). They took the slots of Java's distinct-index codes 7 and 25 in `Prediction::ALL`, `Composition::DEFAULT` and `for_layer`; 7 and 25 are removed from this codec (not decodable), so the Rust grid differs from Java's `bestGrid()` there and `golden-check` reads the rows of 26 and 27 from `--grid rawshared`. Munich tile oracle: +0,006% gzip, 6 to 8% less whole-tile decode time.

@@ -95,6 +95,9 @@ public final class GoldenDump {
      */
     public static final String GRID_PREVFRAME = "prevframe";
 
+    /** {@code --grid rawshared}: the 24 compositions of {@link CompositionGrids#rawSharedGrid()} (codes 26, 27). */
+    public static final String GRID_RAWSHARED = "rawshared";
+
     static List<Row> rows(String grid) {
         if (grid == null) {
             return rows();
@@ -103,8 +106,9 @@ public final class GoldenDump {
             case GRID_BEST -> CompositionGrids.bestGrid();
             case GRID_IFRAME -> CompositionGrids.frameGrid();
             case GRID_PREVFRAME -> CompositionGrids.prevFrameGrid();
+            case GRID_RAWSHARED -> CompositionGrids.rawSharedGrid();
             default -> throw new IllegalArgumentException("unknown grid " + grid + " (known: " + GRID_BEST + ", "
-                    + GRID_IFRAME + ", " + GRID_PREVFRAME + ")");
+                    + GRID_IFRAME + ", " + GRID_PREVFRAME + ", " + GRID_RAWSHARED + ")");
         };
         final var rows = new ArrayList<Row>();
         for (final var composition : compositions) {

@@ -23,7 +23,7 @@ impl Composition {
     /// `PipelineRegistry.DEFAULT`.
     pub const DEFAULT: Self = Self {
         reorder: Reorder::None,
-        predictor: Prediction::QuadCornerSharedPrevFrameFirstOnly,
+        predictor: Prediction::QuadCornerSharedRawPrevFrameFirstOnly,
         segmentation: Segmentation::Class,
         terminal: Terminal::EscapePlanes,
     };
@@ -95,7 +95,7 @@ pub fn encode_reordered(reordered: &Buffer, c: &Composition) -> Encoded {
     }
     let plain = encode_streams(reordered, &c.with_predictor(c.predictor.plain()));
     let scan = match c.predictor {
-        Prediction::QuadCornerShared | Prediction::QuadCornerSharedPrevFrameFirstOnly => {
+        Prediction::QuadCornerSharedRaw | Prediction::QuadCornerSharedRawPrevFrameFirstOnly => {
             refs::scan_rings(&reordered.vertices, &reordered.topology)
         }
         _ => refs::scan_lines(&reordered.vertices, &reordered.topology),
@@ -175,7 +175,7 @@ pub fn decode(payload: &[u8], topology: &Topology, vertex_count: usize) -> Vec<V
         let counts: Vec<usize> = (0..layout.stream_count()).map(|_| input.read_varint() as usize).collect();
         layout = Layout { value_counts: counts, ..layout };
         walk = Some(match c.predictor {
-            Prediction::QuadCornerShared | Prediction::QuadCornerSharedPrevFrameFirstOnly => {
+            Prediction::QuadCornerSharedRaw | Prediction::QuadCornerSharedRawPrevFrameFirstOnly => {
                 Box::new(RingWalk::for_decoding(topology, vertex_count, flags, indices))
             }
             _ => Box::new(LineWalk::for_decoding(topology, vertex_count, flags, indices)),

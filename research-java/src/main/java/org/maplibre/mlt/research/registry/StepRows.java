@@ -107,6 +107,28 @@ final class StepRows {
     }
 
     /**
+     * The raw entry index of the ring references ({@code QUAD_CORNER_SHARED_RAW}, {@code
+     * QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY}) beside the distinct index it replaces, on the per-layer default
+     * composition of every layer whose default has ring references, the predictor swapped only.
+     */
+    static List<Encoding> rawSharedRows() {
+        final var rows = new ArrayList<Encoding>();
+        for (final var layer : List.of(LayerCompositions.BUILDING, LayerCompositions.LANDCOVER, LayerCompositions.LANDUSE,
+                LayerCompositions.WATER, LayerCompositions.AEROWAY)) {
+            final var base = LayerCompositions.forLayer(layer);
+            for (final var predictor : List.of(Prediction.QUAD_CORNER_SHARED, Prediction.QUAD_CORNER_SHARED_RAW,
+                    Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY,
+                    Prediction.QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY)) {
+                final var row = PipelineRegistry.row(base.withPredictor(predictor));
+                if (rows.stream().noneMatch(r -> r.name().equals(row.name()))) {
+                    rows.add(row);
+                }
+            }
+        }
+        return rows;
+    }
+
+    /**
      * The one-vote previous-ring frame with the first edge blended into the previous ring's frame ({@code
      * QUAD_CORNER_PREVFRAME_FIRST_BLEND}) beside plain {@code QUAD_CORNER}, the nearest-ring frame, the previous
      * ring's frame alone and the one-vote frames that replace it, class streams, on {@link

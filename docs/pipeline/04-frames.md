@@ -18,7 +18,7 @@ with the corner guess of the [prediction](03-prediction.md) page and with the
 
 ## The ring frame
 
-Used by `QUAD_CORNER_PREVFRAME_FIRST_ONLY` (code 23) and `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` (code 25,
+Used by `QUAD_CORNER_PREVFRAME_FIRST_ONLY` (code 23) and `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` (code 27,
 with the shared references).
 
 A frame is a wall direction modulo 90°, so walls at right angles share one frame. Each ring gets one vote,
@@ -80,8 +80,8 @@ it sets the frame from that edge's direction. Nothing about frames is read from 
 | `QUAD_CORNER_PREVFRAME_FIRST_ONLY` | -12,38% | -19,47% | -15,03% |
 
 On whole tiles (Munich, the five ring layers of the per-layer default switched) the shared variant
-(code 25) gains 110.174 bytes over `QUAD_CORNER_SHARED` and decodes at 3,83 to 3,87 times stock instead of
-3,20 to 3,21.
+gains 110.174 bytes over the references without a frame and decodes at 3,83 to 3,87 times stock instead of
+3,20 to 3,21 (measured with the earlier entry index, codes 25 and 7).
 
 In the code: `research-rust/mlt-pipeline/src/frame.rs` (frame, tables, shears) and the `FramePass` in
 `research-rust/mlt-pipeline/src/predict.rs` (which vertices are framed).

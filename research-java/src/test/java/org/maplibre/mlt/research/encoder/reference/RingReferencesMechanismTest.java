@@ -89,7 +89,8 @@ class RingReferencesMechanismTest {
   @ParameterizedTest
   @EnumSource(
       value = Prediction.class,
-      names = {"QUAD_CORNER_SHARED", "QUAD_CORNER_SHARED_FRAME"})
+      names = {"QUAD_CORNER_SHARED", "QUAD_CORNER_SHARED_FRAME", "QUAD_CORNER_SHARED_RAW",
+          "QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY"})
   void aTerraceTakesTheReferencesAndIsSmallerThanThePlainPredictor(Prediction prediction) {
     var ctx = terrace(40);
     for (var segmentation : Segmentation.values()) {
@@ -107,7 +108,8 @@ class RingReferencesMechanismTest {
   @ParameterizedTest
   @EnumSource(
       value = Prediction.class,
-      names = {"QUAD_CORNER_SHARED", "QUAD_CORNER_SHARED_FRAME"})
+      names = {"QUAD_CORNER_SHARED", "QUAD_CORNER_SHARED_FRAME", "QUAD_CORNER_SHARED_RAW",
+          "QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY"})
   void decodesFromTheTopologyAloneToTheEmittedBuffer(Prediction prediction) {
     for (var ctx : List.of(terrace(40), terrace(3), detached(5))) {
       for (var segmentation : Segmentation.values()) {
@@ -125,7 +127,8 @@ class RingReferencesMechanismTest {
   @ParameterizedTest
   @EnumSource(
       value = Prediction.class,
-      names = {"QUAD_CORNER_SHARED", "QUAD_CORNER_SHARED_FRAME"})
+      names = {"QUAD_CORNER_SHARED", "QUAD_CORNER_SHARED_FRAME", "QUAD_CORNER_SHARED_RAW",
+          "QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY"})
   void detachedHousesFallBackToThePlainPredictorAndAreNotRotated(Prediction prediction) {
     var ctx = detached(10);
     var shared = new PipelineEncoding(config(prediction, Segmentation.CLASS));

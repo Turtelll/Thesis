@@ -25,29 +25,34 @@ pub enum Prediction {
     Delta,
     QuadCorner,
     LineContinuation,
-    QuadCornerShared,
     /// `LINE_CONTINUATION_SHARED` (code 12): `LINE_CONTINUATION` on the shared-vertex references of line parts.
     /// A buffer the references do not shrink is written as plain `LINE_CONTINUATION`.
     LineContinuationShared,
     /// `QUAD_CORNER_PREVFRAME_FIRST_ONLY` (code 23): the previous ring's frame, one vote per ring (the ring's first
     /// edge). The ring frame of [`Prediction::ALL`], the grids and the per-layer defaults.
     QuadCornerPrevFrameFirstOnly,
-    /// `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` (code 25): code 23 on the shared-vertex references.
-    /// The shared ring frame of [`Prediction::ALL`], the grids and the per-layer defaults.
-    QuadCornerSharedPrevFrameFirstOnly,
+    /// `QUAD_CORNER_SHARED_RAW` (code 26): `QUAD_CORNER` on the shared-vertex references of polygon rings, the entry
+    /// index a slot into the window's raw vertices (no hash of the window). The ring references of [`Prediction::ALL`]
+    /// and the per-layer defaults; Java's distinct-index codes 7 and 25 are not in this codec
+    /// (docs/results/shared-decode-time.md). A buffer the references do not shrink is written as plain `QUAD_CORNER`.
+    QuadCornerSharedRaw,
+    /// `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` (code 27): code 23 on the references of code 26. The shared ring
+    /// frame of [`Prediction::ALL`], the grids and the per-layer defaults; falls back to code 23.
+    QuadCornerSharedRawPrevFrameFirstOnly,
 }
 
 impl Prediction {
     /// The seven predictors of the 42-composition grid, in the order the grid iterates in (the
     /// first of equal sizes wins, so the order is part of the result): the ring frame is the one-vote one
-    /// (codes 23 and 25); lines have no frame. The other frames (5, 8, 11, 13, 16-19) are gone from this codec.
+    /// (codes 23 and 27), the ring references have the raw entry index (26, 27, in the slots of Java's 7 and 25);
+    /// lines have no frame. The other frames (5, 8, 11, 13, 16-19) are gone from this codec.
     pub const ALL: [Self; 7] = [
         Self::Delta,
         Self::QuadCorner,
         Self::LineContinuation,
         Self::QuadCornerPrevFrameFirstOnly,
-        Self::QuadCornerShared,
-        Self::QuadCornerSharedPrevFrameFirstOnly,
+        Self::QuadCornerSharedRaw,
+        Self::QuadCornerSharedRawPrevFrameFirstOnly,
         Self::LineContinuationShared,
     ];
 
@@ -56,10 +61,10 @@ impl Prediction {
         Self::Delta,
         Self::QuadCorner,
         Self::LineContinuation,
-        Self::QuadCornerShared,
         Self::LineContinuationShared,
         Self::QuadCornerPrevFrameFirstOnly,
-        Self::QuadCornerSharedPrevFrameFirstOnly,
+        Self::QuadCornerSharedRaw,
+        Self::QuadCornerSharedRawPrevFrameFirstOnly,
     ];
 
     /// The stable header code (not the ordinal).
@@ -69,10 +74,10 @@ impl Prediction {
             Self::Delta => 0,
             Self::QuadCorner => 1,
             Self::LineContinuation => 2,
-            Self::QuadCornerShared => 7,
             Self::LineContinuationShared => 12,
             Self::QuadCornerPrevFrameFirstOnly => 23,
-            Self::QuadCornerSharedPrevFrameFirstOnly => 25,
+            Self::QuadCornerSharedRaw => 26,
+            Self::QuadCornerSharedRawPrevFrameFirstOnly => 27,
         }
     }
 
@@ -88,10 +93,10 @@ impl Prediction {
             Self::Delta => "DELTA",
             Self::QuadCorner => "QUAD_CORNER",
             Self::LineContinuation => "LINE_CONTINUATION",
-            Self::QuadCornerShared => "QUAD_CORNER_SHARED",
             Self::LineContinuationShared => "LINE_CONTINUATION_SHARED",
             Self::QuadCornerPrevFrameFirstOnly => "QUAD_CORNER_PREVFRAME_FIRST_ONLY",
-            Self::QuadCornerSharedPrevFrameFirstOnly => "QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY",
+            Self::QuadCornerSharedRaw => "QUAD_CORNER_SHARED_RAW",
+            Self::QuadCornerSharedRawPrevFrameFirstOnly => "QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY",
         }
     }
 
@@ -105,9 +110,9 @@ impl Prediction {
     #[must_use]
     pub fn plain(self) -> Self {
         match self {
-            Self::QuadCornerShared => Self::QuadCorner,
+            Self::QuadCornerSharedRaw => Self::QuadCorner,
             Self::LineContinuationShared => Self::LineContinuation,
-            Self::QuadCornerSharedPrevFrameFirstOnly => Self::QuadCornerPrevFrameFirstOnly,
+            Self::QuadCornerSharedRawPrevFrameFirstOnly => Self::QuadCornerPrevFrameFirstOnly,
             other => other,
         }
     }

@@ -189,6 +189,13 @@ Names below are the **new** ones; the bodies of the linked files still use the o
   decode overhead of `_FIRST_ONLY` 17 to 36% of `IFRAME`'s. Tokyo 82%; on axis-aligned Chicago every frame (`IFRAME` too)
   loses to plain `QUAD_CORNER`, so the selector takes none there; two safeguards (axis dead zone, blend, code 24) are not needed. The Hilbert order is not what makes it work. `_FIRST_ONLY` is ported to Rust, bit for bit with Java (52.416 row/buffer pairs): on the Munich tile (five layers) it keeps 81% of the frame's gain (0,17% of the tile short of `IFRAME`) for 38 to 40% of its decode overhead (3,1 x stock instead of 4,0 x). Its shared-reference variant (`QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY`, code 25, Rust too): 83% of `QUAD_CORNER_SHARED_IFRAME`'s whole-tile gain (0,14% of the tile short of it) for 40% of its decode overhead (3,85 x stock instead of 4,8 x). **Adopted** (codes 23 and 25 are the ring frames of the grid and the per-layer defaults, 16/17 and the other variants retired for now): the per-layer default of the Munich tile +0,14% (15.807.921 against 15.785.379 B), the tile oracle +0,13% (15.103.506 against 15.084.297 B), whole-tile decode of the default 3,8 x stock instead of 4,7 x.
 
+- [shared-decode-time.md](shared-decode-time.md) — where the decode time of the ring references goes (counters and an
+  additive cost split: the position-table insert 27%, the per-entry hash of the window 25%, the lookup 14%; only 7,8% of
+  ring vertices are references) and the raw entry index (codes 26, 27: a slot into the window's raw vertices, no hash):
+  +0,009% gzip on the corpus, 35 to 37% less reference decode overhead, 27 decodes 11 to 12% faster than 25. Munich whole
+  tile, the per-layer default with 25 swapped for 27: +849 B (+0,005%), 7% less decode time (2,61x to 2,43x stock). Java and
+  Rust bit for bit; adopted in Rust (7 and 25 removed there), experimental in Java.
+
 - [tile-oracle.md](tile-oracle.md) — the real per-(tile, layer) oracle (`measure --step best`): the
   best of 252 compositions (96 since the retirement; every predictor x streams x terminal x reorder) per buffer, chosen alone and
   on the compressed tile, against the fixed per-layer default; and which options of the grid the oracle

@@ -26,10 +26,10 @@ with a trivial encoder.
 
   | layer | predictor | streams |
   |---|---|---|
-  | building, landcover, landuse | `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` | `CLASS` |
-  | water (`CHAIN`) | `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` | `CLASS` |
-  | aeroway (`CHAIN`) | `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` | `FLAT` |
-  | park | `QUAD_CORNER_SHARED` | `FLAT` |
+  | building, landcover, landuse | `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` | `CLASS` |
+  | water (`CHAIN`) | `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` | `CLASS` |
+  | aeroway (`CHAIN`) | `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` | `FLAT` |
+  | park | `QUAD_CORNER_SHARED_RAW` | `FLAT` |
   | place | `QUAD_CORNER_PREVFRAME_FIRST_ONLY` | `FLAT` |
   | transportation (`CHAIN`) | `LINE_CONTINUATION_SHARED` | `CLASS` |
   | transportation_name, waterway (`CHAIN`) | `LINE_CONTINUATION_SHARED` | `FLAT` |
@@ -38,7 +38,7 @@ with a trivial encoder.
   | poi | `DELTA` | `CLASS` |
   | aerodrome_label | `DELTA` | `FLAT` |
 
-  `DEFAULT` (no reorder, `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY`, class streams) is the fallback.
+  `DEFAULT` (no reorder, `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY`, class streams) is the fallback.
 - The table was fitted on the geometry buffers alone (buffers compressed alone under gzip) over an earlier,
   larger grid; `transportation` on geometry plus property columns. It is not re-fitted for the 42-composition
   grid: where the fit chose an option the grid no longer has, the table holds its nearest kept one.
@@ -50,7 +50,7 @@ taken from the layer's composition (nothing to undo).
 
 ## Results
 **Headline** (whole MLT v2 tiles, `munich-plantiler`, 358 tiles, gzip level 6, `mlt-oracle compare`):
-**15.835.761 B, -5,66%** against stock MLT v2 (16.786.524 B).
+**15.836.613 B, -5,66%** against stock MLT v2 (16.786.524 B; `mlt convert --vertex-pipeline default`).
 
 Supporting figures (same metric):
 

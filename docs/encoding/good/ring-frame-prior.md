@@ -1,12 +1,13 @@
 # Ring frame prior
 
-**Code names:** `QUAD_CORNER_PREVFRAME_FIRST_ONLY` (code 23), `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` (code 25)
+**Code names:** `QUAD_CORNER_PREVFRAME_FIRST_ONLY` (code 23), `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` (code 27; code 25 before the
+entry index changed, [shared ring vertices](shared-ring-vertices.md))
 
 > **Verdict: Kept.** `building` -12,38% gzip against -9,20% for plain quad corner; part of the layer
 > default of every large polygon layer.
 
 ## Encoding target
-building, landcover, landuse, water, aeroway (Polygon, `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY`); place
+building, landcover, landuse, water, aeroway (Polygon, `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY`); place
 (`QUAD_CORNER_PREVFRAME_FIRST_ONLY`).
 
 ## Idea
@@ -65,7 +66,7 @@ frame gained on `building` over `QUAD_CORNER`, for 38 to 40% of its whole-tile d
 Supporting figures (whole MLT v2 tiles, Munich, the five ring layers of the per-layer default switched):
 
 - Code 23 against `QUAD_CORNER`: 112.250 bytes smaller, decode 3,04 to 3,11 x stock against 2,45 to 2,48.
-- Code 25 against `QUAD_CORNER_SHARED`: 110.174 bytes smaller, decode 3,83 to 3,87 x stock against 3,20
+- Code 25 against `QUAD_CORNER_SHARED` (the earlier entry index; 27 and 26 today): 110.174 bytes smaller, decode 3,83 to 3,87 x stock against 3,20
   to 3,21.
 - Chicago (axis-aligned grid): every frame loses to plain `QUAD_CORNER`, so the selector takes no frame there.
 

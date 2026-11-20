@@ -18,7 +18,7 @@ use flate2::Compression;
 use flate2::write::GzEncoder;
 use mlt_core::encoder::{EncoderConfig, Network, Profile, Tessellation, WireVersion};
 use mlt_core::{Decoder, Parser, TileLayer};
-use mlt_pipeline::registry::{best_grid, for_layer, golden_grid};
+use mlt_pipeline::registry::{best_grid, for_layer};
 use mlt_pipeline::{Composition, Prediction, Reorder};
 use rayon::prelude::*;
 use std::io::Write;
@@ -52,10 +52,10 @@ impl VertexMode {
         Some(Self::DefaultSwap(find(from)?, find(to)?))
     }
 
-    /// A composition of `golden_grid()` (`best_grid()` and the float-frame rows it replaced) by its
+    /// A composition of `best_grid()` by its
     /// `Composition::name()`.
     pub fn fixed(name: &str) -> Option<Self> {
-        golden_grid().into_iter().find(|c| c.name() == name).map(Self::Fixed)
+        best_grid().into_iter().find(|c| c.name() == name).map(Self::Fixed)
     }
 }
 

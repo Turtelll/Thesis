@@ -8,7 +8,7 @@ use std::collections::VecDeque;
 
 const WINDOW: usize = 4;
 
-/// Bits to index `size` candidates.
+/// Bits to index `size` values.
 fn width(size: usize) -> u32 {
     if size <= 1 { 0 } else { usize::BITS - (size - 1).leading_zeros() }
 }
@@ -133,9 +133,6 @@ struct State {
     seen: FxHashMap<u64, i32>,
     window: VecDeque<(usize, usize)>,
     window_vertices: usize,
-    /// position -> candidate index, rebuilt per ring
-    distinct: FxHashMap<u64, i32>,
-    candidates: Vec<usize>,
 }
 
 impl State {
@@ -147,8 +144,6 @@ impl State {
             seen: FxHashMap::with_capacity_and_hasher(vertex_count, rustc_hash::FxBuildHasher),
             window: VecDeque::new(),
             window_vertices: 0,
-            distinct: FxHashMap::default(),
-            candidates: Vec::new(),
         }
     }
 
@@ -163,27 +158,33 @@ impl State {
         vertices[start + (source - start + length - 1) % length]
     }
 
-    fn has_candidates(&self) -> bool {
+    fn has_window(&self) -> bool {
         self.window_vertices > 0
     }
 
-    /// The distinct positions of the window, newest ring first, first occurrence kept.
-    fn collect_candidates(&mut self, vertices: &[V]) {
-        self.distinct.clear();
-        self.candidates.clear();
+    /// The entry index of `position`: its slot among the window's vertices, newest ring first and in vertex
+    /// order within a ring (the first slot holding it), `None` when the window does not hold it.
+    fn entry_index(&self, position: V, vertices: &[V]) -> Option<usize> {
+        let mut offset = 0;
         for &(s, e) in self.window.iter().rev() {
-            for i in s..e {
-                let key = vertices[i].key();
-                if !self.distinct.contains_key(&key) {
-                    self.distinct.insert(key, self.candidates.len() as i32);
-                    self.candidates.push(i);
-                }
+            if let Some(k) = vertices[s..e].iter().position(|&v| v == position) {
+                return Some(offset + k);
             }
+            offset += e - s;
         }
+        None
     }
 
-    fn candidate_index(&self, position: V) -> i32 {
-        self.distinct.get(&position.key()).copied().unwrap_or(-1)
+    /// The vertex index at slot `index` of the window ([`State::entry_index`]): at most four ring lengths, no table.
+    fn entry_vertex(&self, index: usize) -> usize {
+        let mut offset = index;
+        for &(s, e) in self.window.iter().rev() {
+            if offset < e - s {
+                return s + offset;
+            }
+            offset -= e - s;
+        }
+        panic!("entry index {index} outside the window")
     }
 
     fn add_ring(&mut self, start: usize, end: usize, vertices: &[V]) {
@@ -248,14 +249,13 @@ impl<'a> RingWalk<'a> {
             self.flags_out.write(u32::from(referenced), 1);
             return referenced;
         }
-        if ring && i == start && self.state.has_candidates() {
-            self.state.collect_candidates(vertices);
-            let index = self.state.candidate_index(vertex);
-            self.flags_out.write(u32::from(index >= 0), 1);
-            if index >= 0 {
-                self.indices_out.write(index as u32, width(self.state.candidates.len()));
+        if ring && i == start && self.state.has_window() {
+            let index = self.state.entry_index(vertex, vertices);
+            self.flags_out.write(u32::from(index.is_some()), 1);
+            if let Some(index) = index {
+                self.indices_out.write(index as u32, width(self.state.window_vertices));
             }
-            return index >= 0;
+            return index.is_some();
         }
         false
     }
@@ -271,11 +271,10 @@ impl ReferenceWalk for RingWalk<'_> {
         if source >= 0 {
             return if flags.read(1) == 1 { Some(self.state.previous_on_source(source as usize, vertices)) } else { None };
         }
-        if ring && i == start && self.state.has_candidates() && flags.read(1) == 1 {
-            self.state.collect_candidates(vertices);
-            let w = width(self.state.candidates.len());
+        if ring && i == start && self.state.has_window() && flags.read(1) == 1 {
+            let w = width(self.state.window_vertices);
             let index = self.indices_in.as_mut().expect("a decoding walk").read(w) as usize;
-            return Some(vertices[self.state.candidates[index]]);
+            return Some(vertices[self.state.entry_vertex(index)]);
         }
         None
     }
@@ -289,7 +288,7 @@ impl ReferenceWalk for RingWalk<'_> {
     }
 }
 
-/// The references of `buffer` under `QUAD_CORNER_SHARED*`: rings rotated, which vertices are
+/// The references of `buffer` under `QUAD_CORNER_SHARED_RAW*` (codes 26, 27): rings rotated, which vertices are
 /// references, the flag and index bits. `None` when the runs are not derivable.
 #[must_use]
 pub fn scan_rings(vertices: &[V], topology: &Topology) -> Option<Scan> {

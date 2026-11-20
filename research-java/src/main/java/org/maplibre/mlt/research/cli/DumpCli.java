@@ -38,7 +38,7 @@ public final class DumpCli {
                 case "--grid" -> grid = args[++i];
                 default -> throw new IllegalArgumentException("Unknown argument: " + args[i]
                         + "\nUsage: [--in <dir>] [--out <dir>] [--limit-tiles <n>] [--layer <name>] [--serial]"
-                        + " [--grid best|iframe|prevframe]"
+                        + " [--grid best|iframe|prevframe|rawshared]"
                         + " | --diff <oldDir> <newDir> [--rows a,b] [--allow-removed a,b] [--max-buffers <n>]");
             }
         }

@@ -123,6 +123,8 @@ public final class SelectionReport {
             case QUAD_CORNER_PREVFRAME_FIRST_ONLY -> "qcpo";
             case QUAD_CORNER_PREVFRAME_FIRST_BLEND -> "qcpb";
             case QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY -> "qcspo";
+            case QUAD_CORNER_SHARED_RAW -> "qcsr";
+            case QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY -> "qcsrpo";
         };
     }
 }

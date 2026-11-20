@@ -20,10 +20,10 @@ The residual map is always zigzag and the terminal always escape width with byte
 them but there is nothing to choose. The name is built from the choices, so it always says what it does:
 
 ```
-PIPE_HILBERT_CENTROID_ROT_MP_QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY_CLASS_ZIGZAG_ESCAPE_PLANES
+PIPE_HILBERT_CENTROID_ROT_MP_QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY_CLASS_ZIGZAG_ESCAPE_PLANES
 
 reorder        HILBERT_CENTROID_ROT_MP
-predictor      QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY
+predictor      QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY
 segmentation   CLASS
 map            ZIGZAG
 terminal       ESCAPE_PLANES
@@ -79,14 +79,14 @@ mlt convert in.mbtiles out.mbtiles --mlt-version 2 --vertex-pipeline <NAME> --ve
 
 `for_layer(layer)` (`registry.rs`) holds one fixed composition per MVT layer. Encoding costs one pass per
 layer, and nothing is searched at runtime. A layer it does not know gets `DEFAULT`: no reorder,
-`QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY`, class streams.
+`QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY`, class streams.
 
 | layer | reorder | predictor | streams |
 |---|---|---|---|
-| building, landcover, landuse | Hilbert | `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` | class |
-| water | chain | `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` | class |
-| aeroway | chain | `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` | flat |
-| park | Hilbert | `QUAD_CORNER_SHARED` | flat |
+| building, landcover, landuse | Hilbert | `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` | class |
+| water | chain | `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` | class |
+| aeroway | chain | `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` | flat |
+| park | Hilbert | `QUAD_CORNER_SHARED_RAW` | flat |
 | place | Hilbert | `QUAD_CORNER_PREVFRAME_FIRST_ONLY` | flat |
 | transportation | chain | `LINE_CONTINUATION_SHARED` | class |
 | transportation_name, waterway | chain | `LINE_CONTINUATION_SHARED` | flat |
@@ -122,8 +122,8 @@ Each candidate is a complete layer encoding: the reorder permutes whole features
 property columns, so the size the oracle minimises is the size of the real tile. Every candidate also picks
 the encodings of its other streams (ids, geometry lengths, properties) by gzip size instead of raw size. The
 search is a coordinate descent and finds a local optimum, never larger than either starting tile. It is
-expensive: 42 encodes per layer and many gzip trials per tile, 369 seconds for the 358 tiles of the
-corpus against 6 seconds for the per-layer default.
+expensive: 42 encodes per layer and many gzip trials per tile, 338 seconds for the 358 tiles of the
+corpus against 4 seconds for the per-layer default.
 
 ### 3. One composition for every layer
 
@@ -145,18 +145,19 @@ Whole MLT v2 tiles, gzip, against stock MLT v2 (16.786.524 bytes), `mlt convert`
 
 | composition | gzip | vs stock | encode time | decode (× stock) |
 |---|---|---|---|---|
-| per-layer default | 15.835.761 | -5,66% | 6 s | 2,78 |
-| tile oracle (with gzip stream choice) | 15.172.888 | -9,61% | 369 s | 2,52 |
+| per-layer default | 15.836.613 | -5,66% | 4 s | 2,57 to 2,60 |
+| tile oracle (with gzip stream choice) | 15.173.753 | -9,61% | 338 s | 2,33 to 2,35 |
 
-Decode is whole-tile, single-threaded, decompression not timed (`mlt-oracle decode-time`, stock 89 ms for
-the 358 tiles).
+Decode is whole-tile, single-threaded, decompression not timed (`mlt-oracle decode-time`, three runs, stock 112
+to 119 ms for the 358 tiles on a machine that was not idle; only the ratios are comparable).
 
-What the tile oracle picks on whole tiles (share of the 4.368 layers):
+What the tile oracle picks on whole tiles (share of the 4.368 layers; counted with the earlier entry index,
+codes 7 and 25 in the slots of 26 and 27, not recounted):
 
 | stage | picks |
 |---|---|
 | reorder | none 72,6%, Hilbert 21,9%, chain 5,5% |
-| predictor | `DELTA` 34,7%, `LINE_CONTINUATION_SHARED` 15,9%, `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` 13,1%, `QUAD_CORNER` 12,7%, `LINE_CONTINUATION` 9,4%, `QUAD_CORNER_PREVFRAME_FIRST_ONLY` 7,4%, `QUAD_CORNER_SHARED` 6,9% |
+| predictor | `DELTA` 34,7%, `LINE_CONTINUATION_SHARED` 15,9%, `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` (now 27) 13,1%, `QUAD_CORNER` 12,7%, `LINE_CONTINUATION` 9,4%, `QUAD_CORNER_PREVFRAME_FIRST_ONLY` 7,4%, `QUAD_CORNER_SHARED` (now 26) 6,9% |
 | streams | class 58,7%, flat 41,3% |
 
 No composition dominates: the most frequent, `PIPE_DELTA_FLAT_ZIGZAG_ESCAPE_PLANES`, is picked on 24,2% of

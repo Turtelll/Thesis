@@ -143,7 +143,21 @@ public enum Prediction {
      * #QUAD_CORNER_PREVFRAME_FIRST_ONLY}. The shared ring frame of the grid and of the per-layer defaults, in the
      * place of {@link #QUAD_CORNER_SHARED_IFRAME}.
      */
-    QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY(25);
+    QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY(25),
+
+    /**
+     * {@link #QUAD_CORNER_SHARED} with the entry index into the raw vertex slots of the window instead of its
+     * distinct positions ({@link RingReferences#scan(BufferContext, boolean)}): the decoder finds the referenced
+     * vertex by walking at most four ring lengths, with no hash of the window per entry. Experimental
+     * (docs/results/shared-decode-time.md). A buffer without a gain is written as plain {@link #QUAD_CORNER}.
+     */
+    QUAD_CORNER_SHARED_RAW(26),
+
+    /**
+     * {@link #QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY} with the raw entry index of {@link #QUAD_CORNER_SHARED_RAW}.
+     * A buffer without a gain is written as plain {@link #QUAD_CORNER_PREVFRAME_FIRST_ONLY}.
+     */
+    QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY(27);
 
     // Retired codes, free: 3 QUAD_CORNER_LINE, 4 TURN_SCALAR, 6 QUAD_CORNER_LINE_FRAME, 9 LINE_CONTINUATION_FRAME,
     // 10 LINE_CONTINUATION_HEADING, 12 LINE_CONTINUATION_SHARED (see encoder.retired and docs/results/tile-oracle.md).
@@ -256,6 +270,8 @@ public enum Prediction {
             case QUAD_CORNER_SHARED_IFRAME -> QUAD_CORNER_IFRAME;
             case LINE_CONTINUATION_SHARED_IFRAME_HEADING -> LINE_CONTINUATION_IFRAME_HEADING;
             case QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY -> QUAD_CORNER_PREVFRAME_FIRST_ONLY;
+            case QUAD_CORNER_SHARED_RAW -> QUAD_CORNER;
+            case QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY -> QUAD_CORNER_PREVFRAME_FIRST_ONLY;
             default -> this;
         };
     }
@@ -269,6 +285,7 @@ public enum Prediction {
         return switch (this) {
             case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME, QUAD_CORNER_SHARED_IFRAME,
                     QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY -> RingReferences.scan(ctx);
+            case QUAD_CORNER_SHARED_RAW, QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY -> RingReferences.scan(ctx, true);
             case LINE_CONTINUATION_SHARED_FRAME_HEADING, LINE_CONTINUATION_SHARED_IFRAME_HEADING ->
                     LineReferences.scan(ctx);
             default -> throw new UnsupportedOperationException(this + " has no references");
@@ -281,6 +298,8 @@ public enum Prediction {
             case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME, QUAD_CORNER_SHARED_IFRAME,
                     QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY ->
                     RingReferences.Walk.forDecoding(topo, vertexCount, flags, indices);
+            case QUAD_CORNER_SHARED_RAW, QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY ->
+                    RingReferences.Walk.forDecoding(topo, vertexCount, flags, indices, true);
             case LINE_CONTINUATION_SHARED_FRAME_HEADING, LINE_CONTINUATION_SHARED_IFRAME_HEADING ->
                     LineReferences.walkForDecoding(topo, vertexCount, flags, indices);
             default -> throw new UnsupportedOperationException(this + " has no references");
@@ -329,7 +348,8 @@ public enum Prediction {
             // the residual predictor of a shared row is its plain one; the references are PipelineEncoding's
             case QUAD_CORNER_SHARED, QUAD_CORNER_SHARED_FRAME, LINE_CONTINUATION_SHARED_FRAME_HEADING,
                     QUAD_CORNER_SHARED_IFRAME, LINE_CONTINUATION_SHARED_IFRAME_HEADING,
-                    QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY -> plain().predictor();
+                    QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY, QUAD_CORNER_SHARED_RAW,
+                    QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY -> plain().predictor();
         };
     }
     /**

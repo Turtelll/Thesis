@@ -118,9 +118,24 @@ public final class CompositionGrids {
      * port), the plain one's first. Not part of {@link PipelineRegistry#all()}.
      */
     public static List<Composition> prevFrameGrid() {
+        return gridOf(List.of(Prediction.QUAD_CORNER_PREVFRAME_FIRST_ONLY,
+                Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY));
+    }
+
+    /**
+     * The raw entry index of the ring references, {@link Prediction#QUAD_CORNER_SHARED_RAW} (code 26) and {@link
+     * Prediction#QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY} (code 27), over the grid's reorders, streams and terminals:
+     * 24 compositions (the dump {@code --grid rawshared}, the reference of their Rust port). Not part of {@link
+     * PipelineRegistry#all()}.
+     */
+    public static List<Composition> rawSharedGrid() {
+        return gridOf(List.of(Prediction.QUAD_CORNER_SHARED_RAW, Prediction.QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY));
+    }
+
+    /** {@code predictors} x the three reorders x flat or class streams x the two terminals. */
+    private static List<Composition> gridOf(List<Prediction> predictors) {
         final var configs = new ArrayList<Composition>();
-        for (final var predictor : List.of(Prediction.QUAD_CORNER_PREVFRAME_FIRST_ONLY,
-                Prediction.QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY)) {
+        for (final var predictor : predictors) {
             for (final var reorder : List.of(Reorder.NONE, Reorder.HILBERT_CENTROID_ROT_MP, Reorder.CHAIN)) {
                 for (final var segmentation : List.of(Segmentation.FLAT, Segmentation.CLASS)) {
                     final var base = PipelineRegistry.DEFAULT.withReorder(reorder).withPredictor(predictor)

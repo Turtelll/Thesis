@@ -13,28 +13,32 @@ A reference costs a flag bit and a short index, which is far less than a residua
 referenced still counts as decoded, so guesses and frames after it work as before.
 
 References are added on top of a guess. Each shared predictor is the plain predictor of the
-[prediction](03-prediction.md) page plus references: `QUAD_CORNER_SHARED` and
-`QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` for rings, `LINE_CONTINUATION_SHARED` for lines.
+[prediction](03-prediction.md) page plus references: `QUAD_CORNER_SHARED_RAW` (code 26) and
+`QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` (code 27, with the [ring frame](04-frames.md)) for rings, `LINE_CONTINUATION_SHARED` for lines.
 
 ## The encodings
 
-### Rings: a window of neighbours
+### Rings: a window of neighbours, then a walk along the wall
 
-Rings refer to the vertices of the last four rings (`encoder/reference/RingReferences.java`). Two
-neighbouring rings with the same winding walk their shared wall in opposite directions, which the encoding
-uses:
+Rings refer to earlier rings (`research-rust/mlt-pipeline/src/refs.rs`, `encoder/reference/RingReferences.java`).
+Two neighbouring rings with the same winding walk their shared wall in opposite directions, which the encoding
+uses. There are two kinds of reference: an **entry** into a shared wall, which needs an address, and a **follow**
+step along it, which needs only one bit.
 
 1. Each ring is rotated (its winding kept) to start where its longest shared stretch begins. This is a
    free choice of the encoder and is not written.
-2. Entry flag, once per ring: one bit saying whether the ring's first vertex is one of the positions in the
-   window. On a hit, an index of `ceil(log2 candidates)` bits replaces the start residual.
-3. Follow flag, after every vertex whose position an earlier ring holds: one bit saying whether the next
-   vertex is that ring's previous vertex. On a hit, no residual at all.
+2. Entry flag, once per ring: one bit saying whether the ring's first vertex is one of the vertices of the
+   **window**, the last four rings. On a hit, the **entry index** replaces the start residual: the vertex's
+   slot among the window's vertices, counted from the newest ring back, in `ceil(log2 windowVertices)` bits.
+   A position that appears twice in the window (a corner both neighbours share) takes the first slot.
+3. Follow flag, after every vertex whose position an earlier ring holds (any earlier ring of the buffer, not
+   only the window): one bit saying whether the next vertex is that ring's previous vertex. On a hit, no
+   residual at all.
 
 ```
-ring A (decoded)    a0 a1 a2 a3
-ring B              shares the wall a2-a1, rotated to start at a2: b0=a2 b1=a1 b2 b3
-B is written as     entry=1, index of a2 | follow=1 | residual of b2 | corner residual of b3
+window (newest first)   ring A: a0 a1 a2 a3    ring Z: z0 .. z5        -> 10 slots, 4 bits
+ring B                  shares the wall a2-a1, rotated to start at a2: b0=a2 b1=a1 b2 b3
+B is written as         entry=1, slot 2 (a2) | follow=1 | residual of b2 | corner residual of b3
 ```
 
 ![Ring B shares a wall with the decoded ring A. B starts at a2: an entry flag and an index replace its start, a follow flag replaces b1, and only b2 and b3 carry residuals.](img/shared-ring-wall.svg)
@@ -91,14 +95,44 @@ Flags and indices are bit-packed, most significant bit first.
 
 The decoder reads the flag and index bits and the value counts, then walks the vertices. Where a flag is
 due, it reads one; on a hit it emits the referenced position, otherwise it decodes the residual of the
-plain predictor. It keeps the window of the last four rings (or the line dictionary) up to date with every
-decoded vertex. Rotated rings and reversed parts are emitted as they are.
+plain predictor. Rotated rings and reversed parts are emitted as they are.
+
+For rings it keeps two things up to date, once per completed ring:
+
+- **the window**, the bounds of the last four rings. An entry index is resolved by walking at most four ring
+  lengths back from the newest ring: no table.
+- **a position table** of every earlier ring vertex (position to the latest vertex holding it). It tells the
+  decoder whether a follow flag is due after a vertex, and from which ring to take the previous vertex.
+
+The position table is what the references cost at decode time: one lookup and one insert per ring vertex,
+although only 7,8% of the ring vertices of the corpus are references. It cannot be limited to the window:
+55% of the follow references reach further back than four rings. Lines keep the dictionary instead, one
+lookup and insert per line vertex.
+
+## The entry index: window slots instead of distinct positions
+
+The entry index used to count the window's **distinct** positions (codes 7 and 25, which the Java research
+pipeline still has). That index is a little narrower where neighbours share corners, but the decoder can only
+read it after deduplicating the window: a hash of the window's four rings for every entry reference, which was
+25% of the decode cost of the references. Counting raw slots needs no deduplication, so the decoder resolves
+the index by walking ring lengths.
+
+| | distinct positions (7, 25) | window slots (26, 27) |
+|---|---|---|
+| gzip, corpus (per-layer default compositions) | | +0,009% |
+| decode cost of the references (codec alone, over the same predictor without them) | 1,02 / 0,92 × `DELTA` | 0,67 / 0,58 × `DELTA` (-35% / -37%) |
+| Munich, tile oracle, whole tiles | 15.172.888 B, 2,46 × stock | 15.173.753 B (+0,006%), 2,28 × stock (-7%) |
+
+The index only gets wider where duplicates in the window push its size past a power of two, on 69.512 entry
+references of the corpus. The rotation, the flags, the follow references and the residuals are unchanged.
 
 ## What it is worth
 
 - Rings: in the earlier pipeline, adding references to `QUAD_CORNER` saved 2,22 points of gzip on the whole
-  corpus. `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` is today the default of `building`, `landcover`,
-  `landuse`, `water` and `aeroway`.
+  corpus; on `building` today they add 2,4 to 2,5 points (gzip, with and without the ring frame). `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` is
+  the default of `building`, `landcover`, `landuse`, `water` and `aeroway`, `QUAD_CORNER_SHARED_RAW` that of `park`.
+- Decode: in the codec alone a ring vertex under `QUAD_CORNER_SHARED_RAW` costs 1,60 × a `DELTA` vertex, against 0,96 × for
+  plain `QUAD_CORNER`; with the frame (`QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY`) 2,40 ×.
 - Lines: on `transportation` (gzip, against plain delta + varint, measured on the earlier line-frame
   predictor), references added 5,8 points in stored order and 2,9 with the chain order, which places
   connected parts next to each other. `LINE_CONTINUATION_SHARED` is today the default of `transportation`,
@@ -107,4 +141,5 @@ decoded vertex. Rotated rings and reversed parts are emitted as they are.
 Further reading: [shared ring vertices](../encoding/good/shared-ring-vertices.md),
 [line dictionary](../encoding/good/shared-line-vertices.md),
 [shared vertices](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/shared-vertices.md),
+[shared-reference decode time](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/shared-decode-time.md),
 [line shared vertices](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/line-shared-vertices.md).

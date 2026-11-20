@@ -5,7 +5,7 @@
 
 use crate::extraction::{self, ManifestEntry};
 use flate2::read::GzDecoder;
-use mlt_pipeline::registry::golden_grid;
+use mlt_pipeline::registry::best_grid;
 use mlt_pipeline::{Buffer, Composition, Reorder, decode, encode_reordered};
 use rayon::prelude::*;
 use sha2::{Digest, Sha256};
@@ -79,7 +79,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
         }
     }
 
-    let grid = golden_grid();
+    let grid = best_grid();
     let index: HashMap<String, usize> = grid.iter().enumerate().map(|(i, c)| (c.name(), i)).collect();
     let (goldens, covered) = read_golden(&golden.join("buffers.tsv.gz"), &index, grid.len())?;
     println!(

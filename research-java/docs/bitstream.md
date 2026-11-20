@@ -78,6 +78,8 @@ and writable by name but are in no grid, default or selector. The float line fra
 | 23 | `QUAD_CORNER_PREVFRAME_FIRST_ONLY` (the ring frame of the grids and the per-layer defaults: as 22, a ring remembered by its first edge, one vote per ring) |
 | 24 | `QUAD_CORNER_PREVFRAME_FIRST_BLEND` (retired: as 23, the first edge votes on top of the previous ring's frame) |
 | 25 | `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` (the shared ring frame of the grids and the per-layer defaults: 23 on the shared-vertex references, as 17 is 16; a buffer the references do not shrink is written as 23) |
+| 26 | `QUAD_CORNER_SHARED_RAW` (experimental: 7 with the raw entry index, see Rings below; a buffer the references do not shrink is written as 1) |
+| 27 | `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` (experimental: 25 with the raw entry index; falls back to 23) |
 
 The codes 3 (`QUAD_CORNER_LINE`), 4 (`TURN_SCALAR`), 6 (`QUAD_CORNER_LINE_FRAME`), 9
 (`LINE_CONTINUATION_FRAME`), 10 (`LINE_CONTINUATION_HEADING`) and 12 (`LINE_CONTINUATION_SHARED`)
@@ -139,7 +141,9 @@ cannot be derived from the topology; hence the explicit `valueCount`s.
 
 - **Rings** (`RingReferences`): per ring vertex that can reference an earlier ring in a window
   of `WINDOW`=4 rings, an entry flag and, on entry, a `ceil(log2 candidates)`-bit index into
-  the candidate positions; after any vertex whose position an earlier ring holds (a referenced vertex or
+  the candidate positions (the window's distinct positions, newest ring first, first occurrence kept; under codes 26
+  and 27 a `ceil(log2 windowVertices)`-bit slot into the window's raw vertices, newest ring first, the first slot
+  holding the position, which the decoder reads without a table); after any vertex whose position an earlier ring holds (a referenced vertex or
   one that coincides with it) a follow flag says "the next vertex is the previous vertex of that ring". Rings are rotated by the encoder to start where a
   shared stretch begins; the rotation is never transmitted (the decoder emits the rotated ring).
 - **Lines** (`LineReferences`): at every line part start and end, a flag and on a hit a

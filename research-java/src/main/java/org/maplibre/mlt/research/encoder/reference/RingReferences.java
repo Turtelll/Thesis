@@ -99,13 +99,23 @@ public final class RingReferences {
      * topology streams (then no vertex can be a reference). {@code ctx} must hold the vertices.
      */
     public static Scan scan(BufferContext ctx) {
+        return scan(ctx, false);
+    }
+
+    /**
+     * {@link #scan(BufferContext)}, with the entry index addressing either the window's distinct positions
+     * ({@code rawIndex = false}, the codes of {@code QUAD_CORNER_SHARED}) or its raw vertex slots ({@code true}): the
+     * slot of the window's vertices, newest ring first, of the first vertex holding the position, in {@code
+     * width(window vertices)} bits. The raw index needs no hash of the window on the decoder's side.
+     */
+    public static Scan scan(BufferContext ctx, boolean rawIndex) {
         final var vertices = ctx.vertices();
         final var runs = Runs.of(ctx, vertices.size());
         if (runs == null) {
             return null;
         }
         final var rotated = rotate(vertices, runs);
-        final var walk = new Walk(runs, null, null);
+        final var walk = new Walk(runs, null, null, rawIndex);
         final var referenced = new boolean[rotated.size()];
         for (var i = 0; i < rotated.size(); i++) {
             referenced[i] = walk.encode(i, rotated);
@@ -140,11 +150,13 @@ public final class RingReferences {
         private final BitWriter indicesOut = new BitWriter();
         private final BitReader flagsIn;
         private final BitReader indicesIn;
+        private final boolean rawIndex;
         private State state;
         private int run;
 
-        private Walk(Runs runs, BitReader flagsIn, BitReader indicesIn) {
+        private Walk(Runs runs, BitReader flagsIn, BitReader indicesIn, boolean rawIndex) {
             this.runs = runs;
+            this.rawIndex = rawIndex;
             this.flagsIn = flagsIn;
             this.indicesIn = indicesIn;
         }
@@ -155,11 +167,17 @@ public final class RingReferences {
          * @param topo topology streams of the emitted buffer; no vertices needed
          */
         public static Walk forDecoding(BufferContext topo, int vertexCount, byte[] flags, byte[] indices) {
+            return forDecoding(topo, vertexCount, flags, indices, false);
+        }
+
+        /** {@link #forDecoding(BufferContext, int, byte[], byte[])} with the index of {@link #scan(BufferContext, boolean)}. */
+        public static Walk forDecoding(
+                BufferContext topo, int vertexCount, byte[] flags, byte[] indices, boolean rawIndex) {
             final var runs = Runs.of(topo, vertexCount);
             if (runs == null) {
                 throw new IllegalStateException("the runs of a shared-reference buffer must follow from the topology");
             }
-            return new Walk(runs, new BitReader(flags), new BitReader(indices));
+            return new Walk(runs, new BitReader(flags), new BitReader(indices), rawIndex);
         }
 
         private State state(List<Vertex> vertices) {
@@ -191,6 +209,14 @@ public final class RingReferences {
                 flagsOut.write(referenced ? 1 : 0, 1);
                 return referenced;
             }
+            if (ring && i == start && state.hasCandidates() && rawIndex) {
+                final var index = state.rawIndex(vertex);
+                flagsOut.write(index >= 0 ? 1 : 0, 1);
+                if (index >= 0) {
+                    indicesOut.write(index, width(state.windowVertices()));
+                }
+                return index >= 0;
+            }
             if (ring && i == start && state.hasCandidates()) {
                 state.collectCandidates();
                 final var index = state.candidateIndex(vertex);
@@ -218,6 +244,9 @@ public final class RingReferences {
                 return flagsIn.read(1) == 1 ? state.previousOnSource(source) : null;
             }
             if (ring && i == start && state.hasCandidates() && flagsIn.read(1) == 1) {
+                if (rawIndex) {
+                    return state.rawCandidate(indicesIn.read(width(state.windowVertices())));
+                }
                 state.collectCandidates();
                 return state.candidate(indicesIn.read(width(state.candidateCount())));
             }
@@ -312,6 +341,43 @@ public final class RingReferences {
 
         int candidateCount() {
             return candidateCount;
+        }
+
+        int windowVertices() {
+            return windowVertices;
+        }
+
+        /**
+         * The raw slot of {@code position} in the window, newest ring first and in vertex order within a ring
+         * (the first slot holding it), or {@code -1}.
+         */
+        int rawIndex(Vertex position) {
+            var offset = 0;
+            final var rings = window.descendingIterator();
+            while (rings.hasNext()) {
+                final var ring = rings.next();
+                for (var i = ring[0]; i < ring[1]; i++) {
+                    if (vertices.get(i).equals(position)) {
+                        return offset + i - ring[0];
+                    }
+                }
+                offset += ring[1] - ring[0];
+            }
+            return -1;
+        }
+
+        /** The vertex at raw slot {@code index} of the window ({@link #rawIndex}): no table, at most four rings walked. */
+        Vertex rawCandidate(int index) {
+            var offset = index;
+            final var rings = window.descendingIterator();
+            while (true) {
+                final var ring = rings.next();
+                final var length = ring[1] - ring[0];
+                if (offset < length) {
+                    return vertices.get(ring[0] + offset);
+                }
+                offset -= length;
+            }
         }
 
         Vertex candidate(int index) {

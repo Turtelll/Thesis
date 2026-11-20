@@ -1,6 +1,7 @@
 # Shared ring vertices
 
-**Code names:** `QUAD_CORNER_SHARED`
+**Code names:** `QUAD_CORNER_SHARED_RAW` (code 26), `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` (code 27, with the ring frame); before them `QUAD_CORNER_SHARED`
+(code 7) and `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` (code 25), which differ only in the entry index
 
 > **Verdict: Kept.** -5,58% gzip on the tileset against -3,36% for quad corner alone in the same layout;
 > the references are part of the polygon layer default.
@@ -28,9 +29,11 @@ geometry) and puts the repeats where one flag can catch them.
 
 1. **Ring rotation (not transmitted).** Each ring is cyclically shifted (winding kept) to start where its
    longest shared stretch begins: a position one of the last 4 rings holds whose predecessor is not shared.
-2. **Entry flag, once per ring** (only if candidates exist): 1 bit "the ring start is one of the window's
-   distinct positions". On a hit a `ceil(log2 candidates)`-bit index replaces the start residual (mean 4,67
-   bits). Always referenced on a hit (an earlier "only if narrower" rule was 0,15–0,23% worse).
+2. **Entry flag, once per ring** (only if the window holds a ring): 1 bit "the ring start is one of the
+   window's vertices". On a hit the entry index replaces the start residual: the slot of the first window
+   vertex holding the position, newest ring first, in `ceil(log2 windowVertices)` bits. Always referenced on a
+   hit (an earlier "only if narrower" rule was 0,15–0,23% worse). Codes 7 and 25 indexed the window's distinct
+   positions instead (`ceil(log2 candidates)` bits, mean 4,67); see "Entry index" below.
 3. **Follow flag:** after a vertex whose exact position an earlier ring holds, 1 bit "this vertex is that
    ring's previous vertex". On a hit no residual.
 4. Every other vertex keeps its `QUAD_CORNER` residual, predicted from the actual (decoded or referenced)
@@ -51,9 +54,10 @@ B written:  entry=1 idx(a2) | follow=1 (a1) | residual b2 | corner residual b3
 ## How the decoder works
 1. Read the header; if it names a shared predictor, read the flag and index bit streams and the per-stream
    value counts, then the residual streams.
-2. Keep a primitive position table of the last 4 rings' vertices.
-3. Per ring start with candidates: read the entry flag; on 1 read the index and emit the candidate
-   position, else decode a normal residual.
+2. Keep the bounds of the last 4 rings (the window) and a position table of every earlier ring vertex
+   (position to the latest vertex index holding it), both updated once per completed ring.
+3. Per ring start with a non-empty window: read the entry flag; on 1 read the index and emit the vertex at
+   that slot (walk back over at most four ring lengths, no table), else decode a normal residual.
 4. After any vertex whose position the table holds: read the follow flag; on 1 emit that source ring's
    previous vertex, no residual read.
 5. All other vertices: `QUAD_CORNER` prediction + next residual of its class stream.
@@ -66,7 +70,7 @@ layout. A per-layer gzip figure was not reported for this layout.
 
 **Decisive case for inclusion:** the references add 2,2 points on the tileset, and the same step is worth
 249.754 B gzip (2,22 points) in the pipeline. The per-buffer fallback (plain quad corner when the references
-do not pay) means a buffer never gets larger. Its frame variant `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` is
+do not pay) means a buffer never gets larger. Its frame variant `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` is
 the layer default of `building`, `landcover`, `landuse`, `water` and `aeroway` ([ring frame prior](ring-frame-prior.md)).
 
 Supporting figures:
@@ -92,5 +96,21 @@ Supporting figures:
 - Decode (allocation-free state): `_SHARED_SEG_FASTPFOR` 1,27x, worst bucket 2,93x; marginal step over
   `QUAD_CORNER_SEG` 1,20x.
 
-Source: `research-java/docs/results/shared-vertices.md`, `general-purpose-compression.md`,
+## Entry index: window slots instead of distinct positions
+The distinct-position index of codes 7 and 25 made the decoder hash the window's four rings at every entry
+reference to deduplicate it, 25% of the references' decode cost. Codes 26 and 27 index the window's raw slots
+instead, which the decoder resolves without a table. Everything else is unchanged.
+
+- Size: +0,009% gzip on the corpus (per-layer default compositions, 25 to 27: 10.142.845 to 10.143.733 B);
+  `building` -14,75% to -14,73% against `DELTA_ZIGZAG_VARINT`.
+- Decode, codec alone: the references' cost over the same predictor without them falls from 1,02 to 0,67 ×
+  a `DELTA` vertex (7 to 26) and from 0,92 to 0,58 × (25 to 27).
+- Whole tiles, Munich tile oracle: +865 B (+0,006%), decode 2,46 to 2,28 × stock (-7%).
+- The Rust MLT v2 encoder has only 26 and 27; the Java research pipeline keeps 7 and 25 in its grid and has 26
+  and 27 as experimental rows.
+
+What is left of the decode cost is the position table: one lookup and one insert per ring vertex, while only
+7,8% of the ring vertices are references. Limiting it to the window would lose 55% of the follow references.
+
+Source: `research-java/docs/results/shared-vertices.md`, `shared-decode-time.md`, `general-purpose-compression.md`,
 `openzl-pipeline.md`; the -3,36% is computed from the gzip byte totals in `revisit-varint-split.md`.

@@ -115,7 +115,7 @@ public final class PipelineRegistry {
     /** The step names, in order. */
     public static List<String> steps() {
         return List.of("s0", "s1", "s2", "s3", "s4", "s6", "s7", "s8", "selector", "frame", "framelayers",
-                "shared", "framelines", "linesshared", "prevframe", "prevblend", "prevshared");
+                "shared", "framelines", "linesshared", "prevframe", "prevblend", "prevshared", "rawshared");
     }
 
     /** The rows measured by one step. */
@@ -148,6 +148,8 @@ public final class PipelineRegistry {
             // the first edge blended into the previous ring's frame, six rows
             case "prevblend" -> StepRows.prevBlendRows();
             case "prevshared" -> StepRows.prevSharedRows();
+            // the raw entry index of the ring references beside the distinct one, per-layer default compositions
+            case "rawshared" -> StepRows.rawSharedRows();
             // the references to earlier line parts' positions beside the line predictors
             case "linesshared" -> StepRows.lineSharedRows();
             // not a step of the build-up: the cumulative stages, for the benchmark run
