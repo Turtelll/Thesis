@@ -88,9 +88,9 @@ layer, and nothing is searched at runtime. A layer it does not know gets `DEFAUL
 | aeroway | chain | `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` | flat |
 | park | Hilbert | `QUAD_CORNER_SHARED_RAW` | flat |
 | place | Hilbert | `QUAD_CORNER_PREVFRAME_FIRST_ONLY` | flat |
-| transportation | chain | `LINE_CONTINUATION_SHARED` | class |
-| transportation_name, waterway | chain | `LINE_CONTINUATION_SHARED` | flat |
-| boundary | Hilbert | `LINE_CONTINUATION_SHARED` | flat |
+| transportation | chain | `LINE_CONTINUATION_SHARED_RAW` | class |
+| transportation_name, waterway | chain | `LINE_CONTINUATION_SHARED_RAW` | flat |
+| boundary | Hilbert | `LINE_CONTINUATION_SHARED_RAW` | flat |
 | mountain_peak, water_name, housenumber | Hilbert | `LINE_CONTINUATION` | flat |
 | poi | Hilbert | `DELTA` | class |
 | aerodrome_label | Hilbert | `DELTA` | flat |
@@ -151,13 +151,13 @@ Whole MLT v2 tiles, gzip, against stock MLT v2 (16.786.524 bytes), `mlt convert`
 Decode is whole-tile, single-threaded, decompression not timed (`mlt-oracle decode-time`, three runs, stock 112
 to 119 ms for the 358 tiles on a machine that was not idle; only the ratios are comparable).
 
-What the tile oracle picks on whole tiles (share of the 4.368 layers; counted with the earlier entry index,
-codes 7 and 25 in the slots of 26 and 27, not recounted):
+What the tile oracle picks on whole tiles (share of the 4.368 layers; counted with the earlier index,
+codes 7, 25 and 12 in the slots of 26, 27 and 28, not recounted):
 
 | stage | picks |
 |---|---|
 | reorder | none 72,6%, Hilbert 21,9%, chain 5,5% |
-| predictor | `DELTA` 34,7%, `LINE_CONTINUATION_SHARED` 15,9%, `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` (now 27) 13,1%, `QUAD_CORNER` 12,7%, `LINE_CONTINUATION` 9,4%, `QUAD_CORNER_PREVFRAME_FIRST_ONLY` 7,4%, `QUAD_CORNER_SHARED` (now 26) 6,9% |
+| predictor | `DELTA` 34,7%, `LINE_CONTINUATION_SHARED` (now 28) 15,9%, `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` (now 27) 13,1%, `QUAD_CORNER` 12,7%, `LINE_CONTINUATION` 9,4%, `QUAD_CORNER_PREVFRAME_FIRST_ONLY` 7,4%, `QUAD_CORNER_SHARED` (now 26) 6,9% |
 | streams | class 58,7%, flat 41,3% |
 
 No composition dominates: the most frequent, `PIPE_DELTA_FLAT_ZIGZAG_ESCAPE_PLANES`, is picked on 24,2% of

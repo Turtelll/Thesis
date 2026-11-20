@@ -305,18 +305,24 @@ pub fn scan_rings(vertices: &[V], topology: &Topology) -> Option<Scan> {
 
 // --- line parts -------------------------------------------------------------------------------------
 
-/// The positions of every finished line part in first-seen order. Append-only.
+/// The slots an entry or exit index addresses: every vertex of every finished line part in buffer order,
+/// duplicates included. Append-only. Only the encoder looks positions up (position -> first slot holding it); the
+/// decoder resolves a slot by its vertex index, no table.
 struct Dictionary {
+    /// position -> first slot holding it; empty on the decoder's side
     index: FxHashMap<u64, i32>,
     entries: Vec<usize>,
+    lookups: bool,
 }
 
 impl Dictionary {
-    /// At most one entry per vertex of the buffer.
-    fn new(vertex_count: usize) -> Self {
+    /// At most one entry per vertex of the buffer. `lookups`: the encoder's side, with the position table.
+    fn new(vertex_count: usize, lookups: bool) -> Self {
+        let capacity = if lookups { vertex_count } else { 0 };
         Self {
-            index: FxHashMap::with_capacity_and_hasher(vertex_count, rustc_hash::FxBuildHasher),
+            index: FxHashMap::with_capacity_and_hasher(capacity, rustc_hash::FxBuildHasher),
             entries: Vec::with_capacity(vertex_count),
+            lookups,
         }
     }
 
@@ -333,13 +339,13 @@ impl Dictionary {
     }
 
     fn add_part(&mut self, start: usize, end: usize, vertices: &[V]) {
-        for i in start..end {
-            let key = vertices[i].key();
-            if !self.index.contains_key(&key) {
-                self.index.insert(key, self.entries.len() as i32);
-                self.entries.push(i);
+        if self.lookups {
+            for i in start..end {
+                let slot = (self.entries.len() + i - start) as i32;
+                self.index.entry(vertices[i].key()).or_insert(slot);
             }
         }
+        self.entries.extend(start..end);
     }
 }
 
@@ -360,15 +366,16 @@ fn reference(dictionary: &Dictionary, vertex: V, flags: &mut BitWriter, indices:
     index >= 0
 }
 
-/// The references of one buffer under `LINE_CONTINUATION_SHARED`: its line parts
-/// reversed where that lets the entry flag catch the part, which vertices are references, the bits.
+/// The references of one buffer under `LINE_CONTINUATION_SHARED_RAW` (code 28): its line parts reversed where that
+/// lets the entry flag catch the part, which vertices are references, the bits. The index is the slot among the
+/// earlier line parts' vertices, duplicates included (the first slot holding the position).
 #[must_use]
 pub fn scan_lines(original: &[V], topology: &Topology) -> Option<Scan> {
     let runs = Runs::of(topology, original.len())?;
     let n = original.len();
     let mut out: Vec<V> = Vec::with_capacity(n);
     let mut referenced = vec![false; n];
-    let mut dictionary = Dictionary::new(n);
+    let mut dictionary = Dictionary::new(n, true);
     let mut flags = BitWriter::default();
     let mut indices = BitWriter::default();
     for r in 0..runs.count() {
@@ -409,7 +416,7 @@ impl<'a> LineWalk<'a> {
     pub fn for_decoding(topology: &Topology, vertex_count: usize, flags: &'a [u8], indices: &'a [u8]) -> Self {
         let runs = Runs::of(topology, vertex_count)
             .expect("the runs of a shared-reference buffer must follow from the topology");
-        Self { runs, flags: BitReader::new(flags), indices: BitReader::new(indices), dictionary: Dictionary::new(vertex_count), run: 0 }
+        Self { runs, flags: BitReader::new(flags), indices: BitReader::new(indices), dictionary: Dictionary::new(vertex_count, false), run: 0 }
     }
 
     fn advance(&mut self, i: usize) {
@@ -437,6 +444,71 @@ impl ReferenceWalk for LineWalk<'_> {
         if self.runs.is_line[self.run] && i == self.runs.end(self.run) - 1 {
             let (s, e) = (self.runs.starts[self.run], self.runs.end(self.run));
             self.dictionary.add_part(s, e, vertices);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::buffer::{Buffer, Topology, V, geometry_type};
+    use crate::{Composition, Prediction, Reorder, Segmentation, Terminal, decode, encode};
+
+    /// `n` lines of 6 vertices from one of four hubs out across the tile, every third one drawn towards its hub.
+    fn star(n: i32) -> Buffer {
+        let hubs = [V::new(100, 100), V::new(4000, 200), V::new(300, 3900), V::new(3800, 3700)];
+        let mut vertices = Vec::new();
+        for k in 0..n {
+            let hub = hubs[(k % 4) as usize];
+            let mut line: Vec<V> = (0..6).map(|j| V::new(hub.x + j * (37 + k * 13 % 50), hub.y + j * (k * 29 % 60 - 30))).collect();
+            if k % 3 == 2 {
+                line.reverse();
+            }
+            vertices.extend(line);
+        }
+        Buffer::new(
+            vertices,
+            Topology {
+                geometry_types: vec![geometry_type::LINESTRING; n as usize],
+                num_geometries: vec![],
+                num_parts: vec![6; n as usize],
+                num_rings: vec![],
+            },
+        )
+    }
+
+    /// [`star`] in a polygon column: a square ring before every fourth line, which takes no slot.
+    fn star_with_rings(n: i32) -> Buffer {
+        let lines = star(n);
+        let mut vertices = Vec::new();
+        let mut geometry_types = Vec::new();
+        let mut num_parts = Vec::new();
+        let mut num_rings = Vec::new();
+        for k in 0..n {
+            if k % 4 == 0 {
+                vertices.extend([V::new(k * 90, 50), V::new(k * 90 + 40, 50), V::new(k * 90 + 40, 90), V::new(k * 90, 90)]);
+                geometry_types.push(geometry_type::POLYGON);
+                num_parts.push(1);
+                num_rings.push(4);
+            }
+            vertices.extend_from_slice(&lines.vertices[(k * 6) as usize..(k * 6 + 6) as usize]);
+            geometry_types.push(geometry_type::LINESTRING);
+            num_rings.push(6);
+        }
+        Buffer::new(vertices, Topology { geometry_types, num_geometries: vec![], num_parts, num_rings })
+    }
+
+    #[test]
+    fn the_line_references_round_trip_and_are_kept() {
+        for buffer in [star(40), star_with_rings(40)] {
+            for segmentation in [Segmentation::Flat, Segmentation::Class] {
+                let predictor = Prediction::LineContinuationSharedRaw;
+                let c = Composition { reorder: Reorder::None, predictor, segmentation, terminal: Terminal::EscapePlanes };
+                let encoded = encode(&buffer, &c);
+                let header = Composition::parse_header(encoded.payload[0], encoded.payload[1], Reorder::None).unwrap();
+                assert_eq!(header.predictor, predictor, "{segmentation:?} fell back");
+                let decoded = decode(&encoded.payload, &buffer.topology, buffer.vertices.len());
+                assert_eq!(decoded, encoded.emitted.vertices, "{segmentation:?}");
+            }
         }
     }
 }

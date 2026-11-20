@@ -80,11 +80,11 @@ Seven combinations are live. The code is the value in the payload header.
 | 26 | `QUAD_CORNER_SHARED_RAW` | quad corner | | ring references |
 | 27 | `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` | quad corner | ring frame | ring references |
 | 2 | `LINE_CONTINUATION` | line continuation | | |
-| 12 | `LINE_CONTINUATION_SHARED` | line continuation | | line references |
+| 28 | `LINE_CONTINUATION_SHARED_RAW` | line continuation | | line references |
 
 The missing codes belonged to retired predictors (for example a turn-angle predictor, a corner guess on
-lines, earlier ring frames and the line frames, and codes 7 and 25, the ring references with the earlier
-entry index, see [shared references](05-shared-references.md)). Their codes are not reused, so a payload never changes
+lines, earlier ring frames and the line frames, and codes 7, 25 and 12, the ring and line references with the
+earlier index, see [shared references](05-shared-references.md)). Their codes are not reused, so a payload never changes
 meaning.
 
 ## Decoding

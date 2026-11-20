@@ -25,9 +25,6 @@ pub enum Prediction {
     Delta,
     QuadCorner,
     LineContinuation,
-    /// `LINE_CONTINUATION_SHARED` (code 12): `LINE_CONTINUATION` on the shared-vertex references of line parts.
-    /// A buffer the references do not shrink is written as plain `LINE_CONTINUATION`.
-    LineContinuationShared,
     /// `QUAD_CORNER_PREVFRAME_FIRST_ONLY` (code 23): the previous ring's frame, one vote per ring (the ring's first
     /// edge). The ring frame of [`Prediction::ALL`], the grids and the per-layer defaults.
     QuadCornerPrevFrameFirstOnly,
@@ -39,13 +36,19 @@ pub enum Prediction {
     /// `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` (code 27): code 23 on the references of code 26. The shared ring
     /// frame of [`Prediction::ALL`], the grids and the per-layer defaults; falls back to code 23.
     QuadCornerSharedRawPrevFrameFirstOnly,
+    /// `LINE_CONTINUATION_SHARED_RAW` (code 28, Rust only): `LINE_CONTINUATION` on the shared-vertex references of
+    /// line parts, the index a slot among the earlier line parts' raw vertices (no position table on the decoder's
+    /// side), as code 26 is for rings. The line references of [`Prediction::ALL`] and the per-layer defaults; Java's
+    /// distinct-index code 12 is not in this codec. A buffer the references do not shrink is written as plain
+    /// `LINE_CONTINUATION`.
+    LineContinuationSharedRaw,
 }
 
 impl Prediction {
     /// The seven predictors of the 42-composition grid, in the order the grid iterates in (the
     /// first of equal sizes wins, so the order is part of the result): the ring frame is the one-vote one
-    /// (codes 23 and 27), the ring references have the raw entry index (26, 27, in the slots of Java's 7 and 25);
-    /// lines have no frame. The other frames (5, 8, 11, 13, 16-19) are gone from this codec.
+    /// (codes 23 and 27), the ring and line references have the raw index (26, 27, 28, in the slots of Java's 7, 25
+    /// and 12); lines have no frame. The other frames (5, 8, 11, 13, 16-19) are gone from this codec.
     pub const ALL: [Self; 7] = [
         Self::Delta,
         Self::QuadCorner,
@@ -53,7 +56,7 @@ impl Prediction {
         Self::QuadCornerPrevFrameFirstOnly,
         Self::QuadCornerSharedRaw,
         Self::QuadCornerSharedRawPrevFrameFirstOnly,
-        Self::LineContinuationShared,
+        Self::LineContinuationSharedRaw,
     ];
 
     /// Every predictor the codec writes and reads.
@@ -61,10 +64,10 @@ impl Prediction {
         Self::Delta,
         Self::QuadCorner,
         Self::LineContinuation,
-        Self::LineContinuationShared,
         Self::QuadCornerPrevFrameFirstOnly,
         Self::QuadCornerSharedRaw,
         Self::QuadCornerSharedRawPrevFrameFirstOnly,
+        Self::LineContinuationSharedRaw,
     ];
 
     /// The stable header code (not the ordinal).
@@ -74,10 +77,10 @@ impl Prediction {
             Self::Delta => 0,
             Self::QuadCorner => 1,
             Self::LineContinuation => 2,
-            Self::LineContinuationShared => 12,
             Self::QuadCornerPrevFrameFirstOnly => 23,
             Self::QuadCornerSharedRaw => 26,
             Self::QuadCornerSharedRawPrevFrameFirstOnly => 27,
+            Self::LineContinuationSharedRaw => 28,
         }
     }
 
@@ -93,10 +96,10 @@ impl Prediction {
             Self::Delta => "DELTA",
             Self::QuadCorner => "QUAD_CORNER",
             Self::LineContinuation => "LINE_CONTINUATION",
-            Self::LineContinuationShared => "LINE_CONTINUATION_SHARED",
             Self::QuadCornerPrevFrameFirstOnly => "QUAD_CORNER_PREVFRAME_FIRST_ONLY",
             Self::QuadCornerSharedRaw => "QUAD_CORNER_SHARED_RAW",
             Self::QuadCornerSharedRawPrevFrameFirstOnly => "QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY",
+            Self::LineContinuationSharedRaw => "LINE_CONTINUATION_SHARED_RAW",
         }
     }
 
@@ -111,7 +114,7 @@ impl Prediction {
     pub fn plain(self) -> Self {
         match self {
             Self::QuadCornerSharedRaw => Self::QuadCorner,
-            Self::LineContinuationShared => Self::LineContinuation,
+            Self::LineContinuationSharedRaw => Self::LineContinuation,
             Self::QuadCornerSharedRawPrevFrameFirstOnly => Self::QuadCornerPrevFrameFirstOnly,
             other => other,
         }

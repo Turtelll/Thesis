@@ -31,9 +31,9 @@ with a trivial encoder.
   | aeroway (`CHAIN`) | `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` | `FLAT` |
   | park | `QUAD_CORNER_SHARED_RAW` | `FLAT` |
   | place | `QUAD_CORNER_PREVFRAME_FIRST_ONLY` | `FLAT` |
-  | transportation (`CHAIN`) | `LINE_CONTINUATION_SHARED` | `CLASS` |
-  | transportation_name, waterway (`CHAIN`) | `LINE_CONTINUATION_SHARED` | `FLAT` |
-  | boundary | `LINE_CONTINUATION_SHARED` | `FLAT` |
+  | transportation (`CHAIN`) | `LINE_CONTINUATION_SHARED_RAW` | `CLASS` |
+  | transportation_name, waterway (`CHAIN`) | `LINE_CONTINUATION_SHARED_RAW` | `FLAT` |
+  | boundary | `LINE_CONTINUATION_SHARED_RAW` | `FLAT` |
   | mountain_peak, water_name, housenumber | `LINE_CONTINUATION` | `FLAT` |
   | poi | `DELTA` | `CLASS` |
   | aerodrome_label | `DELTA` | `FLAT` |

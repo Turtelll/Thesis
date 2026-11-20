@@ -22,7 +22,7 @@ fn grid_of(predictors: &[Prediction]) -> Vec<Composition> {
 }
 
 /// The 42 compositions: three reorders x seven predictors x flat or class streams. The ring frames
-/// are the one-vote frames (codes 23 and 27), the ring references have the raw entry index (26, 27), lines
+/// are the one-vote frames (codes 23 and 27), the ring and line references have the raw index (26, 27, 28), lines
 /// have no frame ([`Prediction::ALL`]); it holds [`Composition::DEFAULT`] and every [`for_layer`] composition.
 /// Also what `golden-check` looks a Java dump's row names up in.
 #[must_use]
@@ -44,16 +44,16 @@ pub fn for_layer(layer: &str) -> Composition {
     let chain = |c: Composition| c.with_reorder(Reorder::Chain);
     match layer {
         "place" => hilbert(P::QuadCornerPrevFrameFirstOnly, Flat, Esc),
-        "transportation" => chain(hilbert(P::LineContinuationShared, Class, Esc)),
+        "transportation" => chain(hilbert(P::LineContinuationSharedRaw, Class, Esc)),
         "landcover" | "landuse" | "building" => hilbert(P::QuadCornerSharedRawPrevFrameFirstOnly, Class, Esc),
-        "transportation_name" => chain(hilbert(P::LineContinuationShared, Flat, Esc)),
+        "transportation_name" => chain(hilbert(P::LineContinuationSharedRaw, Flat, Esc)),
         "water" => chain(hilbert(P::QuadCornerSharedRawPrevFrameFirstOnly, Class, Esc)),
         "park" => hilbert(P::QuadCornerSharedRaw, Flat, Esc),
-        "boundary" => hilbert(P::LineContinuationShared, Flat, Esc),
+        "boundary" => hilbert(P::LineContinuationSharedRaw, Flat, Esc),
         "poi" => hilbert(P::Delta, Class, Esc),
         "water_name" => hilbert(P::LineContinuation, Flat, Esc),
         "housenumber" => hilbert(P::LineContinuation, Flat, Esc),
-        "waterway" => chain(hilbert(P::LineContinuationShared, Flat, Esc)),
+        "waterway" => chain(hilbert(P::LineContinuationSharedRaw, Flat, Esc)),
         "mountain_peak" => hilbert(P::LineContinuation, Flat, Esc),
         "aeroway" => chain(hilbert(P::QuadCornerSharedRawPrevFrameFirstOnly, Flat, Esc)),
         "aerodrome_label" => hilbert(P::Delta, Flat, Esc),
@@ -89,14 +89,14 @@ mod tests {
     #[test]
     fn names_follow_the_java_grid() {
         // the one-vote ring frames took the slots of the float and then the integer ring frame (Java: `Prediction.grid()`),
-        // the raw entry index (26, 27) those of Java's distinct one (7, 25)
+        // the raw index (26, 27, 28) those of Java's distinct one (7, 25, 12)
         assert_eq!(
             Composition::DEFAULT.name(),
             "PIPE_QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY_CLASS_ZIGZAG_ESCAPE_PLANES"
         );
         assert_eq!(
             for_layer("transportation").name(),
-            "PIPE_CHAIN_LINE_CONTINUATION_SHARED_CLASS_ZIGZAG_ESCAPE_PLANES"
+            "PIPE_CHAIN_LINE_CONTINUATION_SHARED_RAW_CLASS_ZIGZAG_ESCAPE_PLANES"
         );
     }
 }

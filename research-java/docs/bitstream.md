@@ -80,6 +80,7 @@ and writable by name but are in no grid, default or selector. The float line fra
 | 25 | `QUAD_CORNER_SHARED_PREVFRAME_FIRST_ONLY` (the shared ring frame of the grids and the per-layer defaults: 23 on the shared-vertex references, as 17 is 16; a buffer the references do not shrink is written as 23) |
 | 26 | `QUAD_CORNER_SHARED_RAW` (experimental: 7 with the raw entry index, see Rings below; a buffer the references do not shrink is written as 1) |
 | 27 | `QUAD_CORNER_SHARED_RAW_PREVFRAME_FIRST_ONLY` (experimental: 25 with the raw entry index; falls back to 23) |
+| 28 | `LINE_CONTINUATION_SHARED_RAW` (Rust only, the line references of its grid and per-layer defaults: 12 with the index a slot into the earlier line parts' raw vertices, see Lines below; falls back to 2) |
 
 The codes 3 (`QUAD_CORNER_LINE`), 4 (`TURN_SCALAR`), 6 (`QUAD_CORNER_LINE_FRAME`), 9
 (`LINE_CONTINUATION_FRAME`), 10 (`LINE_CONTINUATION_HEADING`) and 12 (`LINE_CONTINUATION_SHARED`)
@@ -148,8 +149,9 @@ cannot be derived from the topology; hence the explicit `valueCount`s.
   shared stretch begins; the rotation is never transmitted (the decoder emits the rotated ring).
 - **Lines** (`LineReferences`): at every line part start and end, a flag and on a hit a
   `ceil(log2 dictionarySize)`-bit index into the dictionary of all distinct positions of earlier
-  line parts. A part whose end alone is in the dictionary is reversed by the encoder (never
-  transmitted; this changes line direction).
+  line parts (under code 28 a `ceil(log2 slots)`-bit slot into the earlier line parts' raw vertices, in buffer
+  order, the first slot holding the position, which the decoder reads without a table). A part whose end alone
+  is in the dictionary is reversed by the encoder (never transmitted; this changes line direction).
 
 ### Streams
 

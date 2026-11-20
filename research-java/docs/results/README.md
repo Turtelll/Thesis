@@ -194,7 +194,9 @@ Names below are the **new** ones; the bodies of the linked files still use the o
   ring vertices are references) and the raw entry index (codes 26, 27: a slot into the window's raw vertices, no hash):
   +0,009% gzip on the corpus, 35 to 37% less reference decode overhead, 27 decodes 11 to 12% faster than 25. Munich whole
   tile, the per-layer default with 25 swapped for 27: +849 B (+0,005%), 7% less decode time (2,61x to 2,43x stock). Java and
-  Rust bit for bit; adopted in Rust (7 and 25 removed there), experimental in Java.
+  Rust bit for bit; adopted in Rust (7 and 25 removed there), experimental in Java. The line references the same way (code 28,
+  a raw slot among the earlier line parts' vertices, no position table, Rust only, replacing 12): Munich per-layer default
+  +0,046% gzip, 4% less whole-tile decode, reference overhead on `transportation` -42%.
 
 - [tile-oracle.md](tile-oracle.md) — the real per-(tile, layer) oracle (`measure --step best`): the
   best of 252 compositions (96 since the retirement; every predictor x streams x terminal x reorder) per buffer, chosen alone and
