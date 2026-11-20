@@ -1,4 +1,4 @@
-# Shared line vertices via dictionary
+# Shared line vertices
 
 **Code names:** `LINE_CONTINUATION_SHARED_RAW` (code 28, Rust: the index a slot among the earlier parts' raw
 vertices); before it `LINE_CONTINUATION_SHARED` (code 12) and `LINE_CONTINUATION_SHARED_DICT`, which index the
@@ -20,20 +20,21 @@ only the end of a part is a junction, flip the part so the junction comes first.
 A part start is the most expensive residual of a line buffer (a jump), and at a junction it repeats a position
 the decoder already holds. A flag per part end plus an index into all earlier line positions should cost far
 less than the jump. Unlike ring references, which only look back 4 rings, junctions can be anywhere in the
-buffer, so the dictionary keeps every earlier line position; the index grows with log2 of its size. Flipping a
+buffer, so the index reaches every vertex of every earlier line part; it grows with log2 of their number. Flipping a
 part whose end is the junction is free in geometry terms (a line part read backwards covers the same points)
 but drops the line's direction.
 
 ## How the encoding works
-`LineContinuation` plus references (`encoder/reference/LineReferences.java`). Per line part, in buffer
-order:
+`LineContinuation` plus references (`research-rust/mlt-pipeline/src/refs.rs`, `encoder/reference/LineReferences.java`).
+Per line part, in buffer order:
 1. **Part reversal (not transmitted):** if the end is a candidate and the start is not, reverse the part
    (changes line direction).
-2. **Entry flag** at the part start, only if the dictionary is non-empty: 1 bit; on a hit a
-   `ceil(log2 dictionarySize)`-bit index replaces the start residual.
+2. **Entry flag** at the part start, only if an earlier line part exists: 1 bit; on a hit a
+   `ceil(log2 slots)`-bit index replaces the start residual.
 3. **Exit flag** at the part's last vertex: same, flag + index.
-4. **Dictionary:** every distinct position of every earlier line part, first-seen order, flat index,
-   append-only.
+4. **Slots:** every vertex of every earlier line part in buffer order, duplicates included, append-only; a
+   position several parts hold (a junction) is addressed by its first slot. Codes 12 and `_DICT` indexed the
+   distinct positions instead; see "Index" below.
 5. Rings and points in the column keep plain residuals and are never candidates. A buffer the references do
    not shrink is written under the plain predictor.
 
@@ -41,18 +42,17 @@ Payload: header, shared-reference block (flag bits, index bits, per-stream value
 (segmented order starts-last).
 
 ```
-part P1: a b c         dictionary after P1: {a, b, c}
-part P2: d e c   →  reversed to c e d:  entry=1 idx(c) | residual e | exit=0, residual d
+part P1: a b c         slots after P1: 0 a, 1 b, 2 c
+part P2: d e c   →  reversed to c e d:  entry=1 slot 2 (c) | residual e | exit=0, residual d
 ```
 
 ## How the decoder works
 1. Read flags, indices, value counts and the residual streams.
-2. Keep a position table of every distinct decoded line-part position (the dictionary).
-3. At each part start with a non-empty dictionary read the entry flag: on 1 emit `dictionary[index]`, else
+2. Keep the vertex index of every slot, appended once per completed line part; no position table.
+3. At each part start after the first line part read the entry flag: on 1 emit the vertex of slot `index`, else
    decode the residual. Same at the part's last vertex (exit flag); the last vertex is known from the part
    lengths.
-4. All other vertices: line continuation prediction + residual.
-5. Insert every decoded line vertex into the dictionary. Reversed parts are emitted reversed.
+4. All other vertices: line continuation prediction + residual. Reversed parts are emitted reversed.
 
 ## Results
 **Headline** (gzip per tile vs `DELTA_ZIGZAG_VARINT`, `munich-plantiler`, `transportation`, pipeline,
@@ -85,3 +85,17 @@ Supporting figures:
 - Decode `_SEG` 1,44x–1,47x baseline (after dropping follow state); 1,85x/1,59x in a later run.
 
 Source: `research-java/docs/results/line-shared-vertices.md`, `general-purpose-compression.md`.
+
+## Index: raw slots instead of distinct positions
+Code 12 indexed the earlier parts' distinct positions. The decoder could only resolve that index by keeping a
+position table of every line vertex (a lookup and an insert per vertex), although lines have no follow flag that
+would need one. `LINE_CONTINUATION_SHARED_RAW` (code 28, Rust) indexes the raw slots, as the ring references do
+since codes 26 and 27; the table is gone from the decoder. Everything else is unchanged.
+
+- Size: Munich, per-layer default +0,046% gzip (15.836.613 to 15.843.951 B), tile oracle +0,043% (15.173.753 to
+  15.180.223 B).
+- Decode: the references' overhead over `LINE_CONTINUATION` on `transportation` falls from 17,4 / 16,3 to
+  10,0 / 9,4 ns per vertex (-42%, codec alone, two runs); whole tile 4% (per-layer default) and 3% (tile oracle) less.
+- The headline figures above were measured with the distinct index.
+
+Source: `research-java/docs/results/shared-decode-time.md`.

@@ -43,7 +43,7 @@ B is written as         entry=1, slot 2 (a2) | follow=1 | residual of b2 | corne
 
 ![Ring B shares a wall with the decoded ring A. B starts at a2: an entry flag and an index replace its start, a follow flag replaces b1, and only b2 and b3 carry residuals.](img/shared-ring-wall.svg)
 
-### Lines: a dictionary of earlier positions
+### Lines: the slots of earlier parts
 
 Lines refer to the vertices of the earlier line parts in the buffer (`research-rust/mlt-pipeline/src/refs.rs`,
 `encoder/reference/LineReferences.java`). Junctions are at the ends of parts, so only the ends are checked:
@@ -51,7 +51,7 @@ Lines refer to the vertices of the earlier line parts in the buffer (`research-r
 1. At every part start and every part end, a flag bit; on a hit the index replaces the residual: the vertex's
    slot among the earlier line parts' vertices, in buffer order, in `ceil(log2 slots)` bits. A position that
    several earlier parts hold (a junction) takes the first slot. Rings and points in the buffer take no slot.
-2. A part whose end is in the dictionary and whose start is not is reversed, so the junction comes first.
+2. A part whose end an earlier part holds and whose start does not is reversed, so the junction comes first.
    This is not written, and it is the one place where the pipeline changes line direction.
 
 ```
@@ -59,7 +59,7 @@ part P1   a b c          slots 0 a, 1 b, 2 c
 part P2   d e c          reversed to c e d: entry=1, slot 2 (c) | residual of e | exit=0, residual of d
 ```
 
-![Line part P2 ends at the junction c that P1 already holds. It is reversed to start at c, which is then written as a dictionary index.](img/shared-line-dictionary.svg)
+![Line part P2 ends at the junction c that P1 already holds. It is reversed to start at c, which is then written as the slot of c.](img/shared-line-dictionary.svg)
 
 Rings and points in a line layer keep their plain residuals.
 
@@ -154,7 +154,7 @@ positions repeat in many earlier parts, so the slots outgrow the distinct positi
   `transportation_name`, `waterway` and `boundary`.
 
 Further reading: [shared ring vertices](../encoding/good/shared-ring-vertices.md),
-[line dictionary](../encoding/good/shared-line-vertices.md),
+[shared line vertices](../encoding/good/shared-line-vertices.md),
 [shared vertices](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/shared-vertices.md),
 [shared-reference decode time](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/shared-decode-time.md),
 [line shared vertices](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/line-shared-vertices.md).

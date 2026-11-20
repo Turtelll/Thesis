@@ -22,10 +22,10 @@ corpus, 358 tiles, every layer, gzip level 6, summed over all tiles.
 | stock MLT v2 with its own feature sorting | 18.317.963 | 16.643.440 | -0,85% | -21,08% |
 | stock MLT v2, gzip stream choice | 20.721.218 | 16.083.379 | -4,19% | -23,74% |
 | pipeline, plain delta + escape planes on every layer | 19.810.846 | 16.279.891 | -3,02% | -22,81% |
-| pipeline, per-layer default composition | 19.248.593 | 15.836.613 | -5,66% | -24,91% |
+| pipeline, per-layer default composition | 19.255.816 | 15.843.951 | -5,62% | -24,87% |
 | pipeline, tile oracle without feature reorder | 18.998.820 | 15.384.854 | -8,35% | -27,05% |
 | pipeline, tile oracle | 18.936.228 | 15.319.927 | -8,74% | -27,36% |
-| pipeline, tile oracle, gzip stream choice | 20.553.784 | 15.173.753 | **-9,61%** | **-28,05%** |
+| pipeline, tile oracle, gzip stream choice | 20.559.369 | 15.180.223 | **-9,57%** | **-28,02%** |
 
 The MVT row is the source tileset (`munich-plantiler.mbtiles`, Planetiler), every tile decompressed and gzipped
 again at level 6 with Python's zlib; this reproduces the stored tiles to the byte. Every MLT row is converted from
@@ -36,8 +36,8 @@ The tile oracle with gzip stream choice saves 1,61 MB of 16,79 MB. Four things s
 - The pipeline's tiles are larger before compression and smaller after it. The stages make the bytes
   easy to compress, not small on their own.
 - Choosing the stock encodings by gzip size alone makes stock tiles 4,19% smaller. Against that stock row,
-  which uses the same criterion, the pipeline's own gain is -5,66%. On top of the tile oracle the gzip
-  stream choice adds 0,88 points.
+  which uses the same criterion, the pipeline's own gain is -5,62%. On top of the tile oracle the gzip
+  stream choice adds 0,83 points.
 - Of the 8,74 points with the stock stream choice, 3,02 come from writing the vertices in a gzip-friendly
   form at all. The predictors, frames, references and stream layouts add 5,3 points, the feature reorder 0,4.
 - All 358 tiles of both tile oracles decode, and every feature keeps its shape (the stock gzip stream
@@ -59,8 +59,9 @@ stream choice):
 | landuse | 876.416 | 796.522 | -9,12% |
 | all 16 layers | 17.064.891 | 15.433.214 | -9,56% |
 
-(Per layer and the two tile oracle rows without gzip stream choice above: measured with the earlier entry index
-of the ring references, codes 7 and 25; the window-slot index moves the whole tile by +0,006%.)
+(Per layer and the two tile oracle rows without gzip stream choice above: measured with the earlier index of the
+shared references, codes 7, 25 and 12; the raw slot index of rings and lines, codes 26, 27 and 28, moves the whole
+tile by +0,05%.)
 
 Buildings gain most from corner guesses, wall frames and shared walls, landcover from shared borders, roads
 from continuation and junctions. Point layers have little shape to exploit: `poi` ends 1,14% below stock,
@@ -73,13 +74,14 @@ decompression not timed, single-threaded, per tile the minimum of 10 runs:
 
 | encoder | decode ms | × stock |
 |---|---|---|
-| stock MLT v2 | 116 | 1,00 |
-| pipeline, per-layer default composition | 299 | 2,57 |
-| pipeline, tile oracle, gzip stream choice | 271 | 2,33 |
+| stock MLT v2 | 120 | 1,00 |
+| pipeline, per-layer default composition | 290 | 2,42 |
+| pipeline, tile oracle, gzip stream choice | 262 | 2,19 |
 
 The middle of three runs; the machine was not idle, so the milliseconds move between sessions and only the
-ratios compare (the three runs: 2,57 to 2,60 and 2,33 to 2,35). The ring references' entry index into window
-slots took 7% off the tile oracle's decode time for 865 bytes ([shared references](pipeline/05-shared-references.md)).
+ratios compare (the three runs: 2,42 to 2,52 and 2,18 to 2,25). The index into raw slots instead of distinct
+positions took 7% off the tile oracle's decode time for the ring references (865 bytes) and another 3% for the line
+references (6.470 bytes) ([shared references](pipeline/05-shared-references.md)).
 Measured before that change: by zoom the ratio is lowest at z10 to z12 (1,8 to 2,5 × stock) and highest at z14 (2,6 to 2,9 ×). The tile
 oracle decodes faster than the per-layer default; it writes 34,7% of the layers with plain `DELTA`. What the ring frame
 adds on its own is on the [frames](pipeline/04-frames.md) page. The thesis target is compressed size per
@@ -92,6 +94,40 @@ mlt-oracle decode-time stock.mbtiles default.mbtiles oracle.mbtiles --by-zoom
 
 Full results, by zoom and by layer:
 [mlt-v2-rust-port.md](https://github.com/Turtelll/Thesis/blob/main/research-java/docs/results/mlt-v2-rust-port.md).
+
+## Across cities
+
+The same encoder on four cities: the tile oracle with gzip stream choice (the 42 compositions, codes 26, 27 and 28)
+against stock MLT v2 and the source MVT tiles. Munich is the corpus above (`munich-plantiler`, Planetiler 0.10.2); Tokyo,
+Chicago and São Paulo are 25 km extracts of the same schema. Every tile gzip level 6, summed over the tileset:
+
+| city | tiles | MVT | stock MLT v2 | tile oracle | vs stock v2 | vs MVT | decode × stock v2 |
+|---|---|---|---|---|---|---|---|
+| Munich | 358 | 21.090.045 | 16.854.860 | 15.180.223 | **-9,94%** | **-28,02%** | 2,22 (2,21 to 2,23) |
+| Tokyo | 278 | 51.562.148 | 42.376.064 | 37.164.623 | **-12,30%** | **-27,92%** | 2,20 (2,15 to 2,20) |
+| Chicago | 338 | 24.994.575 | 21.853.388 | 19.322.918 | **-11,58%** | **-22,69%** | 1,84 (1,79 to 1,88) |
+| São Paulo | 214 | 32.326.807 | 27.705.767 | 23.946.072 | **-13,57%** | **-25,93%** | 4,98 (4,60 to 5,06) |
+| all four | 1.188 | 129.973.575 | 108.790.079 | 95.613.836 | **-12,11%** | **-26,44%** | |
+
+- Stock v2 here is `mlt convert --mlt-version 2 --vertex-pipeline off` (16.854.860 B on Munich); the tables above take
+  stock from `mlt-oracle compare` (16.786.524 B). Both are the stock encoder; why they differ by 0,41% was not looked into,
+  so the Munich figures of the two tables do not mix.
+- MVT is the source tileset, every tile decompressed and gzipped again at level 6 (Python's zlib); this reproduces the
+  stored tiles to the byte in all four.
+- The gain against stock is smallest in Munich and largest in São Paulo; against MVT it is smallest in Chicago, where
+  stock MLT already gains least on MVT (-12,57%, against -20,08% in Munich).
+- Decode: whole tiles, parse and decode of every layer, decompression not timed, single-threaded, per tile the minimum
+  of 10 runs; the middle of three runs, the range in brackets. São Paulo is the outlier: its z14 tiles decode at 5,75 ×
+  stock (z12 1,89 ×, z13 1,78 ×); not yet looked into.
+- Every oracle tileset was converted with `--verify`, and `mlt-oracle diff` against the MVT input reports the same
+  tiles, layers and features for all four. Conversion took 5 min (Munich), 17,5 min (Tokyo), 8,3 min (Chicago) and 11 min
+  (São Paulo).
+
+```
+mlt convert ../data/MVT/<city>.mbtiles stock.mbtiles --mlt-version 2 --gzip --vertex-pipeline off
+mlt convert ../data/MVT/<city>.mbtiles oracle.mbtiles --mlt-version 2 --gzip --vertex-pipeline oracle --verify
+mlt-oracle decode-time stock.mbtiles oracle.mbtiles
+```
 
 ## How the encoding builds on itself
 
@@ -142,8 +178,8 @@ per step:
 | + the 28 compositions with a feature reorder | 15.319.927 | -8,74% | -0,42% |
 | + gzip stream choice for the other streams | 15.172.888 | -9,61% | -0,96% |
 
-(The build-up was measured with the earlier entry index of the ring references, codes 7 and 25; with the
-window-slot index, codes 26 and 27, the last row is 15.173.753 B.) The codec's own stages (prediction, frames,
+(The build-up was measured with the earlier index of the shared references, codes 7, 25 and 12; with the raw
+slot index, codes 26, 27 and 28, the last row is 15.180.223 B.) The codec's own stages (prediction, frames,
 references, class streams) are the largest step. The reorder
 shortens the jumps between features, but it permutes the property columns too and often costs more there
 than it saves on the geometry, so the tile oracle uses it on 27,4% of the layers only
